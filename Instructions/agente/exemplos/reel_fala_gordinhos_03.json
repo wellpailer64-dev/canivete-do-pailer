@@ -1,0 +1,233 @@
+{
+ "pasta_card": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/03 - REELS - TROCADOR DE CALOR - VENDA CONSULTIVA",
+ "trabalho": "D:/kanivete_testes/gordinhos/nov11",
+ "saida": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/03 - REELS - TROCADOR DE CALOR - VENDA CONSULTIVA/03 - PROJETO - REELS - TROCADOR DE CALOR - VENDA CONSULTIVA/Trocador de Calor - Venda Consultiva.vknv",
+ "brasao": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/01 - IDENTIDADE VISUAL/PERFIL.png",
+ "musica": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/03 - REELS - TROCADOR DE CALOR - VENDA CONSULTIVA/02 - ASSETS/ES_Late to the Party (Instrumental Version) - Sleepaway Camp.mp3",
+ "cor_tarja": "#0d5c91",
+ "video_base": "a",
+ "fontes": {
+  "a": "20261111_103350",
+  "b": "20261111_103543",
+  "c": "20261111_105601",
+  "br1": "20261111_100138",
+  "br2": "20261111_100920",
+  "br3": "20261111_101159"
+ },
+ "nomes": {
+  "capriche": "Capricho",
+  "capricho": "Capricho",
+  "importes": "Imports",
+  "importe": "Imports",
+  "import": "Imports",
+  "totaltech": "Total Tech"
+ },
+ "versoes": [
+  {
+   "id": "seq_a",
+   "nome": "Reels A - com Capricho",
+   "roteiro": [
+    [
+     "a",
+     "a cliente nem sabia",
+     "trocador de calor"
+    ],
+    [
+     "a",
+     "e após uma",
+     "do arrefecimento"
+    ],
+    [
+     "b",
+     "agora que já",
+     "solução definitiva"
+    ],
+    [
+     "c",
+     "e aqui o kit",
+     "super recomendo"
+    ],
+    [
+     "c",
+     "no caso aqui estamos aplicando",
+     "no seu veículo"
+    ],
+    [
+     "c",
+     "então recomendo a capricho",
+     "link abaixo"
+    ]
+   ],
+   "momento_chave": [
+    "c",
+    "representado pela"
+   ]
+  },
+  {
+   "id": "seq_b",
+   "nome": "Reels B - sem parceria",
+   "roteiro": [
+    [
+     "a",
+     "pessoal quanto é",
+     "para o cliente"
+    ],
+    [
+     "a",
+     "a cliente nem sabia",
+     "trocador de calor"
+    ],
+    [
+     "a",
+     "e após uma",
+     "do arrefecimento"
+    ],
+    [
+     "b",
+     "agora que já",
+     "solução definitiva"
+    ],
+    [
+     "b",
+     "olha por que",
+     "uns dias"
+    ],
+    [
+     "b",
+     "então a venda consultiva",
+     "corretiva"
+    ]
+   ],
+   "momento_chave": [
+    "b",
+    "essa cliente vai perder"
+   ]
+  }
+ ],
+ "apoios": [
+  [
+   "a",
+   "aplicando o upgrade",
+   "br1",
+   9.4,
+   4.2
+  ],
+  [
+   "b",
+   "sistema de arrefecimento",
+   "br1",
+   3.0,
+   3.4
+  ],
+  [
+   "b",
+   "então traga seu carro",
+   "br3",
+   0.3,
+   3.1
+  ]
+ ],
+ "tarjas": [
+  [
+   "Venda consultiva",
+   "a",
+   "pessoal quanto",
+   0
+  ],
+  [
+   "Defeito crônico do trocador",
+   "a",
+   "a cliente nem sabia",
+   0
+  ],
+  [
+   "Upgrade definitivo",
+   "a",
+   "upgrade do trocador",
+   1
+  ],
+  [
+   "Solução definitiva",
+   "b",
+   "solução definitiva",
+   1
+  ],
+  [
+   "Sistema contaminado",
+   "b",
+   "totalmente contaminado",
+   0
+  ],
+  [
+   "Antecipa o problema",
+   "b",
+   "consegue antecipar",
+   0
+  ],
+  [
+   "Aqui não empurramos serviço",
+   "b",
+   "aqui não empurramos",
+   1
+  ],
+  [
+   "Capricho Imports",
+   "c",
+   "representado pela",
+   0
+  ],
+  [
+   "Kit Total Tech completo",
+   "c",
+   "um kit da",
+   1
+  ],
+  [
+   "Link da Capricho abaixo",
+   "c",
+   "aqui no link",
+   1
+  ]
+ ],
+ "zooms": [
+  [
+   "a",
+   "a cliente nem sabia",
+   "trocador de calor",
+   "suave",
+   118
+  ],
+  [
+   "b",
+   "com certeza",
+   "sistema da transmissão",
+   "suave",
+   118
+  ],
+  [
+   "b",
+   "essa cliente vai perder",
+   "uns dias",
+   "empurra",
+   116
+  ],
+  [
+   "c",
+   "representado pela",
+   "imports",
+   "suave",
+   116
+  ],
+  [
+   "c",
+   "então recomendo a capricho",
+   "link abaixo",
+   "empurra",
+   118
+  ]
+ ],
+ "finalizacao": [
+  "br3",
+  12.3
+ ]
+}

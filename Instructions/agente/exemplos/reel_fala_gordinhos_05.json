@@ -1,0 +1,171 @@
+{
+ "pasta_card": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/05 - REELS - CARROS ELETRICOS",
+ "trabalho": "D:/kanivete_testes/gordinhos/nov11",
+ "saida": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/05 - REELS - CARROS ELETRICOS/03 - PROJETO - REELS - CARROS ELETRICOS/Carros Eletricos.vknv",
+ "brasao": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/01 - IDENTIDADE VISUAL/PERFIL.png",
+ "musica": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/05 - REELS - CARROS ELETRICOS/02 - ASSETS/ES_Wide Awake (Instrumental Version) - Fox Drop.mp3",
+ "cor_tarja": "#0d5c91",
+ "video_base": "a",
+ "fontes": {
+  "a": "20261111_105256",
+  "m": "20261111_112134",
+  "v1": "20261111_100047",
+  "v2": "20261111_101224",
+  "v3": "20261111_100009"
+ },
+ "nomes": {},
+ "versoes": [
+  {
+   "id": "seq_a",
+   "nome": "Reels A - Novidade carros eletricos",
+   "roteiro": [
+    [
+     "a",
+     "temos novidades",
+     "vocês aqui"
+    ]
+   ],
+   "momento_chave": [
+    "a",
+    "nós temos a solução"
+   ]
+  },
+  {
+   "id": "seq_b",
+   "nome": "Reels B - Mito ou verdade ar condicionado",
+   "roteiro": [
+    [
+     "m",
+     "então está fazendo",
+     "a bateria"
+    ],
+    [
+     "m",
+     "é verdade",
+     "alta tensão"
+    ],
+    [
+     "m",
+     "olha a dica",
+     "do seu carro"
+    ],
+    [
+     "m",
+     "fica atento",
+     "mais pessoal"
+    ]
+   ],
+   "momento_chave": [
+    "m",
+    "é verdade"
+   ]
+  }
+ ],
+ "apoios": [
+  [
+   "a",
+   "equipe totalmente treinada",
+   "v1",
+   17.0,
+   3.6
+  ],
+  [
+   "m",
+   "refrigerar a bateria",
+   "v1",
+   13.6,
+   3.6
+  ],
+  [
+   "m",
+   "principalmente carros elétricos",
+   "v2",
+   0.8,
+   2.4
+  ]
+ ],
+ "tarjas": [
+  [
+   "Novidade na oficina",
+   "a",
+   "temos novidades",
+   0
+  ],
+  [
+   "Carros elétricos",
+   "a",
+   "você que tem",
+   1
+  ],
+  [
+   "Equipe treinada",
+   "a",
+   "temos uma equipe",
+   0
+  ],
+  [
+   "Mito ou verdade?",
+   "m",
+   "mito ou verdade",
+   1
+  ],
+  [
+   "Ar-condicionado",
+   "m",
+   "se tiver algum",
+   0
+  ],
+  [
+   "Bateria de alta tensão",
+   "m",
+   "refrigerar a bateria",
+   0
+  ],
+  [
+   "Dica importante",
+   "m",
+   "olha a dica",
+   1
+  ],
+  [
+   "Mais dicas no Instagram",
+   "m",
+   "fica atento",
+   1
+  ]
+ ],
+ "zooms": [
+  [
+   "a",
+   "temos novidades",
+   "gordinhos",
+   "suave",
+   118
+  ],
+  [
+   "a",
+   "nós temos a solução",
+   "aqui",
+   "suave",
+   118
+  ],
+  [
+   "m",
+   "mito ou verdade",
+   "carro elétrico",
+   "empurra",
+   116
+  ],
+  [
+   "m",
+   "qualquer problema",
+   "do seu carro",
+   "empurra",
+   116
+  ]
+ ],
+ "finalizacao": [
+  "v1",
+  4.5
+ ]
+}

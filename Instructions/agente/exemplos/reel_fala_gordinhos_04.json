@@ -1,0 +1,139 @@
+{
+ "pasta_card": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/04 - REELS - BASTIDORES MONTAGEM DE MOTOR HB20",
+ "trabalho": "D:/kanivete_testes/gordinhos/nov11",
+ "saida": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/04 - REELS - BASTIDORES MONTAGEM DE MOTOR HB20/03 - PROJETO - REELS - BASTIDORES MONTAGEM DE MOTOR HB20/Bastidores Motor HB20.vknv",
+ "brasao": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/01 - IDENTIDADE VISUAL/PERFIL.png",
+ "musica": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/04 - REELS - BASTIDORES MONTAGEM DE MOTOR HB20/02 - ASSETS/ES_Scootaloo - Jobii.mp3",
+ "cor_tarja": "#0d5c91",
+ "video_base": "m",
+ "fontes": {
+  "m": "20261111_095634",
+  "b1": "20261111_095837",
+  "b2": "20261111_095904"
+ },
+ "nomes": {},
+ "versoes": [
+  {
+   "id": "seq_a",
+   "nome": "Reels - Bastidores motor HB20",
+   "roteiro": [
+    [
+     "m",
+     "olá pessoal",
+     "dia abençoado"
+    ],
+    [
+     "m",
+     "estamos aqui no laboratório",
+     "hb20"
+    ],
+    [
+     "m",
+     "o espaço aqui",
+     "somente com o motor"
+    ],
+    [
+     "m",
+     "aqui é o nosso padrão",
+     "gordinhos"
+    ],
+    [
+     "m",
+     "então você tá",
+     "fazer esse trabalho"
+    ],
+    [
+     "m",
+     "até mais galera",
+     "galera"
+    ]
+   ],
+   "momento_chave": [
+    "m",
+    "aqui é o nosso padrão"
+   ]
+  }
+ ],
+ "apoios": [
+  [
+   "m",
+   "o técnico fica",
+   "b2",
+   0.8,
+   3.6
+  ],
+  [
+   "m",
+   "padrão de montagem",
+   "b1",
+   9.0,
+   4.0
+  ],
+  [
+   "m",
+   "usamos aqui laboratório",
+   "b1",
+   1.2,
+   3.4
+  ]
+ ],
+ "tarjas": [
+  [
+   "Bastidores da oficina",
+   "m",
+   "olá pessoal",
+   0
+  ],
+  [
+   "Motor 1.0 3 cilindros HB20",
+   "m",
+   "montagem de um motor",
+   1
+  ],
+  [
+   "Laboratório isolado",
+   "m",
+   "o espaço aqui",
+   0
+  ],
+  [
+   "Padrão Bosch Car Service",
+   "m",
+   "aqui é o nosso padrão",
+   1
+  ],
+  [
+   "Motor e transmissão automática",
+   "m",
+   "até na transmissão",
+   0
+  ]
+ ],
+ "zooms": [
+  [
+   "m",
+   "estamos aqui no laboratório",
+   "hb20",
+   "suave",
+   118
+  ],
+  [
+   "m",
+   "aqui na bosch",
+   "gordinhos",
+   "empurra",
+   116
+  ],
+  [
+   "m",
+   "então você tá",
+   "no motor do seu carro",
+   "suave",
+   116
+  ]
+ ],
+ "finalizacao": [
+  "b2",
+  7.3
+ ]
+}

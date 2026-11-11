@@ -21,5 +21,8 @@ Projeto modelo: card `11 - NOVEMBRO/01 - REELS - UPGRADE DO TROCADOR DE CALOR`. 
 ## Não usar
 `01 - ASSETS/Base de texto gordinhos.mogrt`: no Kanivete 1.2.441 sai fundo preto opaco, sem a pílula (11 avisos na importação). Use a tarja nativa acima.
 
+## Montagens de 11/11 (cards 03, 04, 05)
+Roteiros de exemplo em `exemplos/reel_fala_gordinhos_03|04|05.json`: duas versões num projeto só (`versoes`), `momento_chave` por versão, nomes corrigidos no cache `tx/` do trabalho (Bosch Car Service Gordinhos). Proxy corrompido na primeira abertura: apagar a pasta `m_*` da mídia em `D:Canivete Media CacheProjeto - X` e reabrir.
+
 ## Parceiros
 Merchandising Total Tech / Capricho Imports: fazer versão com e versão sem quando ele pedir. Na versão sem, conferir falas e imagens.

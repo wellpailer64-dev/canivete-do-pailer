@@ -292,6 +292,7 @@ def versao(v):
         tl = quando(k, frase)
         if tl is None:
             continue
+        tl = next((st for _, _, _, _, _, st in mapa if st < tl <= st + 0.2), tl)   # o corte abre 0,08 s antes da palavra: sem pisca de rosto antes do apoio
         fc = fim_do_corte(tl + d)
         d = min(fc - tl if fc - (tl + d) < 1.5 else d, 4.2)
         clips.append({"tr": 1, "x": "v", "st": tl, "s": s, "e": round(s + d, 3), "m": MID[fonte], "p": dict(PADRAO)})
@@ -414,9 +415,10 @@ def versao(v):
     som("whoosh", fim_fala - meio, GANHO["whoosh_fim"])
     som("impacto", fim_fala + 0.05, GANHO["impacto_fim"])
     chave_ = None
-    if CFG.get("momento_chave"):
-        chave_ = quando(*CFG["momento_chave"])
-        som("impacto", chave_, GANHO["impacto"])
+    if v.get("momento_chave", CFG.get("momento_chave")):    # por versão, se ela tiver o seu; frase que a versão não usa: sem impacto
+        chave_ = quando(*v.get("momento_chave", CFG.get("momento_chave")))
+        if chave_ is not None:
+            som("impacto", chave_, GANHO["impacto"])
     seq = {"id": v["id"], "name": v["nome"], "clips": clips, "trilhas": {"v": [{} for _ in range(8)], "a": [{}, {}, {}]}, "texto": {"palavras": []}, "legendas": legs,
            "inPt": None, "outPt": None, "markers": [], "guias": [], "playhead": 0, "view": {"pps": 12, "x": 0}, "w": W, "h": H, "legEstilo": LEG}
     print(f"{v['nome']}: fala {fim_fala:.1f} s, total {fim:.1f} s, {sum(1 for c in clips if c['tr'] == 0)} cortes, {len(legs)} legendas")
