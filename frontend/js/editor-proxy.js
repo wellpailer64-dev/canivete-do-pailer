@@ -23,6 +23,9 @@ function veProxyQuadro(c, src, t) {
     const k = Math.max(0, Math.round(veSrcAt(c, t) * fps));
     const chave = m.path + '|' + k;
     const q = VEPROXY.quadros.get(chave);
+    // vídeo com transparência: quadro em JPEG (Python antigo, sem o PNG com alfa) pintaria o fundo de PRETO
+    // — fica a prévia, que tem alfa
+    if (q && veTemAlfa(c) && /\.jpe?g(\?|$)/i.test(q.src)) return src;
     if (q && q.complete && q.naturalWidth) return q;
     if (!q) veProxyPedir(chave, m.path, k / fps);
     return src;   // enquanto o original não chega, a prévia
