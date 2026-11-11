@@ -79,8 +79,128 @@ function ieCrAtmosfera(c) {
     ord.forEach(i => { A[0] += d[i * 4]; A[1] += d[i * 4 + 1]; A[2] += d[i * 4 + 2]; });
     return A.map(x => Math.max(64, x / ord.length));
 }
+// Camera Raw na placa de vídeo (WebGL2): LUT 3D + soma final (Claridade, Textura, Nitidez, Névoa, Vinheta, Grão) num só
+// passo. 4000x3000: LUT ~415 ms → ~40 ms; com todos os efeitos, 900 → ~90 ms (medido em 2026-11-11). Os mapas pesados
+// (desfoques etc.) continuam no JS e sobem como textura UMA vez (ficam na placa enquanto o cache não muda).
+// Precisão float32: ~3% dos bytes saem ±1 nível em relação ao JS. Qualquer falha cai no JS (ieCrLut3dJs + laço de soma).
+const IE_CR_GL = { ctx: null, falhou: false, lutRef: null };
+const IE_CR_GL_MAPAS = ['dClar', 'dTex', 'dNit', 'tNev', 'vinh', 'grao'];
+function ieCrGlIniciar() {
+    const G = IE_CR_GL, cv = document.createElement('canvas');
+    cv.width = cv.height = 1;
+    const gl = cv.getContext('webgl2', { antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true, alpha: true });
+    if (!gl) throw new Error('sem WebGL2');
+    const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+    const pr = gl.createProgram();
+    gl.attachShader(pr, sh(gl.VERTEX_SHADER, `#version 300 es
+in vec2 p; void main(){ gl_Position=vec4(p,0,1); }`));
+    gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, `#version 300 es
+precision highp float; precision highp sampler3D; precision highp sampler2D;
+uniform sampler2D img, tC, tT, tNi, tNe, tV, tG; uniform sampler3D lut;
+uniform float n1, kC, kT, kN, aN, aV, aG; uniform vec3 Ar; uniform bool uLut, uC, uT, uNi, uNe, uV, uG;
+out vec4 o;
+vec3 L(ivec3 c){return texelFetch(lut,c,0).rgb;}
+void main(){
+ ivec2 p=ivec2(gl_FragCoord.xy); vec4 s=texelFetch(img,p,0);
+ if(s.a==0.){o=s;return;}
+ vec3 c=floor(s.rgb*255.+0.5);
+ if(uLut){
+  vec3 f=s.rgb*n1; ivec3 b=ivec3(min(floor(f),vec3(n1-1.))); vec3 t=f-vec3(b);
+  vec3 c00=mix(L(b),L(b+ivec3(1,0,0)),t.x), c10=mix(L(b+ivec3(0,1,0)),L(b+ivec3(1,1,0)),t.x), c01=mix(L(b+ivec3(0,0,1)),L(b+ivec3(1,0,1)),t.x), c11=mix(L(b+ivec3(0,1,1)),L(b+ivec3(1,1,1)),t.x);
+  c=floor(clamp(mix(mix(c00,c10,t.y),mix(c01,c11,t.y),t.z)*255.+0.5,0.,255.)+0.5);
+ }
+ float dl=0.;
+ if(uC) dl+=texelFetch(tC,p,0).r*kC;
+ if(uT) dl+=texelFetch(tT,p,0).r*kT;
+ if(uNi) dl+=texelFetch(tNi,p,0).r*kN;
+ if(dl!=0.) c+=dl;
+ if(uNe){ float tt=texelFetch(tNe,p,0).r; c+=((c-Ar)/tt+Ar-c)*aN; }
+ else if(aN<0.) c+=(Ar-c)*(-aN)*0.55;
+ if(uV){ float t=texelFetch(tV,p,0).r*aV; if(aV<0.) c*=1.+t; else c+=(255.-c)*t; }
+ if(uG){ float y=clamp(dot(c,vec3(.299,.587,.114))/255.,0.,1.); c+=texelFetch(tG,p,0).r*aG*(0.35+2.6*y*(1.-y)); }
+ o=vec4(clamp(c,0.,255.)/255.,s.a);
+}`));
+    gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+    gl.useProgram(pr);
+    const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const tex2 = un => {
+        const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + un); gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        return t;
+    };
+    const U = n => gl.getUniformLocation(pr, n), un = {};
+    ['img', 'lut', 'tC', 'tT', 'tNi', 'tNe', 'tV', 'tG'].forEach((n, i) => gl.uniform1i(U(n), i));
+    ['n1', 'kC', 'kT', 'kN', 'aN', 'aV', 'aG', 'Ar', 'uLut', 'uC', 'uT', 'uNi', 'uNe', 'uV', 'uG'].forEach(n => un[n] = U(n));
+    const img = tex2(0), t3 = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_3D, t3);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    // um mapa por unidade (2..7); sem mapa fica uma textura 1x1 (o shader nem lê, mas a unidade precisa ser válida)
+    const mapas = {};
+    IE_CR_GL_MAPAS.forEach((nome, i) => {
+        const t = tex2(2 + i);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 1, 1, 0, gl.RED, gl.FLOAT, new Float32Array(1));
+        mapas[nome] = { un: 2 + i, t, ref: null, w: 0, h: 0 };
+    });
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1); gl.pixelStorei(gl.PACK_ALIGNMENT, 1);
+    G.ctx = { cv, gl, un, img, mapas, max: Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_VIEWPORT_DIMS)[0]) };
+    cv.addEventListener('webglcontextlost', ev => { ev.preventDefault(); G.ctx = null; G.lutRef = null; });
+}
+// d: RGBA no lugar; L = { lut, N } ou null (cor neutra); P = mapas e fatores da soma final. Devolve false se não deu (o chamador usa o JS).
+function ieCrFinalGl(d, w, h, L, P) {
+    const G = IE_CR_GL;
+    if (G.falhou || !w || !h || w * h < 250000) return false;
+    const temMapa = IE_CR_GL_MAPAS.some(k => P[k]);
+    if (!L && !temMapa && !P.aN) return true;   // nada a fazer
+    if (IE_CR_GL_MAPAS.some(k => P[k] && !(P[k] instanceof Float32Array && P[k].length === w * h))) return false;
+    try {
+        if (!G.ctx) ieCrGlIniciar();
+        const { cv, gl, un, img, mapas, max } = G.ctx;
+        if (w > max || h > max) return false;
+        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+        if (L && G.lutRef !== L.lut) {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB32F, L.N, L.N, L.N, 0, gl.RGB, gl.FLOAT, L.lut);
+            G.lutRef = L.lut;
+        }
+        for (const k of IE_CR_GL_MAPAS) {
+            const m = mapas[k], a = P[k] || null;
+            if (a) {
+                if (m.ref !== a || m.w !== w || m.h !== h) {
+                    gl.activeTexture(gl.TEXTURE0 + m.un); gl.bindTexture(gl.TEXTURE_2D, m.t);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, w, h, 0, gl.RED, gl.FLOAT, a);
+                    m.ref = a; m.w = w; m.h = h;
+                }
+            } else if (m.ref) {   // libera a memória da placa do mapa que saiu
+                gl.activeTexture(gl.TEXTURE0 + m.un); gl.bindTexture(gl.TEXTURE_2D, m.t);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 1, 1, 0, gl.RED, gl.FLOAT, new Float32Array(1));
+                m.ref = null; m.w = m.h = 0;
+            }
+        }
+        const Ar = P.Ar || [235, 235, 235];
+        gl.uniform1f(un.n1, L ? L.N - 1 : 1); gl.uniform1i(un.uLut, L ? 1 : 0);
+        gl.uniform1f(un.kC, P.kC || 0); gl.uniform1f(un.kT, P.kT || 0); gl.uniform1f(un.kN, P.kN || 0);
+        gl.uniform1f(un.aN, P.aN || 0); gl.uniform1f(un.aV, P.aV || 0); gl.uniform1f(un.aG, P.aG || 0);
+        gl.uniform3f(un.Ar, Ar[0], Ar[1], Ar[2]);
+        gl.uniform1i(un.uC, P.dClar ? 1 : 0); gl.uniform1i(un.uT, P.dTex ? 1 : 0); gl.uniform1i(un.uNi, P.dNit ? 1 : 0);
+        gl.uniform1i(un.uNe, P.tNev ? 1 : 0); gl.uniform1i(un.uV, P.vinh ? 1 : 0); gl.uniform1i(un.uG, P.grao ? 1 : 0);
+        gl.viewport(0, 0, w, h);
+        const u8 = new Uint8Array(d.buffer, d.byteOffset, w * h * 4);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, img);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, u8);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) { G.lutRef = null; IE_CR_GL_MAPAS.forEach(k => mapas[k].ref = null); return false; }
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, u8);
+        return true;
+    } catch (e) { G.falhou = true; console.warn('Camera Raw: WebGL2 indisponível, usando JS —', e && e.message); return false; }
+}
+function ieCrLut3d(d, lut, N, w = 0, h = 0) {
+    if (!(w && h && ieCrFinalGl(d, w, h, { lut, N }, {}))) ieCrLut3dJs(d, lut, N);
+}
 // LUT 3D trilinear sem funções por pixel (é o passo que roda a cada movimento de barra)
-function ieCrLut3d(d, lut, N) {
+function ieCrLut3dJs(d, lut, N) {
     const n1 = N - 1, s = n1 / 255, N2 = N * N;
     for (let i = 0; i < d.length; i += 4) {
         if (!d[i + 3]) continue;
@@ -190,8 +310,10 @@ function ieCrDados(d, w, h, v, e = 1, ox = 0, oy = 0, tw = w, th = h, A = null, 
     // daqui para baixo é barato: cor, somas e misturas
     if (base) d.set(base);
     const L = ieCrLut(v);
-    if (L) ieCrLut3d(d, L.lut, L.N);
     const kC = v.clar / 100 * 1.2, kT = v.tex / 100 * 0.9, kN = v.nitQ / 100 * 1.4, aN = v.nevoa / 100, aV = v.vig / 100, aG = v.grao / 100 * 38;
+    // placa de vídeo: LUT + soma num passo só; se não der, o JS faz como sempre
+    if (ieCrFinalGl(d, w, h, L, { dClar, dTex, dNit, tNev, vinh, grao, kC, kT, kN, aN, aV, aG, Ar })) return;
+    if (L) ieCrLut3d(d, L.lut, L.N, w, h);
     for (let i = 0, o = 0; i < n; i++, o += 4) {
         if (!d[o + 3]) continue;
         let r = d[o], g = d[o + 1], b = d[o + 2];

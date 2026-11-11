@@ -54,6 +54,10 @@ function ieFGuiado(I, w, h, r, eps) {
 }
 // mediana (histograma corrido, Huang) num canal 0..255
 function ieFMediana(a, w, h, r) {
+    if (typeof ieWasmMediana === 'function') { const q = ieWasmMediana(a, w, h, r); if (q) return q; }
+    return ieFMedianaJs(a, w, h, r);
+}
+function ieFMedianaJs(a, w, h, r) {
     const o = new Float32Array(w * h), meio = ((2 * r + 1) ** 2 - 1) / 2;
     const v = (x, y) => a[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))] | 0;
     for (let y = 0; y < h; y++) {
@@ -75,7 +79,11 @@ function ieFMediana(a, w, h, r) {
     }
     return o;
 }
-function ieFMinMax(a, w, h, r, max) {   // separável
+function ieFMinMax(a, w, h, r, max) {
+    if (typeof ieWasmMinMax === 'function') { const q = ieWasmMinMax(a, w, h, r, max); if (q) return q; }
+    return ieFMinMaxJs(a, w, h, r, max);
+}
+function ieFMinMaxJs(a, w, h, r, max) {   // separável
     const t = new Float32Array(w * h), o = new Float32Array(w * h), f = max ? Math.max : Math.min;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let m = a[y * w + x]; for (let d = -r; d <= r; d++) m = f(m, a[y * w + Math.min(w - 1, Math.max(0, x + d))]); t[y * w + x] = m; }
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let m = t[y * w + x]; for (let d = -r; d <= r; d++) m = f(m, t[Math.min(h - 1, Math.max(0, y + d)) * w + x]); o[y * w + x] = m; }

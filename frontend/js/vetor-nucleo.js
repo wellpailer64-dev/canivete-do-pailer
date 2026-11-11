@@ -522,7 +522,22 @@ function vkObjEm(x, y, direto = false) {   // de cima para baixo; Seleção devo
 }
 
 // ─────────────────────────── histórico e comandos ───────────────────────────
-function vkSnap() { return JSON.stringify({ doc: VK.doc, sel: VK.sel }, (k, v) => (k[0] === '_' ? undefined : v)); }
+// Instantâneo do desfazer. Caminho rápido: stringify sem função de filtro (4x mais rápido); só se aparecer chave "_x"
+// (cache interno) ou referência circular cai no caminho lento que as remove.
+const VK_RE_UNDER = /"_[^"]*":/;
+function vkSnap() {
+    const o = { doc: VK.doc, sel: VK.sel };
+    try { const s = JSON.stringify(o); if (!VK_RE_UNDER.test(s)) return s; } catch (e) { /* circular: caminho lento */ }
+    return JSON.stringify(o, (k, v) => (k[0] === '_' ? undefined : v));
+}
+// Lote: vários comandos com UM só ponto de desfazer (1 cópia do documento em vez de 1 por comando; criar 5000 formas
+// deixa de ser quadrático). VKN.lote('nome', async () => { await VKN.cmd(...); ... })
+async function vkLote(nome, fn) {
+    if (VK._lote) return fn();
+    const antes = vkSnap(); VK._lote = true;
+    try { return await fn(); }
+    finally { VK._lote = false; VK._antes = antes; if (VK.doc) { vkHistorico(nome || 'lote'); vkMudou(); } else VK._antes = null; }
+}
 function vkHistorico(nome) {
     VK.hist.push({ nome, s: VK._antes || vkSnap() }); VK._antes = null;
     if (VK.hist.length > 100) VK.hist.shift();
@@ -543,6 +558,12 @@ async function vkCmd(nome, args = {}, origem = 'ui') {
     if (!c) throw new Error(`comando "${nome}" não existe; há: ${Object.keys(VK_CMDS).join(', ')}`);
     if (!VK.doc && !['novo', 'abrir', 'ajuda', 'recuperacao', 'bibliotecas_cor', 'fonte_modelo'].includes(nome)) throw new Error('nenhum documento aberto: use novo ou abrir');
     if (c.leitura) return await c.fn(args || {});
+    if (VK._lote) {   // dentro de vkLote: sem cópia por comando
+        const r = await c.fn(args || {});
+        VK.log.push({ t: Date.now(), origem, nome, args: JSON.stringify(args).slice(0, 300) });
+        if (VK.log.length > 300) VK.log.shift();
+        return r;
+    }
     VK._antes = VK.doc ? vkSnap() : null;
     try {
         const r = await c.fn(args || {});

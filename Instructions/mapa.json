@@ -221,6 +221,7 @@
     "af_analisar",
     "af_recomendar",
     "af_planejar",
+    "af_recorte_sujeito",
     "af_escolher",
     "afm_config",
     "afm_config_salvar",
@@ -2787,6 +2788,12 @@
    "args": "musica, paths, modelo, dur_alvo=None, ordem=\"inteligente\", semente=0, inicio_modo=\"inicio\", manual=None, telas=True, cobrir=None, reserva=None",
    "modulos": []
   },
+  "af_recorte_sujeito": {
+   "args": "path, t=0.0, eh_video=True",
+   "modulos": [
+    "autoframe as af"
+   ]
+  },
   "af_escolher": {
    "args": "tipo",
    "modulos": []
@@ -3440,6 +3447,7 @@
   "Instructions/agente/plano-identidade-pocket.md": "Plano — Identidade visual \"pocket\" (teste da missão, iniciado 2026-10-15)",
   "Instructions/agente/plano-kanivete-encoder.md": "Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)",
   "Instructions/agente/plano-motion.md": "Motion no Editor Kanivete (recursos do After Effects)",
+  "Instructions/agente/plano-rust.md": "Plano Rust: acelerar o KANIVETE por gargalos (pedido do Pailer, 2026-11-10)",
   "Instructions/agente/plano-slider-kanivete.md": "Plano — Slider Kanivete (Sd, verde-água) — pedido do Pailer em 2026-10-16 (missão da madrugada) — FEITO (v1)",
   "Instructions/agente/plugins.md": "Plugins no KANIVETE",
   "Instructions/agente/ponte-premiere.md": "Ponte Kanivete ↔ Premiere Pro (plugin UXP \"Kanivete Ponte\")",

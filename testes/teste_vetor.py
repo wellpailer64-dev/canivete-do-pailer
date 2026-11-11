@@ -648,6 +648,13 @@ with sync_playwright() as p:
     svg = os.path.join(SAI, "efeitos.svg"); C("exportar_svg", {"caminho": svg}); sv = open(svg, encoding="utf-8").read()
     ok("<filter" in sv and "feOffset" in sv and sv.count("stroke=") >= 2, "SVG com sombra em <filter> e contornos da Aparência")
 
+    # lote: 300 formas num só ponto de desfazer e sem cópia do documento por comando (antes: 1000 formas = 17 s, 5000 = 205 s)
+    r_ = pg.evaluate("""async () => { const n0 = VK.hist.length, t = performance.now();
+        await VKN.lote('lote teste', async () => { for (let i = 0; i < 300; i++) await VKN.cmd('retangulo', {x: i % 50, y: Math.floor(i / 50), larg: 0.8, alt: 0.8, preench: '100K', traco: 'nenhum'}); });
+        const ms = performance.now() - t, h = VK.hist.length - n0, nobj = VK.doc.camadas.flatMap(c => c.itens).length;
+        await vkDesfazer(); return {ms, h, nobj, depois: VK.doc.camadas.flatMap(c => c.itens).length}; }""")
+    ok(r_["h"] == 1 and r_["ms"] < 3000 and r_["depois"] == r_["nobj"] - 300, f"lote: 1 ponto de desfazer, rápido e desfaz tudo ({r_})")
+
     pg.evaluate("c => VKN.abrir(c)", aknv)
     pg.wait_for_timeout(600)
     pg.locator("#vk").screenshot(path=a.print)

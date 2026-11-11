@@ -436,6 +436,7 @@ window.VKN = {
         const r = await vkCmd(nome, args, origem);
         return curto && !(VK_CMDS[nome] && VK_CMDS[nome].leitura) ? vkCurto(r) : r;
     },
+    lote: (nome, fn) => vkLote(nome, fn),
     comandos: () => Object.fromEntries(Object.entries(VK_CMDS).map(([k, v]) => [k, v.desc])),
     mapa: a => vkMapa(a || {}),
     fechamento: o => vkFechamento(o || {}),
