@@ -121,3 +121,9 @@ Regra que a medição confirmou: onde havia conta repetida por pixel, consertar 
 - **Estabilizador** (`Functions/estabilizador.py`, 1080p): analisar 1,1 s para 4 s de vídeo (0,27x), tudo em `cv2` (goodFeaturesToTrack 0,46 s, fluxo óptico 0,26 s). O caminho usa HiGHS (scipy); a 1ª chamada paga 2,3 s só importando scipy. Nada em Python puro.
 - **Já cobertos:** rastreador, respiros e picos usam cv2/numpy/ffmpeg; exportação de motion/zoomsete é ffmpeg.
 - **Conclusão:** o Editor não tem laço pesado em JS/Python. Rust não compensa lá.
+
+## Exportação de motion: onde vão os segundos (2026-11-11) — sem candidato
+- **Motion (4 s, 1080x1920):** ~8 s no total com o app já quente: ~5,2 s de preparação no navegador (desenhar as camadas quadro a quadro: ~2,5 s só em `toDataURL` PNG, resto espera do Python) e ~2,7 s de ffmpeg. Os 18,8 s medidos antes eram a primeira exportação do app recém-aberto (cache frio).
+- **Zoomsete:** a preparação é ~0; os 40 s são do ffmpeg/shader do zoom com desfoque de movimento (já é o caminho mais barato; na CPU não saía em 44 min).
+- **`ieFBox`:** já é soma corrida O(n), separável; Rust daria pouco. Não vale.
+- **Diagnóstico novo:** `CANIVETE_FFTEMPO=<arquivo>` grava quanto cada chamada de ffmpeg/ffprobe levou em `video_cutter.py` (inerte sem a variável).

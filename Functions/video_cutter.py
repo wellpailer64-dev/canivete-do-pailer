@@ -29,6 +29,49 @@ from concurrent.futures import ThreadPoolExecutor
 from Functions.audio_cutter import ffmpeg_path, ffprobe_path, _creationflags
 from Functions import media_server
 
+# Diagnóstico opcional: CANIVETE_FFTEMPO=<arquivo> grava quanto cada chamada de ffmpeg/ffprobe levou (nada muda sem a variável)
+if os.environ.get("CANIVETE_FFTEMPO"):
+    class _SubTempo:
+        def __init__(self, real):
+            self._r = real
+            self._arq = os.environ["CANIVETE_FFTEMPO"]
+
+        def _log(self, cmd, t0):
+            try:
+                c = cmd if isinstance(cmd, (list, tuple)) else [str(cmd)]
+                nome = os.path.basename(str(c[0]))
+                filtro = next((str(c[i + 1])[:160] for i, a in enumerate(c[:-1]) if a in ("-filter_complex", "-vf", "-lavfi")), "")
+                with open(self._arq, "a", encoding="utf-8") as f:
+                    f.write(f"{time.time() - t0:8.2f}s {nome} {filtro}\n")
+            except Exception:
+                pass
+
+        def run(self, cmd, *a, **k):
+            t0 = time.time()
+            try:
+                return self._r.run(cmd, *a, **k)
+            finally:
+                self._log(cmd, t0)
+
+        def Popen(self, cmd, *a, **k):
+            t0 = time.time()
+            p = self._r.Popen(cmd, *a, **k)
+            orig = p.communicate
+
+            def comm(*aa, **kk):
+                try:
+                    return orig(*aa, **kk)
+                finally:
+                    self._log(cmd, t0)
+            p.communicate = comm
+            return p
+
+        def __getattr__(self, n):
+            return getattr(self._r, n)
+
+    subprocess = _SubTempo(subprocess)
+
+
 
 def _hw_cpus():
     """Processadores lógicos pelo núcleo de hardware (Functions/hardware.py; no teste, o PC simulado)."""
