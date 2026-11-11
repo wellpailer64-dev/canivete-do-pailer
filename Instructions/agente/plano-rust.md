@@ -85,3 +85,8 @@ Saída idêntica ao JS atual (dif 0) em todos os casos.
 | Mediana | 5 | 1,9 s | 1,2 s | **0,47 s** |
 | Mediana | 10 | 3,4 s | 2,0 s | **0,84 s** |
 Conclusão: Máximo/Mínimo vale Rust (tempo vira constante, ~45x no raio 10); Mediana ganha 2,5–4x. **Integrado (2026-11-11, ok do Pailer):** `frontend/js/imagem-wasm.js` carrega o módulo (base64, ~35 KB, instancia em segundo plano) e `ieFMinMax`/`ieFMediana` em `imagem-filtros.js` chamam o Rust; se o módulo não carregou, deu erro ou a imagem é minúscula, caem em `ieFMinMaxJs`/`ieFMedianaJs` (o código antigo). Galeria e Faceta também ganham (usam `ieFMediana`). Fonte do Rust em `rust/kanivete_wasm/` (compilar: `cargo build --release --target wasm32-unknown-unknown`, toolchain no D; depois regerar o base64 em `imagem-wasm.js`; não entra no `build.bat`). Conferido no app de teste: dif 0 contra o JS (`bench/wasm_integrado.py`); 1000x700: Máx/Mín raio 10 248 ms → 7 ms.
+
+## Fechamento (2026-11-11)
+- **Camera Raw na GPU** (WebGL2, queda para JS) e **Máximo/Mínimo/Mediana em Rust/WASM** (`frontend/js/imagem-wasm.js`, fonte em `rust/kanivete_wasm`, módulo embutido em base64; recompilar com `cargo build --release --target wasm32-unknown-unknown`): saída idêntica ao JS (dif 0), `teste_filtros` 63/63 e `teste_vetor` ok. Commits `c63229b` e `6f4e443`, já na main.
+- Erro `Cannot set properties of null (setting 'hidden')` resolvido: `vkUiAtualizar` rodava com `#vk` ainda vazio (comando de API antes de montar o Vetor); agora sai cedo.
+- Próximos candidatos medidos: filtros pesados em 4000x3000 (Galeria 18 s, Nuvens 10,6 s, Óleo/Ondulação/Redução de ruído ~9 s), efeitos de camada (Chanfro, Traço), importar PDF grande (9 s, Python). Vídeo ainda não medido.
