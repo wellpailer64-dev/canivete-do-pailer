@@ -132,7 +132,7 @@ function vkMenus() {
 
 // ─────────────────────────── atualização da interface ───────────────────────────
 function vkUiAtualizar() {
-    if (!vkEl('vk')) return;
+    if (!vkEl('vk') || !vkEl('vk-inicio')) return;   // #vk existe vazio até o Vetor ser montado (comando de API antes de abrir a aba)
     vkEl('vk-inicio').hidden = !!VK.doc;
     vkEl('vk-ferr').querySelectorAll('[data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === VK.ferr));
     vkEl('vk-abas')?.querySelectorAll('[data-a]').forEach(b => b.classList.toggle('on', b.dataset.a === (VK.aba || 'camadas')));
