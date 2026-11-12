@@ -30,7 +30,7 @@ LEG = {"fonte": "SF Pro Display", "tam": 3.5, "cor": "#ffffff", "fundo": "sombra
        "sCor": "#000000", "sOp": 100, "sDist": 5, "sBlur": 6, "entrada": "nenhum", "px": 0, "py": 13, "cLarg": 0, "dOn": True, "dCor": "#e0162b", "dTxt": "#ffffff",
        "dOp": 100, "dRaio": 30, "dPad": 12, "caixaOp": 0}
 CONEC = {"um", "uma", "a", "o", "as", "os", "de", "do", "da", "que", "e", "no", "na", "em", "com", "para", "pra", "se", "já"}
-JUNTAS = [(("trinta", "e", "oito"), "38"), (("um", "ponto", "três"), "1.3"), (("um", "ponto", "oito"), "1.8"), (("dez", "por", "cento"), "10%"), (("up", "grade"), "upgrade")]
+JUNTAS = [(("trinta", "e", "oito"), "38"), (("um", "ponto", "três"), "1.3"), (("um", "ponto", "oito"), "1.8"), (("dez", "por", "cento"), "10%"), (("cem", "por", "cento"), "100%"), (("noventa", "por", "cento"), "90%"), (("up", "grade"), "upgrade")]
 # a fonte instalada só para o usuário fica fora de C:/Windows/Fonts; sem achar, a largura da tarja vira chute e o brasão cobre letra
 FONTE_TARJA = next((f for f in (os.path.join(r, "FontsFree-Net-SFProDisplay-Black.ttf") for r in (r"C:/Windows/Fonts", os.path.expandvars(r"%USERPROFILE%/AppData/Local/Microsoft/Windows/Fonts"))) if os.path.exists(f)), "")
 D_TARJA, Y_TARJA, D_FIM = 2.9, 1240, 3.4
@@ -46,6 +46,8 @@ NOMES = {k.lower(): v for k, v in CFG.get("nomes", {}).items()}
 os.makedirs(TRAB + "/tx", exist_ok=True)
 GANHO.update(CFG.get("ganhos", {}))
 COR.update(CFG.get("cor", {}))
+LEG.update(CFG.get("legenda", {}))     # ex.: {"dCor": "<cor da marca>"} para o destaque da palavra falada
+T_TAM = CFG.get("tarja_tam", 52)        # fonte das tarjas (falas em destaque); maior = mais impacto
 
 
 def _duracao(p):
@@ -203,6 +205,7 @@ def add(kind, name, **kw):
 
 MID = {k: add("video", v + ".mp4", path=BR + v + ".mp4") for k, v in FONTES.items()}
 M_BR = add("image", os.path.basename(CFG["brasao"]), path=CFG["brasao"])
+M_LF = add("image", os.path.basename(CFG["logo_fim"]), path=CFG["logo_fim"]) if CFG.get("logo_fim") else M_BR   # logo inteiro na finalização
 M_TX = add("texto", "Texto")
 M_AJ = add("ajuste", "Camada de ajuste")
 ASSETS = PASTA + "/02 - ASSETS/"
@@ -234,7 +237,25 @@ if _mi == "auto":
 else:
     MUS0 = float(_mi)
 DURS = {MID[k]: _duracao(BR + v + ".mp4") for k, v in FONTES.items()}
-FT = ImageFont.truetype(FONTE_TARJA, 52) if os.path.exists(FONTE_TARJA) else None
+
+
+def _escala(k):
+    """Escala que cobre o quadro 1080x1920. No editor, escala 100 = pixel nativo: vídeo 4K de celular ficava 2x ampliado,
+    cortando as cabeças (Carlinhos 2026-11-12). "escala_base" no roteiro, se houver, manda como antes (100 x valor)."""
+    if k in CFG.get("escala_base", {}):
+        return round(100 * CFG["escala_base"][k], 2)
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:stream_side_data=rotation:stream_tags=rotate",
+                        "-of", "json", BR + FONTES[k] + ".mp4"], capture_output=True, text=True).stdout
+    s = (json.loads(r or "{}").get("streams") or [{}])[0]
+    w, h = s.get("width") or W, s.get("height") or H
+    rot = int((s.get("tags") or {}).get("rotate", 0) or next((d.get("rotation", 0) for d in s.get("side_data_list") or []), 0) or 0)
+    if rot % 180:
+        w, h = h, w
+    return round(100 * max(W / w, H / h), 2)
+
+
+ESC = {k: _escala(k) for k in FONTES}
+FT = ImageFont.truetype(FONTE_TARJA, T_TAM) if os.path.exists(FONTE_TARJA) else None
 
 
 KEY_DE = {m: k for k, m in MID.items()}
@@ -264,7 +285,7 @@ def versao(v):
     for k, ini, fim_ in v["roteiro"]:
         for kk, a, b, s0, s1 in cortes(k, ini, fim_):
             s0, s1 = round(s0, 3), round(s1, 3)
-            sc =round(100 * CFG.get("escala_base", {}).get(kk, 1), 2)   # mídia pequena preenche o quadro; escala fixa, sem animação
+            sc = ESC[kk]   # cobre o quadro em qualquer resolução; escala fixa, sem animação
             clips.append({"tr": 0, "st": round(t, 3), "s": s0, "e": s1, "m": MID[kk], "g": GANHO["voz"], "p": {**PADRAO, "sc": sc}})
             # a transcrição estica a palavra por cima da pausa que o corte tirou: a legenda fica dentro do clipe (não atravessa corte)
             for l_ in legendas(kk, a, b, s0 - t):
@@ -295,15 +316,24 @@ def versao(v):
         tl = next((st for _, _, _, _, _, st in mapa if st < tl <= st + 0.2), tl)   # o corte abre 0,08 s antes da palavra: sem pisca de rosto antes do apoio
         fc = fim_do_corte(tl + d)
         d = min(fc - tl if fc - (tl + d) < 1.5 else d, 4.2)
-        clips.append({"tr": 1, "x": "v", "st": tl, "s": s, "e": round(s + d, 3), "m": MID[fonte], "p": dict(PADRAO)})
+        clips.append({"tr": 1, "x": "v", "st": tl, "s": s, "e": round(s + d, 3), "m": MID[fonte], "p": {**PADRAO, "sc": ESC[fonte]}})
     fonte_f, s_f = CFG["finalizacao"]
-    clips.append({"tr": 0, "x": "v", "st": fim_fala, "s": s_f, "e": round(s_f + D_FIM, 3), "m": MID[fonte_f], "p": {**PADRAO, "sc": 108},
+    clips.append({"tr": 0, "x": "v", "st": fim_fala, "s": s_f, "e": round(s_f + D_FIM, 3), "m": MID[fonte_f], "p": {**PADRAO, "sc": round(ESC[fonte_f] * 1.08, 2)},
                   "fx": [{"id": "fxfim", "t": "blur", "on": True, "v": {"amt": 34}}], "k": {"fx.fxfim.amt": [{"t": 0, "v": 0, "i": "ease"}, {"t": 0.5, "v": 34}]}})
     clips.append({"tr": 5, "st": 0, "s": 0, "e": fim_fala, "m": M_BR, "p": {**PADRAO, "sc": 12.5, "x": 930, "y": 175},
                   "k": {"sc": [{"t": 0, "v": 0, "i": "ease"}, {"t": 0.35, "v": 14.2, "i": "ease"}, {"t": 0.5, "v": 12.5}]}})
-    clips.append({"tr": 5, "st": fim_fala, "s": 0, "e": D_FIM, "m": M_BR, "p": {**PADRAO, "sc": 44, "x": 540, "y": 900},
-                  "k": {"sc": [{"t": 0, "v": 12, "i": "ease"}, {"t": 0.32, "v": 47, "i": "ease"}, {"t": 0.5, "v": 44, "i": "lin"}, {"t": D_FIM, "v": 46}],
+    sf = CFG.get("logo_fim_sc", 44)
+    clips.append({"tr": 5, "st": fim_fala, "s": 0, "e": D_FIM, "m": M_LF, "p": {**PADRAO, "sc": sf, "x": 540, "y": CFG.get("logo_fim_y", 900)},
+                  "k": {"sc": [{"t": 0, "v": round(sf * 0.27, 1), "i": "ease"}, {"t": 0.32, "v": round(sf * 1.07, 1), "i": "ease"}, {"t": 0.5, "v": sf, "i": "lin"}, {"t": D_FIM, "v": round(sf * 1.045, 1)}],
                         "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.12, "v": 100}]}})
+    if CFG.get("cta"):    # chamada para ação na finalização, na etiqueta da cor da tarja, entrando logo depois do logo
+        d_c = D_FIM - 0.35
+        tx = {"t": CFG["cta"], "fonte": LEG["fonte"], "fam": LEG["fonte"], "peso": 900, "tam": CFG.get("cta_tam", 64), "neg": True, "ita": False, "alin": "center", "esp": 0, "ent": 120,
+              "cor": "#ffffff", "cOn": False, "cCor": "#000000", "cLarg": 6, "fOn": True, "fCor": CFG["cor_tarja"], "fOp": 100, "fPad": 28, "fRaio": 44,
+              "sOn": True, "sCor": "#000000", "sOp": 55, "sDist": 5, "sBlur": 12, "sAng": 90}
+        clips.append({"tr": 6, "st": round(fim_fala + 0.35, 3), "s": 0, "e": round(d_c, 3), "m": M_TX, "nome": CFG["cta"], "tx": tx, "p": {**PADRAO, "y": CFG.get("cta_y", 1180)},
+                      "k": {"sc": [{"t": 0, "v": 40, "i": "ease"}, {"t": 0.2, "v": 106, "i": "ease"}, {"t": 0.32, "v": 100}],
+                            "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.08, "v": 100}]}})
     # trilha; se for curta, volta 8 compassos numa batida, sob a fala
     bat = lambda x: min(BATIDAS, key=lambda b: abs(b - x))
     if MUS0 + fim > DUR_MUS - 1.5:
@@ -393,16 +423,22 @@ def versao(v):
                           "fx": [{"id": f"fxcor{len(clips)}", "t": "lc", "on": True, "v": dict(cor_da_fonte(k_)) if k_ else dict(COR)}]})
     else:
         clips.append({"tr": 3, "st": 0, "s": 0, "e": fim, "m": M_AJ, "cor": "orange", "nome": "Cor", "fx": [{"id": "fxcor", "t": "lc", "on": True, "v": dict(COR)}]})
+    if CFG.get("aberracao"):    # aberração cromática só nas bordas (efeito "ca", centro limpo), na mesma camada da cor
+        for c in [c for c in clips if c["tr"] == 3 and c["m"] == M_AJ]:
+            c["fx"].append({"id": f"fxca{clips.index(c)}", "t": "ca", "on": True, "v": {"r": 0, "g": 0, "b": 2, "raio": 0, "foco": 35, "suave": 50, **CFG["aberracao"]}})
     tarjas = [(txt, quando(k, fr), bool(pop)) for txt, k, fr, pop in CFG.get("tarjas", [])]
     for txt, tt, pop in [x for x in tarjas if x[1] is not None]:
+        prox = [x[1] for x in tarjas if x[1] is not None and x[1] > tt]
+        DT = round(min(D_TARJA, (min(prox) if prox else 1e9) - tt - 0.05, fim_fala - tt), 3)   # tarja curta antes da seguinte: mesma trilha, sem sobrepor
         larg = FT.getlength(txt) if FT else len(txt) * 28
-        tx = {"t": txt, "fonte": LEG["fonte"], "fam": LEG["fonte"], "peso": 900, "tam": 52, "neg": True, "ita": False, "alin": "center", "esp": 0, "ent": 120, "cor": "#ffffff",
+        tx = {"t": txt, "fonte": LEG["fonte"], "fam": LEG["fonte"], "peso": 900, "tam": T_TAM, "neg": True, "ita": False, "alin": "center", "esp": 0, "ent": 120, "cor": "#ffffff",
               "cOn": False, "cCor": "#000000", "cLarg": 6, "fOn": True, "fCor": CFG["cor_tarja"], "fOp": 100, "fPad": 26, "fRaio": 44, "sOn": True, "sCor": "#000000", "sOp": 55, "sDist": 5, "sBlur": 12, "sAng": 90}
-        clips.append({"tr": 6, "st": tt, "s": 0, "e": D_TARJA, "m": M_TX, "nome": txt, "tx": tx, "p": {**PADRAO, "x": 578, "y": Y_TARJA},
-                      "k": {"sc": [{"t": 0, "v": 40, "i": "ease"}, {"t": 0.2, "v": 106, "i": "ease"}, {"t": 0.32, "v": 100, "i": "lin"}, {"t": D_TARJA - 0.14, "v": 100, "i": "ease"}, {"t": D_TARJA, "v": 72}],
-                            "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.08, "v": 100, "i": "lin"}, {"t": D_TARJA - 0.12, "v": 100, "i": "lin"}, {"t": D_TARJA, "v": 0}]}})
-        clips.append({"tr": 7, "st": tt, "s": 0, "e": D_TARJA, "m": M_BR, "p": {**PADRAO, "sc": 8.6, "x": round(578 - larg / 2 - 96, 1), "y": Y_TARJA},
-                      "k": {"sc": [{"t": 0, "v": 0, "i": "ease"}, {"t": 0.22, "v": 10, "i": "ease"}, {"t": 0.36, "v": 8.6, "i": "lin"}, {"t": D_TARJA - 0.14, "v": 8.6, "i": "ease"}, {"t": D_TARJA, "v": 0}]}})
+        clips.append({"tr": 6, "st": tt, "s": 0, "e": DT, "m": M_TX, "nome": txt, "tx": tx, "p": {**PADRAO, "x": 578, "y": Y_TARJA},
+                      "k": {"sc": [{"t": 0, "v": 40, "i": "ease"}, {"t": 0.2, "v": 106, "i": "ease"}, {"t": 0.32, "v": 100, "i": "lin"}, {"t": DT - 0.14, "v": 100, "i": "ease"}, {"t": DT, "v": 72}],
+                            "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.08, "v": 100, "i": "lin"}, {"t": DT - 0.12, "v": 100, "i": "lin"}, {"t": DT, "v": 0}]}})
+        r_ = T_TAM / 52
+        clips.append({"tr": 7, "st": tt, "s": 0, "e": DT, "m": M_BR, "p": {**PADRAO, "sc": round(8.6 * r_, 2), "x": round(578 - larg / 2 - 96 * r_, 1), "y": Y_TARJA},
+                      "k": {"sc": [{"t": 0, "v": 0, "i": "ease"}, {"t": 0.22, "v": round(10 * r_, 2), "i": "ease"}, {"t": 0.36, "v": round(8.6 * r_, 2), "i": "lin"}, {"t": DT - 0.14, "v": round(8.6 * r_, 2), "i": "ease"}, {"t": DT, "v": 0}]}})
         if pop:
             clips.append({"tr": 2, "x": "a", "st": tt, "s": 0, "e": SONS["pop"][1], "m": SONS["pop"][0], "g": GANHO["pop"]})
     blocos = [m[5] for j, m in enumerate(mapa) if j and mapa[j - 1][0] != m[0]]
