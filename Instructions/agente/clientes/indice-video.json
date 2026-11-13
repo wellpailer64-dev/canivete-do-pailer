@@ -1,0 +1,9 @@
+{
+  "clientes": [
+    {"nome": "Carlinhos", "aliases": ["Carlinhos"], "ficha": "carlinhos.md"},
+    {"nome": "Helo Ribeiro", "aliases": ["Helo Ribeiro", "Helo"], "ficha": "helo-ribeiro.md"},
+    {"nome": "Oficina Produtiva", "aliases": ["Oficina Produtiva"], "ficha": "oficina-produtiva.md"},
+    {"nome": "Gordinhos", "aliases": ["Gordinhos", "Bosch Car Service Gordinhos"], "ficha": "gordinhos.md"},
+    {"nome": "CULTSP PRO", "aliases": ["CULTSP PRO", "CULTSP"], "ficha": "cultsp.md"}
+  ]
+}

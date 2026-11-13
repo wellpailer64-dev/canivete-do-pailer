@@ -247,7 +247,10 @@ async function veFilaTextoSobreRosto(api) {
 }
 // Preparo visível: o item aparece na fila na hora, com o que está sendo preparado (Comps, 3D, transições, motion) —
 // antes a fila ficava vazia por até 1 h no GaIA e parecia que nada estava acontecendo.
+// Diagnóstico de tempo do preparo: cada marca vai para window.VEPREP_LOG como [ms, etapa] (sem efeito na tela)
+function veFilaMarca(etapa) { (window.VEPREP_LOG = window.VEPREP_LOG || []).push([Date.now(), etapa]); }
 function veFilaPrepMsg(m) {
+    if (m) veFilaMarca(m);
     const p = VEFILA.prepAtual; if (!p || !m) return;
     p.msg = m;
     const el = document.querySelector(`#ve-fila-lista [data-prep="${p.id}"] small`);
@@ -262,13 +265,18 @@ async function veFilaAdicionarAgora(nome, cfg, prep = null) {
     finally { VEFILA.preps = VEFILA.preps.filter(p => p !== prep); if (VEFILA.prepAtual === prep) VEFILA.prepAtual = null; veFilaRender(); }
 }
 async function veFilaAdicionarPreparando(nome, cfg) {
+    veFilaMarca('início do preparo');
     await veFilaConferirArquivos();
+    veFilaMarca('arquivos conferidos');
     { const off = veOfflineNaTimeline(); if (off.length) { veAvisoOffline(off); return null; } }
     const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; veFilaPrepMsg(m); };
     msg('Preparando ' + veFilaNomeTimeline() + '…');
     if (typeof veMidiasTamanhoGarantir === 'function') await veMidiasTamanhoGarantir();   // 4K ainda sem tamanho: saía ampliado
+    veFilaMarca('tamanhos garantidos');
     // render maior que a timeline (Full HD → 4K): preparo com a timeline reescalada, nítido (editor.js veExportNoQuadro)
-    return veExportNoQuadro((cfg || veFilaCfgLer()).res, () => veFilaAdicionarPlano(nome, cfg, msg));
+    VE._txCache = new Map();   // textos já desenhados neste preparo (transições e plano): ver veTxCacheKey
+    try { return await veExportNoQuadro((cfg || veFilaCfgLer()).res, () => veFilaAdicionarPlano(nome, cfg, msg)); }
+    finally { VE._txCache = null; }
 }
 // O preparo lê a timeline ABERTA: trocar de timeline no meio (ou pôr outra na fila) fazia o item sair com o conteúdo
 // da outra (Reel A com o Reel B, 2026-10-28). Antes de cada passo, volta à timeline do item em preparo.
@@ -278,12 +286,16 @@ function veFilaNaVez() {
 }
 async function veFilaAdicionarPlano(nome, cfg, msg) {
     veFilaNaVez();
+    veFilaMarca('plano: início Comps');
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
+    veFilaMarca('plano: Comps prontas');
     veFilaNaVez();
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
+    veFilaMarca('plano: 3D prontas');
     veFilaNaVez();
     // placa ligada: só o plano das transições de sobreposição (a placa faz no shader); desligada: renderiza antes
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg, !!(cfg ? cfg.gpu : veFilaCfgLer().gpu));
+    veFilaMarca('plano: transições prontas');
     veFilaNaVez();
     // mapa próprio, posto no VE._txPng só junto do plano (a prévia em segundo plano não troca no meio: editor-render.js)
     let mapa = new Map();
@@ -291,9 +303,11 @@ async function veFilaAdicionarPlano(nome, cfg, msg) {
         msg('Preparando textos, formas e camadas de motion…');
         mapa = await veMoNoTamanho((cfg || veFilaCfgLer()).res, () => veTxPngs(null, VE.clips, false));   // motion já no tamanho da saída
     }
+    veFilaMarca('plano: textos e motion prontos');
     veFilaNaVez();
     msg('Revisando a timeline…');
     const avisos = await veFilaRevisar().catch(() => []);
+    veFilaMarca('plano: revisão feita');
     veFilaNaVez();   // daqui ao fim é sem espera: o plano sai da timeline do item
     if (avisos.length) veToast(`Revisor: ${avisos.length} aviso(s) — ${avisos.slice(0, 2).map(a => veHuman(a.t) + ' ' + a.texto).join(' · ')}${avisos.length > 2 ? ' …' : ''}`);
     msg('Montando o plano do render…');

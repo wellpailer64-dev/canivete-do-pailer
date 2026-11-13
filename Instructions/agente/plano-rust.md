@@ -127,3 +127,29 @@ Regra que a medição confirmou: onde havia conta repetida por pixel, consertar 
 - **Zoomsete:** a preparação é ~0; os 40 s são do ffmpeg/shader do zoom com desfoque de movimento (já é o caminho mais barato; na CPU não saía em 44 min).
 - **`ieFBox`:** já é soma corrida O(n), separável; Rust daria pouco. Não vale.
 - **Diagnóstico novo:** `CANIVETE_FFTEMPO=<arquivo>` grava quanto cada chamada de ffmpeg/ffprobe levou em `video_cutter.py` (inerte sem a variável).
+
+## Preparo do reels "Mais um aprovado - com fala" (2026-11-12) — medido no app de teste
+Timeline 36,8 s, 1080x1920 60 fps, 177 clipes (73 texto, 30 transições de sobreposição, 33 ajustes, 2 roto), 139 camadas no plano. Marcas em `veFilaMarca` (`window.VEPREP_LOG`, `editor-fila.js`) e `veTxPngs` (`editor-props.js`).
+- **Preparo total: 41 s** (2.ª rodada, app quente; a 1.ª deu 63 s).
+- **Textos e motion (`veTxPngs`): ~27 s + ~13 s de transições**, porque `veOvtJob` (`editor-ovt.js:355`) chama `veTxPngs` para cada transição e o plano chama de novo: os mesmos textos são desenhados 2 vezes.
+- **Causa dominante: textos animados** (`veTxaExportar`, `editor-txanim.js`): um PNG por quadro da entrada/saída (`toDataURL` + `ve_salvar_png` pela ponte), em sequência, sem paralelo. Textos fixos somam só ~0,9 s (20 medidos: 235 ms).
+- Transições de sobreposição (30): 0,2–5,5 s cada (a primeira mais lenta, pelo aquecimento).
+- Não é a placa: a fase de preparo não usa GPU (encoder 0%); o gargalo é canvas 2D + PNG + ponte.
+- Próximos passos a decidir: (1) cache de `veTxPngs` por assinatura do clipe + resolução (corta ~13 s sem mudar a saída); (2) quadros animados sem PNG (bruto ou transformação no ffmpeg/shader) — maior ganho, mais trabalho.
+- Scripts de medição: `D:/kanivete_testes/scripts/prep_medir.py` e `prep_textos.py`; resultados em `D:/kanivete_testes/bench/prep_reels*.json`.
+
+## Cache de textos no preparo (2026-11-12, feito)
+- `veTxPngs` (`editor-props.js`) guarda cada texto por `veTxCacheKey` (texto + escala + animação e duração, se animado) em `VE._txCache`, só durante `veFilaAdicionarPreparando`. A chave não inclui posição nem corte, porque a transição usa cópias cortadas.
+- Medido (mesma timeline, app de teste): 40,8 s → 25,8 s na 1.ª rodada e 35,4 s na 2.ª (ruído: os textos animados sozinhos variam de 12 a 15 s conforme a carga). Camadas: 139 nos três casos.
+- Chave estável: 73/73 textos com a mesma chave em duas leituras; segunda passada com cache: 7 ms.
+- Ainda não comparei o render final com e sem cache; a equivalência vem da chave, não de um export comparado.
+- Passo 2 (quadros animados sem PNG): ainda não feito. Mexe no formato que `ve_txa_lista` entrega ao ffmpeg e nas predefinições de `editor-txanim.js`; precisa de decisão e de `testes/teste_export.py`.
+
+## Passo A: quadros de texto animado em lote (2026-11-12, feito)
+- `veTxaExportar` (`editor-txanim.js`): desenha os quadros na ordem, codifica PNG em paralelo (`toBlob`, 16 por vez) e manda um lote por grupo a `ve_salvar_pngs` (novo em `main.py`, junto de `ve_salvar_png`).
+- Pixel igual: PNG de um quadro com `toDataURL` e com `toBlob` saiu com a mesma string (`igual: true`).
+- Por quadro, medido um após o outro com a máquina carregada: 92 ms antes (61 PNG + 31 ponte) → 31 ms agora (~3x). Em carga menor, antes: 40 ms (28 PNG + 12 ponte).
+- Reserva: se `ve_salvar_pngs` não existir (app aberto antes da mudança, o `--py` não recarrega `main.py`), volta ao quadro a quadro. Reabrir o app do Pailer ativa o lote.
+- Total do preparo do reels oscilou entre 29 e 44 s nas rodadas desta noite (carga do PC); o trecho dos textos animados caiu ~3x.
+- Pendente: `testes/teste_export.py` antes de release (exportação mudou, mesmo com pixel igual).
+- Passo B (animação no ffmpeg/shader): não feito.

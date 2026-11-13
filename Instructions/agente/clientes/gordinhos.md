@@ -1,6 +1,9 @@
 # Oficina Gordinhos (Bosch Car Service Gordinhos)
 
+Aplicar junto de `Instructions/agente/metodo-edicao-video.md`; os valores abaixo são referência dos projetos citados, sujeitos ao pedido e às gravações atuais.
+
 Contato: Alessandro Barbosa ("Ale"). Pacote mensal desde nov/2026; escopo e pasta em `PAUTAS/LEIA-ME PACOTE MENSAL.txt`.
+Conteúdo: prova social e considerações para atrair clientes que levam o carro à oficina. NÃO é a Oficina Produtiva (cursos para donos de oficina) e não tem a Capricho Imports como tema: não misturar (ver `oficina-produtiva.md`).
 Pasta: `01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS`. Cards: `PAUTAS/<ano>/<mm> - <MÊS>/`. Sistema: `panda.py ... --cliente Gordinhos`.
 
 ## Material pelo WhatsApp
@@ -26,3 +29,6 @@ Roteiros de exemplo em `exemplos/reel_fala_gordinhos_03|04|05.json`: duas versõ
 
 ## Parceiros
 Merchandising Total Tech / Capricho Imports: fazer versão com e versão sem quando ele pedir. Na versão sem, conferir falas e imagens.
+
+## Origem
+Timeline modelo Upgrade, roteiro de exemplo e histórico em `Instructions/agente/guia-edicao.md`, incluindo notas de 01 e 06/11/2026.

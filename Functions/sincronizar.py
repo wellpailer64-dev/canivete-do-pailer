@@ -45,6 +45,11 @@ def atraso(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
         return {"success": False, "error": "Um dos clipes não tem som (ou é curto demais) para sincronizar"}
     if r.std() < 1 or o.std() < 1:
         return {"success": False, "error": "Um dos clipes está em silêncio: não há som para comparar"}
+    return {"success": True, **_correlacionar(r, o)}
+
+
+def _correlacionar(r, o):
+    import numpy as np
     # pré-ênfase: tira o grave (ronco, vento) que é diferente em cada microfone
     r = np.append(r[0], r[1:] - 0.97 * r[:-1])
     o = np.append(o[0], o[1:] - 0.97 * o[:-1])
@@ -72,5 +77,55 @@ def atraso(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
     # medido (2 celulares na mesma cena × vídeos de outras cenas): mesma cena 0,42–0,66 / destaque 14–58;
     # sem relação ≤ 0,15 / ≤ 7,2
     destaque = pico / ruido
-    return {"success": True, "atraso": round(float(k) / TAXA, 5), "confianca": round(confianca, 3),
+    return {"atraso": round(float(k) / TAXA, 5), "confianca": round(confianca, 3),
             "destaque": round(destaque, 1), "ok": confianca >= 0.25 and destaque >= 10}
+
+
+# ── Lapela: gravador à parte (outro celular, gravador de lapela) ligado o tempo todo; cada tomada da câmera é um
+# trecho curto dentro de um arquivo longo. Para cada tomada acha QUAL lapela tem aquele som e ONDE. Cada tomada é
+# casada sozinha: o relógio de dois aparelhos escorrega (dezenas de ms em 5 min), então casar a lapela inteira de
+# uma vez deixaria as tomadas do fim fora de sincronia. ──
+_cache_lapela = {}
+
+
+def _pcm_lapela(path):
+    import os
+    chave = (path, os.path.getmtime(path))
+    if chave not in _cache_lapela:
+        if len(_cache_lapela) > 8:
+            _cache_lapela.clear()
+        _cache_lapela[chave] = _pcm(path, 0.0, MAX_SEG)
+    return _cache_lapela[chave]
+
+
+def localizar_lapela(ref_path, ref_s, ref_e, lapelas):
+    """Trecho da câmera (ref_s..ref_e) dentro de uma das lapelas. Devolve {success, indice, atraso, confianca,
+    destaque, ok, todos}: o som do instante ref_s da câmera está em `atraso` s da lapela `lapelas[indice]` (pode ser
+    negativo: a câmera começou antes da lapela). Lapela no editor: s = atraso, e = atraso + (ref_e - ref_s)."""
+    try:
+        import numpy as np  # noqa: F401
+    except Exception:
+        return {"success": False, "error": "numpy não está disponível"}
+    try:
+        ref_s, ref_e = float(ref_s), float(ref_e)
+        r = _pcm(ref_path, ref_s, min(MAX_SEG, ref_e - ref_s))
+    except Exception as e:
+        return {"success": False, "error": f"Não foi possível ler o áudio da câmera: {e}"}
+    if len(r) < TAXA or r.std() < 1:
+        return {"success": False, "error": "O clipe da câmera não tem som (ou é curto/silencioso demais) para achar na lapela"}
+    todos = []
+    for i, p in enumerate(lapelas or []):
+        try:
+            o = _pcm_lapela(p)
+        except Exception as e:
+            todos.append({"indice": i, "error": str(e)})
+            continue
+        if len(o) < TAXA or o.std() < 1:
+            todos.append({"indice": i, "error": "lapela sem som"})
+            continue
+        todos.append({"indice": i, **_correlacionar(r, o)})
+    validos = [t for t in todos if "atraso" in t]
+    if not validos:
+        return {"success": False, "error": "Nenhuma lapela com som para comparar", "todos": todos}
+    melhor = max(validos, key=lambda t: (t["ok"], t["confianca"] * t["destaque"]))
+    return {"success": True, **melhor, "todos": todos}

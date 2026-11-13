@@ -121,7 +121,9 @@
     "ve_copias_antigas",
     "ve_encoder_estado",
     "ve_sincronizar_audio",
+    "ve_localizar_lapela",
     "ve_salvar_png",
+    "ve_salvar_pngs",
     "ve_txa_lista",
     "anti_noise_preparar",
     "ve_respiros",
@@ -516,6 +518,7 @@
     "imagem-prancheta.js",
     "imagem-recuperar.js",
     "imagem-texto.js",
+    "imagem-wasm.js",
     "ponte-kanivete.js",
     "imagem.css"
    ],
@@ -899,6 +902,7 @@
   "open_folder",
   "hardware_estado",
   "hardware_definir_modo",
+  "pasta_render",
   "kani_estado",
   "kani_baixar",
   "kani_enviar",
@@ -1193,8 +1197,16 @@
    "args": "ref_path, ref_s, ref_e, outro_path, outro_s, outro_e",
    "modulos": []
   },
+  "ve_localizar_lapela": {
+   "args": "ref_path, ref_s, ref_e, lapelas",
+   "modulos": []
+  },
   "ve_salvar_png": {
    "args": "dados",
+   "modulos": []
+  },
+  "ve_salvar_pngs": {
+   "args": "lote",
    "modulos": []
   },
   "ve_txa_lista": {
@@ -1207,6 +1219,10 @@
   },
   "video_cutter_add_audio": {
    "args": "path",
+   "modulos": []
+  },
+  "pasta_render": {
+   "args": "caminho",
    "modulos": []
   },
   "anti_noise_preparar": {
@@ -1542,7 +1558,9 @@
   },
   "ie_dialogo_salvar": {
    "args": "nome, ext=\"psd\", pasta=\"\"",
-   "modulos": []
+   "modulos": [
+    "pastas_peca"
+   ]
   },
   "ie_colar_windows": {
    "args": "",
@@ -3408,21 +3426,24 @@
  "guias": {
   "Instructions/agente/CLAUDE-detalhes.md": "KANIVETE (antes Canivete do Pailer) — notas para o Claude",
   "Instructions/agente/ajuste-premiere.md": "AJUSTE PREMIERE: plano para a próxima sessão",
+  "Instructions/agente/animacoes-nativas-video.md": "Animações nativas do Vídeo Kanivete — consulta rápida",
   "Instructions/agente/arquiteto-local.md": "Arquiteto Local B",
   "Instructions/agente/ata-kanivete.md": "Ata Kanivete (At, verde #1FA971) — Beta",
   "Instructions/agente/auto-edicao-plano.md": "Edição automática (1 clique) — levantamento 2026-11-05",
   "Instructions/agente/autozoom.md": "Autozoom (Vídeo Kanivete)",
   "Instructions/agente/cena-3d-editor.md": "Cena 3D no Editor Kanivete (estilo After Effects)",
   "Instructions/agente/cor-cinematografica.md": "Cor cinematográfica — pesquisa e uso no Luz e Cor",
+  "Instructions/agente/design-impressos.md": "Design e fechamento de impressos",
   "Instructions/agente/design-photo-kanivete.md": "Fazer arte no Photo Kanivete pela API (guia para IAs)",
   "Instructions/agente/direcao-carrossel.md": "Direção de arte de carrossel (para IAs) — o que separa peça boa de \"landing page genérica\"",
   "Instructions/agente/direcao-de-arte.md": "Direção de arte e motion para o AutoFrame e as edições do Pocket Editor",
   "Instructions/agente/direcao-logotipo.md": "Direção de logotipo — como os grandes fazem (estudo de 2026-10-16)",
   "Instructions/agente/diretor-de-arte.md": "Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)",
+  "Instructions/agente/efeitos-sonoros-video.md": "Efeitos sonoros do Vídeo Kanivete — referência rápida",
   "Instructions/agente/equalizador.md": "Equalizador paramétrico (Vídeo Kanivete)",
   "Instructions/agente/ferramentas-repetitivas.md": "Ferramentas prontas: gatilho → comando",
   "Instructions/agente/fluxo-peca-cliente.md": "Peça de cliente: do card à aprovação",
-  "Instructions/agente/guia-edicao.md": "GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA",
+  "Instructions/agente/guia-edicao.md": "Guia de edição :: Vídeo Kanivete — para agentes de IA",
   "Instructions/agente/kani-maos.md": "Mãos da Kani — a Kani operando os apps ao vivo",
   "Instructions/agente/kani-motor.md": "Motor da Kani: bancada de modelos e escolha (2026-10-10)",
   "Instructions/agente/kaniboard.md": "KaniBoard (Kb, amarelo #FFC933)",
@@ -3452,9 +3473,11 @@
   "Instructions/agente/plugins.md": "Plugins no KANIVETE",
   "Instructions/agente/ponte-premiere.md": "Ponte Kanivete ↔ Premiere Pro (plugin UXP \"Kanivete Ponte\")",
   "Instructions/agente/rastreador.md": "Rastreador de movimento (Tracker do After Effects) — FEITO v1 (2026-10-23)",
+  "Instructions/agente/receita-gancho-texto-atras.md": "Receita: gancho com frase digitada ATRÁS das pessoas + transições curtas (2026-11-12, card Carlinhos \"Mais um aprovado\")",
   "Instructions/agente/relatorio-aula-deepseek.md": "Relatório da aula do DeepSeek-V4.1-Flash",
   "Instructions/agente/remover-fundo.md": "Remover fundo (recorte) — velocidade × qualidade (2026-10-06)",
   "Instructions/agente/repertorio-visual.md": "Repertório visual aprovado pelo Pailer",
+  "Instructions/agente/ritmo-cortes-audio.md": "Ritmo, cortes e áudio — referência de montagem profissional",
   "Instructions/agente/tecnicas-de-montagem.md": "Técnicas de montagem: cortes, transições, storytelling e tempo de tela",
   "Instructions/agente/teste-4k.md": "Teste de 4K (estresse do Editor de Vídeo)",
   "Instructions/agente/worker.md": "Canivete Worker — o assistente local (para o Claude delegar operações)",
@@ -3548,6 +3571,7 @@
   "Functions/organizador_de_imagens.py": "limparduplicadas.py",
   "Functions/organizador_de_videos.py": "organizador_de_videos.py",
   "Functions/otimizar.py": "Forçar Full HD (painel Projeto): vídeo maior que Full HD (2K, 4K, 8K, em pé ou deitado) vira uma cópia com o lado",
+  "Functions/pastas_peca.py": "Pastas padrão de uma peça (card) do Pailer: <mês>/<nn - TIPO - TÍTULO>/ com BRUTO, ASSETS, PROJETO e RENDER",
   "Functions/perfil_comum.py": "perfil_comum.py — A cópia de trabalho do Claude (app de teste na 9333, aberta por tools/agente/abrir_teste.py) usa a",
   "Functions/pincel_roto.py": "pincel_roto.py — Pincel Roto do Vídeo Kanivete (o Roto Brush do After Effects): recorta uma pessoa/objeto do vídeo a",
   "Functions/plugins_pessoais.py": "Plugins pessoais do KANIVETE: ferramentas que moram SÓ no PC de quem as fez, fora do git e do release",

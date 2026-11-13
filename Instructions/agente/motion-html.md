@@ -90,3 +90,9 @@ largura/altura animadas ficava presa no tamanho parado (`veGrafTamanho` em `edit
 - Objeto muito rápido (~100 px/quadro) fica 2–3 px fora no meio do movimento: precisão da exportação, não do tradutor.
 - Mistura (`mix-blend-mode`) → modo de mesclagem da camada; `backdrop-filter` não tem equivalente.
 - `<video>` direto (hoje: `<img data-kv-video>`); áudio da cena.
+
+## Notas de 2026-11-11 (lettering do Graffiti Contra Enchente → Comp com `tools/agente/comp_html.py`)
+- `@font-face` com apelido: `fontes_reais()` troca pelo estilo instalado (Functions/fontes.py), como o MOGRT; fonte não
+  instalada vira AVISO.
+- Pendente: `<svg>` de filtro (0×0) sem `data-kv` derruba o amostrador (`KV.isolar` devolve tamanho nulo); `data-kv="raster"`
+  não existe (camada some calada; usar `caixa`); `filter: drop-shadow()` em `<img>` se perde; `filter:url(#ruído)` também.

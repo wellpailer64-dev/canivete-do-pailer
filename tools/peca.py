@@ -164,7 +164,7 @@ def main():
     ap.add_argument("arquivo", nargs="?")
     ap.add_argument("--pasta"); ap.add_argument("--nome")
     ap.add_argument("--paginas", type=int); ap.add_argument("--exportar", action="store_true")
-    ap.add_argument("--saida", help="pasta dos PNGs de --exportar (padrão: a do card)")
+    ap.add_argument("--saida", help="pasta dos PNGs de --exportar (padrão: a RENDER do card; sem ela, a do card)")
     ap.add_argument("--exame"); ap.add_argument("--monitor", default="auto", choices=["auto"] + list(MONITORES))
     ap.add_argument("--seta"); ap.add_argument("--apagar"); ap.add_argument("--refazer", action="store_true")
     a = ap.parse_args()
@@ -178,6 +178,14 @@ def main():
         return _enquete(a, porta)
     if a.cmd in ("preset", "entregar") and not (a.pasta and a.nome):
         ap.error("--pasta e --nome são obrigatórios")
+    if a.pasta:   # método do Pailer: card com BRUTO, ASSETS, PROJETO, RENDER (Functions/pastas_peca.py)
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from Functions import pastas_peca
+        card = pastas_peca.pasta_card(a.pasta) or a.pasta
+        if a.cmd == "preset":
+            pastas_peca.criar_subpastas(card, a.nome)
+        a.pasta = pastas_peca.pasta_projeto(card) or a.pasta
+        a.saida = a.saida or pastas_peca.pasta_render(card)
     if a.cmd in ("preset", "abrir"):
         if not a.arquivo or not os.path.isfile(a.arquivo): ap.error("arquivo não encontrado")
         cod = f"switchTool('editor-imagem'); await KNV.abrir({q(a.arquivo)});"

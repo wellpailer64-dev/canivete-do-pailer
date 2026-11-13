@@ -436,6 +436,57 @@ def ffmpeg():
             return c
 
 
+def fontes_reais(html, P):
+    """@font-face com apelido ("Sedgwick" -> SedgwickAveDisplay-Regular.ttf): o editor só conhece as fontes instaladas,
+    pelo nome real. Troca apelido+peso pelo estilo instalado (Functions/fontes.py), como o MOGRT faz. Devolve avisos."""
+    from urllib.parse import unquote
+    css = open(html, encoding="utf-8", errors="replace").read()
+    mapa = {}   # (apelido, peso) -> caminho do arquivo
+    for bloco in re.findall(r"@font-face\s*\{([^}]*)\}", css):
+        fam = re.search(r"font-family\s*:\s*['\"]?([^;'\"]+)", bloco)
+        src = re.search(r"url\(\s*['\"]?([^'\")]+)", bloco)
+        if not fam or not src:
+            continue
+        w = re.search(r"font-weight\s*:\s*(\d+)", bloco)
+        u = unquote(src.group(1))
+        cam = re.sub(r"^file:/+", "", u) if u.startswith("file:") else os.path.join(os.path.dirname(html), u)
+        mapa[(fam.group(1).strip(), int(w.group(1)) if w else 400)] = os.path.normpath(cam)
+    if not mapa:
+        return []
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        from Functions import fontes as F
+        inst = F.listar() or {}
+    except Exception as e:
+        return [f"lista de fontes do Windows indisponível ({e}); textos ficam com o apelido do CSS"]
+    from fontTools.ttLib import TTFont
+    ps_de = {}
+    for (ap, peso), cam in mapa.items():
+        try:
+            ps_de[(ap, peso)] = str(TTFont(cam, lazy=True)["name"].getDebugName(6))
+        except Exception:
+            ps_de[(ap, peso)] = None
+    avisos, feitos = [], set()
+    for c in P.get("clips", []):
+        tx = c.get("tx")
+        if not tx:
+            continue
+        ap, peso = tx.get("fam") or tx.get("fonte"), int(tx.get("peso") or 400)
+        chave = (ap, peso) if (ap, peso) in ps_de else next(((a, p) for a, p in ps_de if a == ap), None)
+        if not chave:
+            continue
+        ps = ps_de[chave]
+        achou = next(((fam, e) for fam, est in inst.items() for e in est if ps and e.get("ps") == ps), None)
+        if not achou:
+            if ap not in feitos:
+                avisos.append(f"fonte {os.path.basename(mapa[chave])} não instalada: instale para o texto ficar certo no app")
+                feitos.add(ap)
+            continue
+        fam, e = achou
+        tx.update(fonte=e["gdi"], fam=fam, peso=e["peso"], neg=False, ita=bool(e.get("italico") or e.get("gdi_italico")))
+    return avisos
+
+
 def main():
     a = sys.argv[1:]
     if not a or a[0].startswith("-"):
@@ -458,6 +509,8 @@ def main():
         P["midias"] = sorted(set(P["midias"]))
     if op("--salvar"):
         P["salvar"] = os.path.abspath(op("--salvar"))
+    for av in fontes_reais(html, P):
+        print("AVISO", av)
     json.dump(P, open(os.path.join(pasta, "plano.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"camadas: {len(P['clips'])} · quadros-chave: {contar_chaves(P)} · amostrado em {time.time() - t0:.1f} s")
     for w in avisos:

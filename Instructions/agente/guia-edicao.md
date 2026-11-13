@@ -1,4 +1,4 @@
-# GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA
+# Guia de edição :: Vídeo Kanivete — para agentes de IA
 # REGRAS E ORDEM DE TRABALHO: metodo-edicao-video.md (fonte única); aqui ficam API e histórico.
 # formato: denso, para máquina. calibrar a cada feedback do usuário (seção CALIBRACAO no fim). v2 2026-10-01 (+ seção 7 efeitos sonoros)
 
@@ -8,11 +8,11 @@
 - timeline/painéis podem estar em janelas soltas (outras páginas index.html sem VE): DOM lá, JS/estado na principal
 - TODA ação no app do usuário: `veAgente('descrição curta', () => {...})` (aviso roxo + log; Ctrl+Z desfaz)
 - ver o que o usuário viu: `veLogTexto(40)` (toasts, erros JS, resultado de exportação)
-- NUNCA salvar o projeto (Ctrl+S) nem fechar o app sem pedido. criar timeline nova em vez de mexer na existente
-- testes de código: outra instância `python main.py --agente=9333` (não usar a do usuário)
+- Não salvar nem fechar o app sem pedido. Em ajustes, preservar a timeline aberta e seguir o método; timeline nova só quando o trabalho pedir.
+- Testes de código: app de teste na porta 9333, conforme as instruções aplicáveis à sessão.
 
 ## 1 LER MÍDIA (barato em tokens) — Functions/agente_midia.py
-- `python -m Functions.agente_midia analisar "<proj.vknv>" --nao-usados-em "<timeline>"` → 1 comando:
+- `py -3.13 -m Functions.agente_midia analisar "<proj.vknv>" --nao-usados-em "<timeline>"` → 1 comando:
   folhas de contato (10 vídeos/img) + cena por CLIP local (rótulos em CENAS) + fala (vídeos ≤180 s) + suspeitas
   saída: resumo 1 linha/vídeo + mapa_*.json. ~40 s p/ 19 vídeos (cache depois)
 - no app: `await veAgenteMidia('analisar', [proj, '--nao-usados-em', nome])` (processo à parte)
@@ -39,7 +39,7 @@
 1. ler a timeline modelo (seção 2) → extrair padrão: ritmo de cortes, trilhas de apoio, gráficos fixos, música, legenda
 2. `analisar` (seção 1) → escolher: falas (transcrição) + takes de apoio (rótulo CLIP ≈ palavra falada)
 3. plano em python (fora do app): trechos [mídia, de, até] por PALAVRAS (w[0] in [a,b)); corte seco na pausa:
-   > 0.30 s depois de pontuação (.,?!;:), > 0.60 s no meio da frase (respiração curta fica);
+   > 0.30 s depois de pontuação (.,?!;:), > 0.40 s no meio da frase, medidos na energia da voz;
    FIM do corte = quando a VOZ acaba (energia em quadros de 10 ms > limiar; aceita vales < 60 ms; até +0.7 s;
    nunca até a próxima palavra − 0.04 s) + 0.08 s — o fim de palavra do modelo é estimado e corta sílaba;
    COMEÇO: volta até 0.21 s enquanto há voz ; cortes contíguos do mesmo vídeo (gap < 0.08 s) = 1 corte só
@@ -49,12 +49,8 @@
 6. montar via veAgente em passos visíveis (1 aviso por etapa) ; no fim: 1 print do monitor num ponto com apoio+legenda
 7. relatar: estrutura em tabela tempo→fala→apoio ; o que não tinha imagem ; pedir para o usuário assistir
 
-## 4 ESTILO PADRÃO (cliente imobiliário Helo Ribeiro; confirmar lendo a modelo)
-- 1080x1920 30 qps ; fala em V1 voz +2 dB, cortes ~3 s ; apoio V2 1.4–4 s sem som
-- GC "GC HELO RIBEIRO.mov" + Luma Key no início ; logo BRANDBOOK-02 sc≈9 canto sup.dir. + ca_rot ; ajuste Luz e Cor no topo
-- camada PINCEL (kind 'pincel') sob o logo = fundo de apoio de leitura ; logo e pincel vão de 0 até o fim da fala (não na assinatura)
-- assinatura .mov (alfa) no fim ; música −17 dB na fala → −4 dB na assinatura com fade
-- legenda: SF Pro Display ~50 px, 2 linhas ~18 car, sem caixa, sombra, entrada pop, py 8, destaque palavra #385641
+## 4 ESTILO DE CLIENTE
+- Consultar a ficha em `Instructions/agente/clientes/` e a timeline modelo do cliente; não aplicar um estilo de cliente como padrão geral.
 
 ## 5 TRANSIÇÕES NOS TAKES DE APOIO (dinâmica)
 - não em todos: ~1 a cada 3 takes de apoio ; os demais corte seco
@@ -75,20 +71,20 @@
 - conhecidos (já no dicionário): Elon→Helo ; Brooklyn→Brooklin (bairro SP) ; lisão→Lisonda (marca da quadra de tênis)
 
 ## 7 EFEITOS SONOROS (painel Soundboard — editor-soundboard.js)
-- pack instalado? `VESB.dados` (null → `veSbCarregar()` e esperar) ; `.instalado` false → pedir ao usuário para clicar
-  "Baixar sons" no painel (8,7 MB, 1 vez) ou `window.pywebview.api.ve_sb_baixar()` com o ok dele
+- Escolha por acontecimento, limitações, conferência auditiva e fontes: `Instructions/agente/efeitos-sonoros-video.md`. Prefira som direto ou Soundboard existente quando resolver.
+- pack instalado? `VESB.dados` (null → `veSbCarregar()` e esperar) ; se `.instalado` for false, seguir as instruções atuais da sessão para instalar o pack.
 - catálogo: `VESB.dados.categorias[ci] = {id, nome, sons[si]: {arq, nome, dur, orig, path, url}}` ; chave do som = `"ci:si"`
-  ids: whoosh riser impacto pop notificacao dinheiro glitch cartoon reacoes objetos jingles vozes
+  Os IDs e índices variam conforme a versão: listar o catálogo atual antes de escolher.
   escolher por `nome` (pt, ex. "Riser + hit 03") + `orig` (título original em inglês, mais descritivo) + `dur`
 - aplicar: `VE.playhead = t; await veSbInserir(k)` → entra na mídia "Soundboard" do Projeto e na 1ª trilha de áudio
   livre de cima p/ baixo em [t, t+dur] (nunca sobrescreve; cria trilha se preciso) ; o clipe novo = `VE.clips[VE.sel]`
 - sons nivelados (média ≈ −20 dB, pico −1 dBFS) e já aparados (som começa no 1º quadro) → ajustar só `c.g` (dB)
 - PONTOS DE PARTIDA (calibrar com o usuário):
-  - whoosh/swoosh na transição: começa ~dur/2 antes do corte (pico no corte) ; g −6..−10 sob fala
+  - whoosh/swoosh em movimento ou transição: alinhar o ponto de maior energia ao gesto/corte após ouvir e olhar a forma de onda; ajustar ganho conforme a fala
   - riser/uplifter: TERMINA no momento-chave (st = alvo − dur) ; boom/riser+hit/bass drop: começa NO momento-chave
-  - pop/clique: entrada de texto, gráfico ou apoio que "pula" na tela ; g −8..−12
-  - dinheiro: preço/valor na tela ou falado ; reações (risada, aplausos, ba dum tss): logo depois da piada/frase de efeito
-  - densidade: 1 efeito a cada ~3–5 s no máximo ; nunca 2 fortes juntos ; nada que mascare palavra importante
+  - pop/clique: somente quando houver gesto compatível; ajustar ganho no contexto
+  - dinheiro e reações: somente quando combinarem com a cena, o cliente e o tom; não são automáticos
+  - densidade: usar com parcimônia; nunca 2 fortes juntos e nada que mascare palavra importante
   - preferir a mesma família de whoosh no vídeo inteiro (coerência) ; vozes (inglês) só se pedirem
 - conferir no fim: `VE.clips.filter(c => VE.media[c.m]?.pasta === (VE.bins||[]).find(b => b.nome==='Soundboard')?.id)`
 
@@ -109,8 +105,7 @@
 - simular o recorte em PIL antes de montar (1 tira com 5 quadros) e só depois mexer no app.
 - montar: `tools/agente/cortes_entrevista_montar.py` (timeline nova por corte; `veAgente` é ASSÍNCRONO: await).
   B-roll: 2 batidas da música por plano (`batidas`), música entra 1 batida antes do fim da fala com fade, −4 dB;
-  imagem de fechamento 6 batidas com dissolve. Legenda Oficina Produtiva: SF Pro Display negrito MAIÚSC, branca,
-  contorno/sombra #0a141a, destaque da palavra #e88213, entrada pop, max 16 × 2 linhas, py 14.
+  imagem de fechamento 6 batidas com dissolve. Exemplo antigo de legenda e notas da Oficina Produtiva: `clientes/oficina-produtiva.md`.
 - custo desta 1ª vez: alto (descobrir API, transcrição inteira que caiu, detector refeito 3×). Próxima: ~1/3 seguindo esta seção.
 
 ## LER A MONTAGEM (tripa)
@@ -129,19 +124,21 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
 - Conferir antes de entregar: `py -3.13 tools/agente/polir_montagem.py <projeto.vknv>` → {"pretos": [], "piscas": []};
   em script de montagem, `polir(clips, media, {id_midia: duração})` corrige (estica/antecipa/encolhe o B-roll vizinho).
 
-## REEL FALADO DE CLIENTE: método curto (fazer nesta ordem, sem inventar script)
+## REEL FALADO DE CLIENTE: comandos e exemplo (regras e ordem no método)
 1. Material: `wa.py arquivo|midia`; card: `panda.py criar`; trilha: `kanibrowser/epidemic.py buscar|baixar`. Um olhar nos RENDERS anteriores do cliente e na ficha.
 2. Ver e ouvir: transcrição + uma folha de quadros por vídeo. Só isso: nada de abrir o app ainda.
 3. Roteiro: copiar `Instructions/agente/exemplos/reel_fala_gordinhos.json` e preencher versões (trechos pela 1ª e última palavras), apoios, tarjas, finalização e "zooms" ([fonte, 1ªs palavras, últimas, "suave"|"empurra", zoom %], só nos momentos fortes, ~1 a cada 6-8 s; sem "zooms" fica sem zoom). Só o que é decisão editorial vai aqui.
 4. `py -3.13 tools/agente/reel_fala.py roteiro.json` (~20 s; recusa sobrescrever projeto que já existe).
-5. `py -3.13 tools/agente/conferir_edicao.py projeto.vknv`: sem REPROVADO; o que vier como OUVIR, ouvir. Palavra comida se corrige aqui, antes de mostrar.
+5. `py -3.13 tools/agente/conferir_edicao.py projeto.vknv`: sem REPROVADO; o que vier como OUVIR, ouvir. Onda encostada na borda de corte (palavra comida no início ou no fim) é REPROVADO e se corrige aqui, antes de mostrar.
 6. `reel_fala.py roteiro.json --abrir 9333` (ou 9222, sem clique) e `tools/agente/quadros_monitor.py` numa folha. Ajuste visual = mudar o roteiro antes de mostrar.
 7. Só depois: `tools/agente/exportar_conferencia.py` (taxa, LUFS, pico, pretos) em `tarefas_soltas.py`; não esperar preso.
 8. Mostrar. Depois que o Pailer mexeu e salvou, NUNCA rodar a geração de novo: mudar por cima da versão dele e guardar cópia antes.
 Regras embutidas: zoom em camada de ajuste, cor em outra sem bloom (rosto ficava vermelho), voz -6 dB em gravação quente, legenda sem caixa, fim do corte no vale da voz.
 Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 30); MOGRT só depois de testar UM renderizado; porta sem resposta não é app fechado; `kb.py js` só na aba da Kani; escrever arquivo com Write, não heredoc com barra; desfoque de movimento nos zooms multiplica o export por ~9 (padrão desligado).
 
-## CALIBRACAO (feedback do usuário, mais novo em cima)
+## CALIBRACAO (histórico de feedback, mais novo em cima; regras atuais no método)
+- 2026-11-13 REELS CASA MORUMBI (Helo Ribeiro), campos novos do `reel_fala.py`: (1) fonte com lapela `{"video": "IMG.MOV", "lapela": "LAPELA/LAPELA 01.mp4", "atraso": s}` (atraso do `sincronizar_lapela.py`): vídeo da câmera `x:"v"` + lapela `x:"a"` vinculados por `lk`, como o "Sincronizar com lapela" do editor, sem copiar vídeo; transcrição em cache `tx/<IMG>_lapela.json` (pode ser fatiada da lapela já transcrita). (2) Narração: fonte só com `lapela` (sem vídeo) + `"cobrir": [[fonte, frase, fonte_imagem, segundo], ...]` na versão; cada imagem vai da sua frase até a próxima. (3) `"identidade"` do cliente (logo girando, pincel, GC com `gc_em` por versão, assinatura animada) no lugar do logo/CTA/finalização padrão; `"sons": false`, `"transicoes_blocos": false`, `"apoio_transicoes": ["push","chicote","pop"]` (1 em 3). (4) `"juntas"` do roteiro (São Paulo, R$ 1.830.000, 168). (5) 4º item do trecho `{"fim": s}` (tempo da fonte) quando a escuta mostra palavra a mais na ponta. Fontes com extensão (`.MOV`) e caminho em subpasta valem. Apoios não se sobrepõem mais. `conferir_edicao`: voz repetida conta só sobreposição real de fonte (lapela única em outra ordem não reprova) e "R$ 1.830.000" não é maiúscula. iPhone com taxa variável perto de 59,94 virou timeline 59,94: escolher `video_base` com média longe da NTSC (fica 60). Exemplo: `D:/kanivete_testes/casamorumbi/roteiro.json`.
+- 2026-11-12 REELS DEPOIMENTOS NOV (Carlinhos), nota do Pailer na v2: (1) sombra azul do destaque estava na trilha do logo = gambiarra; agora trilhas fixas 5 logo, 6 sombra, 7 texto (`TR_*` no reel_fala) e o conferir reprova "trilha dividida"; (2) destaque é texto GRANDE na metade de baixo sobre azul `#3258c6` vindo da borda (não centralizado); `destaque_tam`, `tarja_y`, `cor_pincel`; (3) fim cortado em "vem pra Carlinhos, vem pra": `fim_voz` agora não passa da próxima palavra e `pausa_na_palavra` corta na pausa real dentro da palavra esticada pela transcrição; (4) voz das alunas baixa: `nivelar_voz` (ganho por corte até +9 dB, `voz_ganho_max`, Hard Limiter) e o conferir reprova diferença > 6 dB; (5) "Just for Fun" soou infantil: trilha de depoimento do Carlinhos = TROPHIES (Cushy). Cache de batidas agora é por música.
 - 2026-11-12 REELS CARLINHOS REVITALIZAÇÃO: no editor escala 100 = pixel nativo; vídeo 4K de celular (rotação -90) ficava 2x ampliado e cortava as cabeças. `reel_fala.py` agora calcula a escala que cobre o quadro (ffprobe + rotação); `escala_base` só se precisar. Campos novos do roteiro: `legenda` (ex. dCor da marca), `tarja_tam`, `logo_fim`/`logo_fim_sc`/`logo_fim_y`, `cta`/`cta_tam`/`cta_y`, `aberracao` (efeito ca nas bordas, na camada de cor). Tarjas seguidas encurtam para não sobrepor. Exemplo: `D:/kanivete_testes/carlinhos_revit/roteiro.json`.
 - 2026-11-06 REELS GORDINHOS AR CONDICIONADO, nota do Pailer: (1) ESPAÇO VAZIO no fim da frase (0,74 s no seg. 8) = desconforto; cortar sempre: `reel_fala.py` agora apara as pontas pela energia da voz no nível do limite (o ruído da oficina passa de 0,6 do limite) e corta pausa interna medida na energia. (2) ZOOM "bruto e aleatório" (108→128→118 por corte, entrada 0): agora só zoom de ênfase marcado no roteiro, entrada com curva, volta suave. (3) Trilha: rock suave com guitarra. (4) Epidemic: o download passou a exigir `uiOrigin=tracklist_button` e `downloadId`; corrigido no epidemic.py, que agora devolve a aba da Kani (é a do WhatsApp da gerente) ao endereço anterior.
 - 2026-11-01 REELS GORDINHOS, ajuste do Pailer: tirou o bloom e mexeu na cor (rosto muito vermelho): ct 22, hi 10, sh -4, wh 7, vib 17. NÃO COMER PALAVRA: cortei o fim de "saturado" porque limitei o corte ao início estimado da próxima palavra; o limite agora é o vale de energia e `checar_cortes.py` ouve os fins. "Sofreu para um reel simples": seguir o método curto acima.

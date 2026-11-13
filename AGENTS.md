@@ -6,7 +6,7 @@ uma tarefa aqui — em geral um contrato do Claude pelo KaniCode. O contrato man
 - Python: `py -3.13` (o `python` do PATH é 3.11 e não tem pywebview). JS: um arquivo por `<script>` em `frontend/js/`.
 - Nada de commit, push, reset, apagar arquivo do projeto ou mudar dependências.
 - Testes, caches e saídas no disco D (`D:\kanivete_testes`), nunca no C.
-- App de teste = porta **9333**. A **9222** é o KANIVETE aberto do Pailer (ele trabalha ao vivo): nunca conecte nela.
+- App de teste = porta **9333**. Quando o Pailer pedir trabalho no Kanivete aberto, use API, CLI ou atalhos na instância dele; identifique a porta com `tools/porta_agente.py` e preserve o projeto e o trabalho em andamento. Não use a instância dele para testes.
 - Sem janela de diálogo nativa (abrir/salvar) em teste: use as funções da API sem janela.
 - Escreva como o código em volta: nomes e comentários em português, mesma densidade de comentário.
 - Antes de dar por pronto: `py -3.13 -m py_compile <arquivo>` / `node --check <arquivo>` e o teste indicado.

@@ -25,7 +25,9 @@ async function ieCena(html, o = {}) {
     const avisos = [];
     if (novo) {
         if (typeof switchTool === 'function' && !document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem');
+        ieApiFecharAnteriores();
         doc = ieNovoDoc2(o.nome || (nSlides ? 'Carrossel' : 'Cena'), sw * Math.max(1, nSlides), sh, 72, 'transp');
+        doc.pelaApi = true;
         doc.camadas = [];   // a camada vazia sai: o fundo vem do HTML
     } else if (doc.w !== sw * Math.max(1, nSlides) || doc.h !== sh) avisos.push(`documento é ${doc.w}x${doc.h}, a cena pede ${sw * Math.max(1, nSlides)}x${sh}${nSlides ? ` (${nSlides} slides)` : ''}: monte com novo: true`);
     const W = doc.w, H = doc.h;

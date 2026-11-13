@@ -2,6 +2,16 @@
 
 Vale para arte e vídeo de cliente do Pandalab. Siga na ordem. Cliente com ficha: ler `Instructions/agente/clientes/<cliente>.md` no passo 2.
 
+## Método de pastas (toda demanda, do sistema ou local — 2026-11-12)
+1. Quem é o cliente? Tem pasta? (`mapa_clientes.json` do Pandalab). Abrir a pasta do mês das produções.
+2. Peça nova = pasta nova na sequência da anterior (`06 - ESTATICO FLYER BLACK FRIDAY`), com `01 - BRUTO`, `02 - ASSETS`,
+   `03 - PROJETO - <nome>`, `04 - RENDERS`. Sistema: `panda.py baixar` já cria. Local:
+   `py -3.13 tools/agente/nova_peca.py --cliente X --titulo "T" --tipo estatico|reels|carrossel... --criar` (sem --criar só mostra).
+3. Projeto editável (.vknv/.iknv) sempre em PROJETO com o nome certo da peça (`peca.py preset` já grava lá).
+4. Antes de exportar: salvar o projeto em PROJETO. Render sai na RENDERS: o Kanivete já abre Exportar nela
+   (Vídeo: `veDestRender`; Photo: salvar imagem cai em RENDER e projeto em PROJETO; `peca.py --exportar` idem).
+   Busca das pastas pela palavra (BRUTO/ASSETS/PROJETO/RENDER, com ou sem número): `Functions/pastas_peca.py`.
+
 ## Regras fixas do Pailer
 - Trabalhar dentro da pasta do card, onde a demanda foi baixada. Nada de montar em `D:/kanivete_testes`.
 - O programa fica visível do começo ao fim. Ele precisa ver o trabalho acontecendo.
@@ -11,6 +21,7 @@ Vale para arte e vídeo de cliente do Pandalab. Siga na ordem. Cliente com ficha
 
 ## Passos
 1. **Baixar**: `py -3.13 D:/Kanivete/Plugins/pandalab/panda.py demanda <id8>` e `baixar <id8>`. Vai para a pasta certa do cliente. Ler `BRIEFING.txt`, `demanda.json` e os `02 - ASSETS`.
+   Para link de Google Drive ou Google Fotos, usar primeiro o GDrive Dumper do Kanivete (`gdrive_analyze` / `gdrive_dump`), autorizado pelo Pailer; conferir acesso, destino e conclusão. Não depender da extensão do navegador para fazer o download. Guia: `Instructions/gdrive-dumper.md`.
 2. **Modelo**: procurar o preset na ficha do cliente; sem ficha, em `<cliente>/PRESSETS`. Ver também a peça igual mais recente nas pautas. Tem preset: usar, sem redesenhar.
 3. **Instrução extra**: conferir se áudio ou vídeo do cliente fala DESTE card. Se falar de outra imagem ou peça, não usar.
 4. **Abrir**: `py -3.13 tools/peca.py preset "<preset>" --pasta "<pasta do card>" --nome "NOME"`. Ela abre o app à vista, põe o Photo na frente e grava o `.iknv` na pasta. Vídeo: abrir o `.vknv`/preset no Vídeo do app dele, com `kanivete.py frente`.
@@ -18,6 +29,17 @@ Vale para arte e vídeo de cliente do Pandalab. Siga na ordem. Cliente com ficha
 6. **Dúvida que muda o conteúdo** (ponto de exame, texto médico, imagem trocada): montar o resto e perguntar uma vez, objetivo. Não chutar.
 7. **Entregar para aprovação**: `py -3.13 tools/peca.py entregar --pasta "<pasta do card>" --nome "NOME"`. Só dizer "pronto" se `falhas` vier vazio. A resposta traz o caminho, o que foi feito e o que falta.
 8. **Depois do ok**: `peca.py entregar ... --exportar` gera um PNG por fatia; em seguida `panda.py entregar <id> --sim`.
+
+## Alteração (coluna Alteração do Pandalab = status `adjustment`)
+"Alterações do Pandalab" = cards "Alteração: <título da entrega>", criados quando a Nanda/cliente pede ajuste numa entrega já feita.
+O pedido fica nos COMENTÁRIOS da página da entrega (texto, print, áudio), não na descrição do card.
+1. Listar: `panda.py demandas --status adjustment`. Fazer na ordem da coluna, uma por vez; o Pailer aprova cada uma antes da próxima.
+2. Ler: `panda.py alteracao <id8> --json` (card + entrega ligada + comentários gerais e por arte + artes + `pasta_local`/`origem_local`).
+3. Baixar comentários: `panda.py baixar-comentarios <entrega> --pasta "<pasta da peça>\01 - BRUTO\ALTERACAO <data>"`. Ver todo print, ouvir todo áudio.
+4. Achar o projeto: `origem_local` → senão a pasta da peça original (mesmo título, pasta do mês do cliente) → `03 - PROJETO`. Nunca refazer do zero se o editável existe.
+5. Interpretar: listar cada pedido (arte n, o que muda) antes de mexer; dúvida que muda conteúdo → perguntar uma vez.
+6. Aplicar no editável (salvar como `<nome> - ALT1`), abrir à vista e deixar para o Pailer aprovar.
+7. Depois do ok: exportar finais para `04 - RENDERS\ALT1`, `panda.py substituir-artes <entrega> --pasta ...` (prévia) e `--sim`. Conferir os anexos e usar `panda.py concluir-alteracao <entrega>` (prévia) e `--sim` para concluir a alteração e retirar o card da coluna.
 
 ## Pedido que chega por WhatsApp (sem card ainda)
 Ler a conversa com `transcrever`, baixar com `wa.py arquivo|midia` para `<mês>/00 - RECEBIDO DO CLIENTE/<data> WHATSAPP`, ver e ouvir tudo, então `panda.py criar` com briefing e arquivos. Para não baixar tudo de novo do Drive: `pastas.pasta_demanda(d, criar=True)`, mover o bruto e gravar `demanda.json` e `pastas.briefing`. Antes, `panda.py pastas`: se aparecer "criar produção" em cliente que já tem outra pasta de pautas, acertar `producao` no `mapa_clientes.json`. Vídeo: `guia-edicao.md`, seção REEL FALADO.

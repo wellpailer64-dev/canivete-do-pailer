@@ -567,6 +567,12 @@ def ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
     return sincronizar.atraso(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e)
 
 
+def ve_localizar_lapela(ref_path, ref_s, ref_e, lapelas):
+    """Sincronizar com lapela: em qual lapela e em que ponto está o som do trecho da câmera."""
+    from Functions import sincronizar
+    return sincronizar.localizar_lapela(ref_path, ref_s, ref_e, lapelas)
+
+
 def ve_ler_legenda(path):
     """Legendas (.srt, .vtt, .ass/.ssa, .sbv, .txt) → [{st, en, texto}] (segundos)."""
     from Functions import legendas_formatos
@@ -638,6 +644,11 @@ def ve_salvar_png(dados):
         return {"success": False, "error": str(e)}
 
 
+def ve_salvar_pngs(lote):
+    """Vários PNG (data URL) de uma vez: um quadro de texto animado por item → lista de caminhos, na mesma ordem."""
+    return [ve_salvar_png(d) for d in (lote or [])]
+
+
 def ve_txa_lista(entradas):
     """Texto animado do editor: [[png, duração s], ...] → lista do demuxer concat (a camada do texto na exportação)."""
     try:
@@ -682,6 +693,32 @@ def ve_salvar_legenda(itens, formato="srt", nome="legendas", pasta=""):
         return {"success": True, "path": path, "name": os.path.basename(path)}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def pasta_render(caminho):
+    """Pasta RENDER do card de `caminho` (projeto, pasta PROJETO ou mídia do BRUTO): destino padrão do render."""
+    from Functions import pastas_peca
+    try:
+        return {"success": True, "path": pastas_peca.pasta_render(caminho)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _pasta_projeto_sugerida(pasta, dados=None):
+    """Salvar projeto: a pasta PROJETO do card (da pasta atual ou, sem ela, do primeiro arquivo usado no projeto)."""
+    from Functions import pastas_peca
+    try:
+        cands = [pasta] if pasta else []
+        if dados:
+            d = json.loads(dados) if isinstance(dados, str) else dados
+            cands += [m.get("path") for m in (d.get("media") or []) if isinstance(m, dict) and m.get("path")][:5]
+        for c in cands:
+            p = pastas_peca.pasta_projeto(c)
+            if p:
+                return p
+    except Exception:
+        pass
+    return pasta
 
 
 def video_cutter_add_audio(path):
@@ -1329,6 +1366,7 @@ def ve_project_save(path, dados, salvar_como=False, formato=None):
                 if origem:
                     sugestao = os.path.splitext(os.path.basename(origem))[0] + ".vknv"
                     pasta = os.path.dirname(origem)
+            pasta = _pasta_projeto_sugerida(pasta, dados)   # método do Pailer: projeto editável na pasta PROJETO do card
             r = _window.create_file_dialog(
                 _file_dialog_kind("SAVE", webview.SAVE_DIALOG),
                 directory=pasta, save_filename=sugestao,
@@ -3513,8 +3551,14 @@ class ApiBridge:
     def ve_sincronizar_audio(self, ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
         return ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e)
 
+    def ve_localizar_lapela(self, ref_path, ref_s, ref_e, lapelas):
+        return ve_localizar_lapela(ref_path, ref_s, ref_e, lapelas)
+
     def ve_salvar_png(self, dados):
         return ve_salvar_png(dados)
+
+    def ve_salvar_pngs(self, lote):
+        return ve_salvar_pngs(lote)
 
     def ve_txa_lista(self, entradas):
         return ve_txa_lista(entradas)
@@ -3524,6 +3568,9 @@ class ApiBridge:
 
     def video_cutter_add_audio(self, path):
         return video_cutter_add_audio(path)
+
+    def pasta_render(self, caminho):
+        return pasta_render(caminho)
 
     def anti_noise_preparar(self, path):
         return anti_noise_preparar(path)
@@ -3897,6 +3944,12 @@ class ApiBridge:
         # projeto (.iknv), PSD, PSB e PDF achatado aparecem juntos no Salvar como; vale a extensão escolhida no nome.
         salvaveis = ("iknv", "psd", "psb", "pdf")
         extras = tuple(tipos[k] for k in salvaveis if k != ext) if ext in salvaveis else ()
+        try:   # método do Pailer: projeto na pasta PROJETO do card, imagem exportada na RENDER
+            from Functions import pastas_peca
+            alvo = pastas_peca.pasta(pasta, "projeto" if ext in ("iknv", "psd", "psb") else "render") if pasta else None
+            pasta = alvo or pasta
+        except Exception:
+            pass
         r = _window.create_file_dialog(_file_dialog_kind("SAVE", webview.SAVE_DIALOG), directory=pasta or "",
                                        save_filename=f"{nome}.{ext}", file_types=(tipos[ext],) + extras + ("Todos os arquivos (*.*)",))
         if not r:

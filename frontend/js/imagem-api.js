@@ -20,11 +20,18 @@ function ieRecInt(nome) {
     if (!L.c0) throw new Error(`não deu para converter "${L.nome}" em objeto inteligente`);
     return L;
 }
+// o agente cria um documento por arte; sem isso as abas antigas ficavam abertas gastando RAM e memória.
+// Fecha só os criados pela API que já estão salvos. O que o Pailer abriu, ou tem alteração não salva, fica.
+function ieApiFecharAnteriores() {
+    for (const d of IE.docs.slice()) if (d.pelaApi && !d.sujo) ieFecharDoc(d, true);
+}
 const KNV = {
     // ── documento ──
     novo(nome = 'Sem título', w = 1080, h = 1080, fundo = 'branco') {
         if (typeof switchTool === 'function' && !document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem');
+        ieApiFecharAnteriores();
         const d = ieNovoDoc2(nome, w, h, 72, fundo);
+        d.pelaApi = true;
         return { id: d.id, w: d.w, h: d.h };
     },
     doc(id) { if (id != null) { const d = IE.docs.find(x => x.id === id || x.nome === id); if (d) ieMostrarDoc(d); } const d = IE.doc; return d && { id: d.id, nome: d.nome, w: d.w, h: d.h }; },
@@ -367,7 +374,7 @@ const KNV = {
     },
     // projeto do editor (.iknv): salvar e abrir para continuar de onde parou (camadas, máscaras, efeitos, texto)
     async salvar(path) { await ieSalvarIknv(IE.doc, path); IE.doc.sujo = false; return path; },
-    async abrir(path) { await ieAbrirArquivo(path); await KNV._quadro(); return KNV.doc(); },
+    async abrir(path) { const antes = new Set(IE.docs); ieApiFecharAnteriores(); await ieAbrirArquivo(path); for (const d of IE.docs) if (!antes.has(d)) d.pelaApi = true; await KNV._quadro(); return KNV.doc(); },
     async fecharDoc() { const d = IE.doc; if (d) await ieFecharDoc(d, true); return KNV.doc(); },
     async fecharTudo() { for (const d of IE.docs.slice()) await ieFecharDoc(d, true); return true; },
 

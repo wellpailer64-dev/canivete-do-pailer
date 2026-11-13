@@ -70,16 +70,19 @@ for q in d["sequences"]:
             return min(round(x + ov, 3), t) if ini + 0.001 < x < t - 0.001 else x
         return round(x - ov, 3) if t - 0.001 <= x < ate - 0.001 else x
 
-    base = {id(c) for c in v}
+    # par ligado na trilha 0: imagem da câmera (x="v") + som da lapela (x="a"), mesmo "lk". Mexer só no som deixava a
+    # imagem com a duração velha: buraco preto de um lado e dois clipes juntos do outro (Casa Morumbi 2026-11-13)
+    par = {id(c): p for c in v if c.get("lk") for p in q["clips"] if p is not c and p.get("lk") == c["lk"] and p["tr"] == c["tr"]}
+    antes = {id(c): (c["st"], c["s"], c["e"]) for c in v}
+    base = {id(c) for c in v} | {id(p) for p in par.values()}
     for c in q["clips"]:
         if id(c) in base:
             continue
         dur = c["e"] - c["s"]
-        if M.get(c["m"], {}).get("kind") == "ajuste" and any(f["t"] == "zoom" for f in c.get("fx", [])):
+        if dur < 20 or M.get(c["m"], {}).get("kind") == "ajuste":
+            # as duas pontas pelo mesmo mapa: só deslizar empurrava o fim para dentro do vizinho da mesma trilha
             a0, a1 = mapa(c["st"]), mapa(c["st"] + dur)
             c["st"], c["e"] = a0, round(c["s"] + a1 - a0, 3)
-        elif dur < 20:
-            c["st"] = mapa(c["st"])
     if lado == "cabeça":
         v[h]["s"] = round(v[h]["s"] - ov, 3)
         for c in v[h + 1:i]:
@@ -90,6 +93,12 @@ for q in d["sequences"]:
         for c in v[i:j + 1]:
             c["st"] = round(c["st"] - ov, 3)
         v[j]["e"] = round(v[j]["e"] + ov, 3)
+    for c in v:
+        p = par.get(id(c))
+        if p is not None:
+            st0, s0, e0 = antes[id(c)]
+            p["st"] = c["st"]
+            p["s"], p["e"] = round(p["s"] + c["s"] - s0, 3), round(p["e"] + c["e"] - e0, 3)
     lim = t if lado == "cabeça" else t - ov
     for L in q.get("legendas") or []:
         ant = L["st"] < t - 0.05

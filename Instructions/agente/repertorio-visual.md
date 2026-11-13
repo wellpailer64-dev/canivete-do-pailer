@@ -1,6 +1,7 @@
 # Repertório visual aprovado pelo Pailer
 
 O que ele já usou e aprovou em carrosséis de cliente. Antes de inventar a imagem de um slide, procure aqui o tema e o TIPO de solução.
+Os exemplos e escolhas de cor, composição e personagem deste guia vêm do cliente Pedro Teixeira: são referências daquele cliente, não padrões obrigatórios para outros. Adapte apenas quando fizer sentido para o briefing e a identidade do cliente atual.
 A diferença entre peça amadora e a dele raramente é o objeto escolhido (ampulheta e relógio aparecem nas dele também):
 está em **como a imagem é construída**.
 

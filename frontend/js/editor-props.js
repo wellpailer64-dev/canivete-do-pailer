@@ -194,6 +194,14 @@ async function veSalvarPngExport(dataUrl, nome) {
 
 // Exportação: cada clipe de texto vira um PNG no tamanho em que ele aparece (a maior escala dele).
 // clips = os de outra timeline (Comp, editor-comp.js); guardar = false devolve o mapa sem trocar o VE._txPng
+// Assinatura do texto: exatamente o que o PNG usa — o texto (veTxt), a escala f e, se for animado, a animação e a duração
+// (posição e corte do clipe não entram: a transição usa cópias cortadas do mesmo texto)
+function veTxCacheKey(c, f) {
+    try {
+        const animado = typeof veTxaTem === 'function' && veTxaTem(c);
+        return JSON.stringify([f, veTxt(c), animado ? [c.txa, veLen(c), VE.fps || 30] : 0]);
+    } catch (e) { return null; }
+}
 async function veTxPngs(filtro, clips = VE.clips, guardar = true, trk = null) {
     const mapa = new Map();
     // Comp que só organiza (editor-comp-passa.js): as camadas de dentro, como a exportação as monta (veCompPlana)
@@ -203,18 +211,30 @@ async function veTxPngs(filtro, clips = VE.clips, guardar = true, trk = null) {
         const p = veStaticProps(c);
         const escalas = [p.sc].concat(veKfOn(c, 'sc') ? c.k.sc.map(q => q.v) : []);
         const f = Math.min(4, Math.max(1, Math.max(...escalas) / 100));
+        // Cache do preparo (VE._txCache, só durante uma fila): o mesmo texto não é desenhado de novo nas transições e no plano
+        const kc = veTxCacheKey(c, f);
+        if (kc && VE._txCache && VE._txCache.has(kc)) { mapa.set(c, VE._txCache.get(kc)); continue; }
+        let entrada = null;
         if (typeof veTxaTem === 'function' && veTxaTem(c)) {
-            try { mapa.set(c, await veTxaExportar(c, Math.min(f, 2))); continue; } catch (e) { /* cai no PNG parado */ }
+            try { entrada = await veTxaExportar(c, Math.min(f, 2)); } catch (e) { entrada = null; /* cai no PNG parado */ }
         }
-        const d = veTxDesenho(veTxt(c), f);
-        const r = await veSalvarPngExport(d.cv.toDataURL('image/png'), c.nome || veTxt(c).t);
-        mapa.set(c, { path: r.path, f, w: d.cv.width, h: d.cv.height });
+        if (!entrada) {
+            const d = veTxDesenho(veTxt(c), f);
+            const r = await veSalvarPngExport(d.cv.toDataURL('image/png'), c.nome || veTxt(c).t);
+            entrada = { path: r.path, f, w: d.cv.width, h: d.cv.height };
+        }
+        mapa.set(c, entrada);
+        if (kc && VE._txCache) VE._txCache.set(kc, entrada);
     }
+    if (typeof veFilaMarca === 'function') veFilaMarca('  txPngs: textos prontos');
     await veGrafPngs(mapa, filtro, clips);   // cor sólida, formas e desenhos (editor-grafico.js)
+    if (typeof veFilaMarca === 'function') veFilaMarca('  txPngs: gráficos prontos');
     // Pincel Roto: o clipe recortado vira o vídeo transparente do trecho (editor-roto.js)
     if (typeof veRotoPreparar === 'function') await veRotoPreparar(mapa, filtro, clips);
+    if (typeof veFilaMarca === 'function') veFilaMarca('  txPngs: roto pronto');
     // camadas com máscara, fosco, camada mãe, efeito animado... viram vídeo desenhado quadro a quadro (editor-motion.js)
     if (typeof veMoAssar === 'function') await veMoAssar(mapa, filtro, clips);
+    if (typeof veFilaMarca === 'function') veFilaMarca('  txPngs: motion (veMoAssar) pronto');
     if (guardar) VE._txPng = mapa;
     return mapa;
 }

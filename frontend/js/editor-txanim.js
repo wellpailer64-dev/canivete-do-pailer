@@ -284,31 +284,57 @@ function veTxaCanvas(c, alvo, T = VE.playhead) {
 }
 
 // ── exportação: quadros animados em PNG + o trecho parado num PNG só → lista do demuxer concat ──
+// Canvas → PNG em paralelo (toBlob sai da thread principal), 16 por vez, um lote ao Python por grupo; ordem preservada
+async function veTxaSalvarLote(cvs) {
+    const api = window.pywebview.api, out = [];
+    if (typeof api.ve_salvar_pngs !== 'function') {   // app aberto antes desta mudança (main.py só recarrega ao reabrir): um a um
+        for (const cv of cvs) { const r = await api.ve_salvar_png(cv.toDataURL('image/png')); if (!r || !r.success) throw new Error('png'); out.push(r.path); }
+        return out;
+    }
+    for (let i = 0; i < cvs.length; i += 16) {
+        const urls = await Promise.all(cvs.slice(i, i + 16).map(cv => new Promise((res, rej) => cv.toBlob(b => {
+            if (!b) return rej(new Error('png'));
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result); fr.onerror = () => rej(new Error('png'));
+            fr.readAsDataURL(b);
+        }, 'image/png'))));
+        const r = await api.ve_salvar_pngs(urls);
+        if (!Array.isArray(r) || r.length !== urls.length || r.some(q => !q || !q.success)) throw new Error('png');
+        out.push(...r.map(q => q.path));
+    }
+    return out;
+}
 async function veTxaExportar(c, f) {
     const api = window.pywebview.api, x = veTxt(c), fps = VE.fps || 30, len = veLen(c), txa = c.txa;
     const dIn = txa.in && VE_TXA[txa.in.p] ? Math.min(len, +txa.in.d || 0) : 0;
     const dOut = txa.out && VE_TXA[txa.out.p] ? Math.min(len, +txa.out.d || 0) : 0;
     const total = Math.max(1, Math.round(len * fps));
     const kIn = Math.min(total, Math.ceil(dIn * fps)), kOut = Math.max(kIn, total - Math.ceil(dOut * fps));
-    const salvar = async cv => { const r = await api.ve_salvar_png(cv.toDataURL('image/png')); if (!r || !r.success) throw new Error('png'); return r.path; };
-    const entradas = [];
+    // Quadros desenhados na ordem e guardados como canvas; a codificação PNG roda em paralelo (toBlob) e vai ao Python
+    // em lotes (veTxaSalvarLote). Antes: PNG um a um na thread principal, ~28 ms cada + ~11 ms de ponte por quadro.
+    const cvs = [];
+    const entradas = [];   // [índice do canvas, duração]
     let primeiro = null;
-    const quadro = async k => {
+    const quadro = k => {
         const tl = k / fps, est = veTxaEstados(x, txa, tl, len);
         const d = veTxaDesenho(x, f, txa, est, tl);
         if (!primeiro) primeiro = d;
-        return salvar(d.cv);
+        cvs.push(d.cv);
+        return cvs.length - 1;
     };
-    for (let k = 0; k < kIn; k++) entradas.push([await quadro(k), 1 / fps]);
+    for (let k = 0; k < kIn; k++) entradas.push([quadro(k), 1 / fps]);
     if (kOut > kIn) {
         const d = veTxaDesenho(x, f, txa, null, 0);
         if (!primeiro) primeiro = d;
-        entradas.push([await salvar(d.cv), (kOut - kIn) / fps]);
+        cvs.push(d.cv);
+        entradas.push([cvs.length - 1, (kOut - kIn) / fps]);
     }
-    for (let k = kOut; k < total; k++) entradas.push([await quadro(k), 1 / fps]);
-    const r = await api.ve_txa_lista(entradas);
+    for (let k = kOut; k < total; k++) entradas.push([quadro(k), 1 / fps]);
+    const caminhos = await veTxaSalvarLote(cvs);
+    const lista = entradas.map(([i, d]) => [caminhos[i], d]);
+    const r = await api.ve_txa_lista(lista);
     if (!r || !r.success) throw new Error((r && r.error) || 'lista');
-    return { path: entradas[0][0], seq: r.path, f, w: primeiro.cv.width, h: primeiro.cv.height };
+    return { path: lista[0][0], seq: r.path, f, w: primeiro.cv.width, h: primeiro.cv.height };
 }
 
 // ── timeline: faixa colorida no começo/fim do clipe de texto mostrando a entrada/saída ──

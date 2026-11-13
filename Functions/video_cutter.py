@@ -4251,7 +4251,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     alvo_h = _RESOLUCOES.get(str(resolucao), 0)
     previa = bool(saida and previa_h)
     if previa:
-        cfg, alvo_h, sem_audio, usar_gpu = FORMATOS_SAIDA["mp4"], int(previa_h), True, False
+        # prévia de cache: codifica na placa (NVENC) quando existe; sem ela, CPU (x264 ultrafast). Se o NVENC falhar,
+        # o fallback "GPU falhou" refaz pela CPU
+        cfg, alvo_h, sem_audio = FORMATOS_SAIDA["mp4"], int(previa_h), True
+        usar_gpu = _detectar_hw_encoder() == "h264_nvenc"
     op = opcoes if isinstance(opcoes, dict) and not previa else {}
     codec = str(op.get("codec") or "h264").lower()
     if cfg.get("vcodec") == "h264" and codec == "prores":
@@ -4984,7 +4987,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     def _tentar(gpu):
         nonlocal ultimo_cmd
         global _export_proc
-        if previa:
+        if previa and gpu and enc_gpu == "h264_nvenc":
+            # sem quadros B (-bf 0): cada quadro com o próprio tempo; GOP curto (10) para buscar rápido
+            video_args = ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "22", "-b:v", "0", "-bf", "0",
+                          "-g", "10", "-pix_fmt", "yuv420p"]
+        elif previa:
             video_args = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "20",
                           "-g", "10", "-pix_fmt", "yuv420p"]
         elif alfa and alfa_leve:

@@ -1,6 +1,6 @@
 """Conferência obrigatória do Método de Edição: aplica ao .vknv as regras que dá para medir.
     py -3.13 tools/agente/conferir_edicao.py projeto.vknv [--timeline "Nome"] [--render arquivo.mp4] [--sem-ouvir]
-REPROVADO = corrigir antes de mostrar. OUVIR = borda de corte com voz: ouvir antes de dizer que está pronto.
+REPROVADO = corrigir antes de mostrar (inclui onda encostada na borda de corte de fala: checar_cortes.py). OUVIR = conferir com olho e ouvido.
 Sai com código 1 se houver REPROVADO. Regras: Instructions/agente/metodo-edicao-video.md
 """
 import argparse
@@ -85,7 +85,7 @@ for q in seqs:
     if legs:
         if e.get("fundo") == "caixa" or not e:
             relato("REPROVADO", "legenda", "com caixa ou sem estilo definido")
-        if e.get("maiusc") or any(l["texto"].isupper() and len(l["texto"]) > 3 for l in legs):
+        if e.get("maiusc") or any(l["texto"].isupper() and sum(ch.isalpha() for ch in l["texto"]) > 3 for l in legs):
             relato("REPROVADO", "legenda", "em maiúsculas")
         if e and not (e.get("sOn") and int(e.get("sOp", 0)) == 100):
             relato("REPROVADO", "legenda", "sombra precisa de opacidade 100")
@@ -98,14 +98,43 @@ for q in seqs:
     falta = [c for c in cs if M.get(c.get("m"), {}).get("path") and not os.path.isfile(M[c["m"]]["path"]) and not M[c["m"]].get("comp")]
     if falta:
         relato("REPROVADO", "mídia offline", M[falta[0]["m"]]["path"])
-    # emenda em que a fonte volta no tempo repete voz ("moto motor", 2026-11-02)
+    # emenda em que a fonte volta no tempo repete voz ("moto motor", 2026-11-02). Conta só o trecho da fonte que se repete:
+    # a lapela única de uma visita inteira vem em outra ordem no reel (frase de 3 min depois primeiro) sem repetir nada.
     base = sorted([c for c in cs if c["tr"] == 0 and c.get("x") != "v" and kind(c) == "video"], key=lambda c: c["st"])
     for x, y in zip(base, base[1:]):
-        vez = x["e"] - y["s"]
+        vez = min(x["e"], y["e"]) - max(x["s"], y["s"])
         if x["m"] == y["m"] and vez > 0.01:
             n = nivel(M[x["m"]]["path"], y["s"], x["e"])
             if n > -20:
                 relato("REPROVADO" if vez >= 0.12 else "OUVIR", "voz repetida", f"{y['st']:.2f} s volta {vez:.2f} s com voz ({n:.0f} dB): tools/agente/fechar_emenda.py")
+    # uma camada por função: dois elementos na mesma trilha ao mesmo tempo (sombra do destaque na trilha do logo,
+    # Depoimentos Nov 2026-11-12: "gambiarra, não é edição bem feita")
+    vis = [c for c in cs if c.get("x") != "a" and kind(c) not in ("audio", None)]
+    for tr_ in sorted({c["tr"] for c in vis}):
+        lst = sorted([c for c in vis if c["tr"] == tr_], key=lambda c: c["st"])
+        for x, y in zip(lst, lst[1:]):
+            if y["st"] < x["st"] + x["e"] - x["s"] - 0.01:
+                relato("REPROVADO", "trilha dividida", f"V{tr_ + 1}: '{x.get('nome') or os.path.basename(M[x['m']].get('path') or M[x['m']].get('name', ''))}' e "
+                       f"'{y.get('nome') or os.path.basename(M[y['m']].get('path') or M[y['m']].get('name', ''))}' juntos em {y['st']:.2f} s; cada elemento na sua trilha")
+                break
+    # voz de quem está longe do celular fica baixa (alunas x instrutor, 2026-11-12): nível da fala por corte, com o ganho
+    nv = []
+    for c in base:
+        p_ = M[c["m"]].get("path")
+        if p_ and os.path.isfile(p_) and c["e"] - c["s"] > 0.8:
+            nivel(p_, 0, 0)
+            x_ = SONS[p_][int(c["s"] * 16000):int(c["e"] * 16000)]
+            r_ = np.sqrt((x_[:len(x_) // 320 * 320].reshape(-1, 320) ** 2).mean(1))
+            r_ = r_[r_ >= np.median(r_)]   # só a metade com voz
+            nv.append((float(20 * np.log10(np.sqrt((r_ ** 2).mean()) + 1e-9)) + float(c.get("g", 0)), c["st"]))
+    if len(nv) >= 3:
+        ord_ = sorted(nv)
+        lo, hi = ord_[len(ord_) // 10], ord_[-1 - len(ord_) // 10]
+        txt_ = f"fala de {lo[0]:.1f} a {hi[0]:.1f} dB entre cortes (mais baixa em {lo[1]:.1f} s)"
+        if hi[0] - lo[0] > 6:
+            relato("REPROVADO", "voz desigual", txt_ + "; igualar o ganho dos cortes (reel_fala nivela sozinho)")
+        else:
+            print(f"  {'ok':10} voz: {txt_}")
     # legenda larga encosta na borda; brasão não cobre o texto da tarja
     tam = float(e.get("tam") or 3.5) * 19.2
     largas = [l for l in legs if largura(l["texto"], tam) > 880]
@@ -131,8 +160,9 @@ for q in seqs:
             relato("REPROVADO", "texto passa da margem", f"{t_['st']:.1f} '{t_['tx']['t'][:30]}': {larg:.0f} px de {lado:.0f}; diminua ou quebre a linha")
     if not a.sem_ouvir:
         o = subprocess.run([sys.executable, os.path.join(AQUI, "checar_cortes.py"), a.projeto, "--timeline", q["name"]], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+        # onda encostada na borda = palavra comida no início ou no fim (regra do Pailer, 2026-11-13): reprova, não é "ouvir"
         for lin in [x for x in o.splitlines() if " voz na borda " in x and "voz na borda nan" not in x]:
-            relato("OUVIR", "fim de corte", lin.strip())
+            relato("REPROVADO", "início de corte" if " início " in lin else "fim de corte", lin.strip())
 if a.render:
     print("## render", os.path.basename(a.render))
     som = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", a.render, "-af", "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8", errors="replace").stderr

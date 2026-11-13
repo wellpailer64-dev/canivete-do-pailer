@@ -21,6 +21,11 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Mandar vídeo, Reels, exportação ou arquivo: `WA enviar --conversa X --arquivo v.mp4 --texto legenda`. Vídeo acima de 16 MB vai como arquivo, sem compressão; `--comprimir` só se pedirem. Ver como iria sem postar: `--sim` (só simula). PDF e documento vão sem `--documento`: essa opção é para foto e vídeo sem compressão. Nunca testar em grupo de cliente.
 - Saída do envio de arquivo: 0 enviado, 1 não enviado, 3 incerto. Com 3, olhar a conversa antes de reenviar.
 
+## Google Fotos e navegador
+- Álbum compartilhado do Google Fotos inteiro, em qualidade original: `py -3.13 tools/agente/baixar_google_fotos.py "<link>" "<pasta BRUTO>"` (por `tarefas_soltas.py`; retoma, pula os já baixados, para antes de encher o disco). `--so-listar` só conta. Não usar "Fazer o download de tudo".
+- Navegador travado: `kb.py --onde kanicode uso` (quem está usando) → `kb.py recarregar [--aba ID]` (só a página) → `extensao recarregar` (só o motor) → `kb.py reiniciar` (último recurso; reabre as abas, pode pedir QR do WhatsApp).
+- Motor da extensão "não iniciou": a ponte já reinstala sozinha; .py do KaniBrowser editado entra no próximo comando, sem reiniciar o KaniCode.
+
 ## Quando algo falha
 - Mesmo erro duas vezes: parar e ler a causa, não repetir o comando.
 - "Sem veredito" do modo automático: avisar o Pailer na primeira vez; repetir não resolve e não se contorna por outro caminho.
@@ -30,8 +35,9 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Corrigir cor de vídeo pelos escopos (branco estourado, preto esmagado, cor puxada, pele vermelha): `py -3.13 tools/agente/cor_auto.py video.mp4 --look '{...grade do cliente...}' --folha prefixo` → valores do Luz e Cor.
 - Onde a música deve começar (pula intro, acha drop e seções calmo/agitado): `py -3.13 tools/agente/musica_ponto.py musica.mp3 [--min-cena 60]`; o `reel_fala.py` já usa.
 - Conferir, sempre primeiro em projeto pronto: `tools/agente/conferir_edicao.py projeto --sem-ouvir`.
-- Palavra comida no corte: `tools/agente/checar_cortes.py projeto`.
+- Palavra comida no corte (onda encostada no início ou no fim): `tools/agente/checar_cortes.py projeto [--sem-ouvir]`; ponta no vale: `tools/agente/onda_voz.py` (`Onda(arq).ajustar_fim/ajustar_inicio`).
 - Trocar arquivo por outra versão: `tools/agente/trocar_midia.py projeto "antigo" novo.mp4 --aplicar`.
+- Asset (lettering, GC, título) editável na timeline aberta: HTML → Comp nativa com `py -3.13 tools/agente/comp_html.py cena.html --nome "X (Comp)" --fonte PASTA --alvo X.mov`; fluxo em `metodo-edicao-video.md` › Assets editáveis. `.mov` sempre com `<nome>.fonte.json` ao lado.
 - Voz repetida em emenda: `tools/agente/fechar_emenda.py projeto TEMPO --aplicar`.
 - Abrir e fechar app de teste: `tools/agente/abrir_teste.py projeto`; `--fechar`.
 - Exportar e medir: `tools/agente/exportar_conferencia.py "T" pasta --nome n`. Acompanhar sem clicar: `tools/vigia_export.py`.
@@ -50,6 +56,10 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Currículo, CV ou PDF para robô de triagem: `tools/curriculo.py`, Slider A4, ficha JSON, `.dknv` editável e PDF vetorial.
 - Ordem: `extrair arquivo.psd --pasta P` → preencher a ficha → `faltas ficha.json` → perguntar o que faltar, sem inventar → `montar ficha.json --saida BASE` → `conferir BASE.pdf --ficha ficha.json --png P` → ver as páginas → enviar com o ok do Pailer.
 - Padrão: logo ao lado do nome escrito, nível em palavra, todas as experiências com abertura e bullets de uma ideia cada. Duas colunas podem sair fora de ordem em robôs antigos: avisar.
+
+## Texto atrás da pessoa / gancho de reel
+- Receita completa e armadilhas: `Instructions/agente/receita-gancho-texto-atras.md`. Máscara por pessoa e conferida por número: `py -3.13 D:/kanivete_testes/scripts/roto_pessoa.py --base CLIPE --nome NOVO --tr N --soma "x,y;x,y;x,y" --tira "x,y" --caixa x0,x1,y0,y1 --fora x0,x1,y0,y1` (rodar em segundo plano, ~1,5 min).
+- Recorte do Roto cortando cabeça/orelha/óculos (ou checar se está bom) sem olhar imagem: `py -3.13 tools/agente/roto_refinar.py --clip "NOME"` mede contra o BEN2 (falta % por quadro; moto/placa/outra pessoa ficam de fora); `--aplicar` põe os pontos, congela e remede. BEN2 na CPU ~20 s/quadro, guardado em `<cache>/ref` (2ª vez 3 s). `--tirar` mede sobra (objeto na frente da pessoa também conta: conferir antes de tirar).
 
 ## Demandas
 - Pandalab: `py -3.13 D:/Kanivete/Plugins/pandalab/panda.py` (mudar card real só com o Pailer).

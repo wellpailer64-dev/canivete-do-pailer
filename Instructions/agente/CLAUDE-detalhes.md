@@ -425,7 +425,7 @@ Painéis móveis do Vetor (mecanismo do Photo): §16, `frontend/js/vetor-dock.js
 
 ## Reel falado e conferência (2026-11-01)
 Regras: `metodo-edicao-video.md`. Conferência geral: `tools/agente/conferir_edicao.py`.
-`tools/agente/reel_fala.py` (roteiro JSON vira projeto), `tools/agente/checar_cortes.py` (ouve os fins de corte), `tools/agente/quadros_monitor.py` (folha do monitor), `tools/agente/exportar_conferencia.py` (exporta e mede), `D:/Kanivete/Plugins/kanibrowser/epidemic.py` (trilhas). Método em `guia-edicao.md`, seção REEL FALADO. Ficha: `clientes/gordinhos.md`.
+`tools/agente/reel_fala.py` (roteiro JSON vira projeto), `tools/agente/checar_cortes.py` (lê a onda no início e no fim de cada corte; onda na borda reprova), `tools/agente/onda_voz.py` (vale da voz em energia cheia + agudos, usado pelo gerador e pela conferência), `tools/agente/quadros_monitor.py` (folha do monitor), `tools/agente/exportar_conferencia.py` (exporta e mede), `D:/Kanivete/Plugins/kanibrowser/epidemic.py` (trilhas). Método em `guia-edicao.md`, seção REEL FALADO. Ficha: `clientes/gordinhos.md`.
 
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).
@@ -502,7 +502,17 @@ Guia: `Instructions/agente/kaniboard.md`. Testes avulsos: `D:/kanivete_testes/sc
 - `tools/agente/abrir_teste.py` liga `CANIVETE_PERFIL_COMUM=1`: a cópia 9333 usa a pasta de prévias e os limites de cache das preferências REAIS do Pailer (`Functions/perfil_comum.py`, `video_cutter._cache_cfg`), e cada projeto aberto/salvo vai para `%USERPROFILE%/AppData/Roaming/CaniveteDoPailer/recentes_comuns.json`; o app do Pailer junta essa lista aos recentes em `prefs_load`. Rascunhos em `D:\kanivete_testes` não entram. Testes automáticos (sem a variável) seguem isolados.
 - Uma cópia só: `_abrir_em_outra_copia` vale também para `python main.py`; só `--agente=PORTA` abre outra.
 
+## Assets editáveis: `comp_html.py` (2026-11-11)
+`tools/agente/comp_html.py cena.html --nome N --fonte PASTA [--alvo X.mov] [--porta 9222] [--so-plano]`: monta o HTML (`tools/motion_html.py`, montador em `tools/motion_html/montador.js`) numa timeline provisória, vira Comp (`veCompDeClipes`), volta à timeline aberta, põe a Comp na trilha livre acima do alvo, desativa o alvo, apaga a provisória. Não salva. `--fonte` recebe `plano.json`, `assets/` e o HTML. `motion_html.fontes_reais()` troca apelido de `@font-face` pelo nome instalado. `render_html.py` grava `<render>.fonte.json` (29 fichas retroativas; 16 `.mov` antigos sem gerador). Limites: sombra/filtro SVG/`backdrop-filter` não passam; prévia leve mostra retângulo preto atrás de transparência. Passo a passo: `metodo-edicao-video.md` › Fluxo de um asset.
+
 ## Guardas da página e da prévia (2026-11-07)
 - `testes/teste_scripts_globais.py` (sem app, roda no release.yml antes do build): reprova `const/let/class` global repetido entre os scripts do index.html — o 2º arquivo não carrega (o Encoder sumiu assim, `VEKE`).
 - Aviso na tela "Parte do KANIVETE não carregou" (script inline no topo do index.html; lista em `window.__scriptsFalhos`).
 - `testes/teste_previa_assinaturas.py` (app de teste, porta 9341): cada controle que muda a imagem (olho da trilha, clipe desativado, opacidade, efeito, olho das legendas, tamanho) troca `vePrImpressao` (trecho renderizado) e `veCacheSig` (quadro da RAM). Controle novo que mexe na imagem → caso novo em `CONTROLES`.
+
+## roto_refinar.py — refino automático do Pincel Roto (2026-11-12)
+`tools/agente/roto_refinar.py --clip NOME [--aplicar] [--passo 6] [--max-bases 4] [--limiar 0.01] [--tirar] [--qual alta] [--folha x.jpg]`.
+Segunda opinião = BEN2 (mesmo de "Selecionar assunto") no quadro do cache (`quadros/q_N.jpg`), comparado com o alfa final (`a/a_N.png`) em 540 px.
+Falta = BEN2 dentro de uma faixa de 5% em volta do recorte, fora dele e fora das outras pessoas (outros clipes com Roto na mesma mídia);
+pedaço cujo BEN2 continua para longe da faixa (moto, placa) é descartado. Ponto verde no miolo de cada pedaço (máx. 4 por quadro),
+piores quadros afastados viram quadros-base. Caso Carlinhos: topo da cabeça e orelhas 1,4–3,6% → 0,0–0,3% numa rodada.

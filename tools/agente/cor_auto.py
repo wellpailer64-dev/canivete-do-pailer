@@ -207,8 +207,8 @@ def ajustar(p, look=None, lut=None, ini=0.0, fim=None, falar=False):
             passo = {k: x / 2 for k, x in passo.items()}
             if max(passo[k] / VARS[k][2] for k in nomes) < 0.1:
                 break
-    for k in list(v):   # inteiros onde o painel usa passo 1
-        if k != "exp":
+    for k in list(v):   # inteiros onde o painel usa passo 1 (rodas "cw" e curva "cv" da grade do cliente passam como vieram)
+        if k != "exp" and isinstance(v[k], (int, float)):
             v[k] = int(round(v[k]))
     if usa_pele and v.get("qs", 100) == 100 and v.get("qr", 0) == 0:
         for k in ("qh", "qw", "qf", "qs0", "qs1", "ql0", "ql1", "qs", "qr", "qe"):

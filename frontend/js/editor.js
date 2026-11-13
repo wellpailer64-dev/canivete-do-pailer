@@ -1327,11 +1327,26 @@ function veAfterEdit(playhead) {
 // Corta TODAS as trilhas no ponto (cortar = fatiar, nunca apagar). `so` = só estes clipes (E: os selecionados)
 function veSplitAt(t, quiet, so) {
     if (!VE.ready) return false;
-    t = veSnapFrame(veClamp(t));
+    t = veClamp(t);
+    // Agulha em cima de um corte que já existe (mesmo fora da grade de quadros: cortes vindos de importação, áudio...):
+    // cortar nesse tempo exato. Arredondar para a grade cortava a camada de ajuste 0,45 quadro depois do corte dos
+    // vídeos e deixava um "bico" que não dava para cortar nem aparar
+    let borda = null;
+    VE.clips.forEach(c => [c.st, veEnd(c)].forEach(x => {
+        const d = Math.abs(x - t);
+        if (d <= veFrame() * 0.5 && (borda === null || d < Math.abs(borda - t))) borda = x;
+    }));
+    t = borda !== null ? borda : veSnapFrame(t);
     const f = veFrame() * 0.99;
     const base = so || VE.clips;
     const alvo = base.filter(c => !veLocked(c) && t - c.st >= f && veEnd(c) - t >= f);
-    if (!alvo.length) {
+    // Bico: clipe (típico: camada de ajuste) que termina menos de um quadro depois da agulha — fora da grade dos
+    // outros. Não entrava em `alvo` (sobra < 1 quadro), ficava um quadro à frente do corte e não dava para cortar nem
+    // aparar. Cortar em tudo agora também encosta esse fim na agulha (a sobra de menos de um quadro some)
+    const bico = base.filter(c => !veLocked(c) && t - c.st >= f && veEnd(c) - t > VE_SOBRA && veEnd(c) - t < f);
+    // O espelho: começa menos de um quadro antes da agulha → o começo encosta nela (a sobra de trás some)
+    const bicoIni = base.filter(c => !veLocked(c) && t - c.st > VE_SOBRA && t - c.st < f && veEnd(c) - t >= f);
+    if (!alvo.length && !bico.length && !bicoIni.length) {
         if (!quiet && base.some(c => veLocked(c) && t - c.st >= f && veEnd(c) - t >= f)) { veAvisoBloqueio(); return false; }
         if (!quiet) veToast(so ? 'Nenhum clipe selecionado passa pela agulha' : veTopAt(t) < 0 ? 'Não há clipe na agulha' : 'Já existe um corte aqui');
         return false;
@@ -1343,6 +1358,21 @@ function veSplitAt(t, quiet, so) {
         VE.clips.push(veSemTin(lk({ ...c, st: t, s: src, e: c.e })));
         c.e = src;
         delete c.tout; delete c.atout;
+    });
+    // A emenda de dois clipes de ajuste colados fora da grade (ex.: 0,45 quadro depois da agulha) é o bico clássico:
+    // mover as duas pontas juntas para a agulha, senão sobra um buraco de menos de um quadro. Só camada de ajuste
+    // (a fonte dela não tem limite); vídeo/áudio ficam só aparados
+    const vizinho = (c, emIni) => VE.clips.find(d => d !== c && d.tr === c.tr && !veLocked(d) && veIsAdj(d) && veIsAdj(c) &&
+        Math.abs(emIni ? veEnd(d) - c.st : d.st - veEnd(c)) < VE_SOBRA);
+    bico.forEach(c => {
+        const d = vizinho(c, false);
+        c.e = veSrcAt(c, t); delete c.tout; delete c.atout;
+        if (d) { d.s = veSrcAt(d, t); d.st = t; delete d.tin; delete d.atin; }
+    });
+    bicoIni.forEach(c => {
+        const d = vizinho(c, true);
+        c.s = veSrcAt(c, t); c.st = t; delete c.tin; delete c.atin;
+        if (d) { d.e = veSrcAt(d, t); delete d.tout; delete d.atout; }
     });
     VE.sel = selC ? VE.clips.indexOf(selC) : -1;
     veRelayout();
@@ -1787,6 +1817,74 @@ async function veSincronizarClipes() {
     veRelayout();
     veAfterEdit(VE.playhead);
     veToast(grupos.length === 2 ? 'Clipes sincronizados pelo áudio' : `${grupos.length} clipes sincronizados pelo áudio`);
+}
+
+// ── Sincronizar com lapela: tomadas da câmera + gravador de áudio à parte, ligado o tempo todo ──
+// Lapela = mídia do painel Projeto com "lapela" no nome (áudio ou vídeo com som), ou o clipe dela selecionado junto.
+// Cada tomada selecionada é procurada em todas as lapelas (Functions/sincronizar.py: localizar_lapela) e casada
+// sozinha (o relógio de dois aparelhos escorrega). O trecho certo da lapela entra numa trilha de áudio livre,
+// vinculado à tomada, e o som da câmera fica desativado (dá para reativar e comparar). Repetir não duplica.
+function veEhLapela(m) {
+    if (!m || m.removido || !/lapela/i.test(m.name || m.nome || m.path || '')) return false;
+    return m.kind === 'audio' || (m.kind === 'video' && !!(m.info && m.info.has_audio));
+}
+function veTemLapela() { return (VE.media || []).some(veEhLapela); }
+async function veSincronizarLapela() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_localizar_lapela) return;
+    const sel = veSelLista();
+    const selLap = sel.filter(c => veEhLapela(veMediaOf(c)));
+    let lapelas = [...new Set(selLap.map(veMediaOf))];
+    if (!lapelas.length) lapelas = VE.media.filter(veEhLapela);
+    if (!lapelas.length) { veToast('Importe a lapela no painel Projeto (com "lapela" no nome) ou selecione o clipe dela junto'); return; }
+    const grupos = [];
+    sel.filter(c => !selLap.includes(c)).forEach(c => { if (!grupos.some(g => g.includes(c))) grupos.push([...new Set([c, ...veVinculados(c)])]); });
+    const tomadas = grupos.map(g => ({ g, som: g.find(c => veTemSom(c) && !veEhLapela(veMediaOf(c))) })).filter(t => t.som);
+    if (!tomadas.length) { veToast('Selecione as tomadas da câmera (com som) para sincronizar com a lapela'); return; }
+    if (tomadas.some(t => t.g.some(veLocked))) { veAvisoBloqueio(); return; }
+    if (tomadas.some(t => Math.abs(veVel(t.som) - 1) > 1e-6)) { veToast('Sincronizar com lapela: deixe a velocidade das tomadas em 100% antes'); return; }
+    veToast(`Procurando ${tomadas.length} tomada${tomadas.length > 1 ? 's' : ''} na lapela...`);
+    const achados = [];
+    let falhas = 0;
+    for (const t of tomadas) {
+        let r;
+        try { r = await api.ve_localizar_lapela(veMediaOf(t.som).path, t.som.s, t.som.e, lapelas.map(m => m.path)); } catch (e) { r = { error: String(e) }; }
+        if (r && r.success && r.ok) achados.push({ t, m: lapelas[r.indice], atraso: r.atraso }); else falhas++;
+    }
+    if (!achados.length) { veToast('Nenhuma tomada bateu com a lapela (são da mesma gravação?)'); return; }
+    vePushHistory();
+    let feitos = 0;
+    achados.forEach(({ t, m, atraso }) => {
+        const som = t.som;
+        if (!VE.clips.includes(som)) return;
+        if (!som.lk && !som.x) veSeparar(som);           // tomada inteira vira imagem + som vinculados
+        if (!som.lk) som.lk = veNovoLk();
+        const lk = som.lk;
+        VE.clips = VE.clips.filter(o => !(o.lk === lk && veEhLapela(veMediaOf(o))));   // ressincronizar: tira a anterior
+        const cam = VE.clips.filter(o => o.lk === lk && veOcupaA(o));
+        const ini = Math.min(...VE.clips.filter(o => o.lk === lk).map(o => o.st));
+        const fim = Math.max(...VE.clips.filter(o => o.lk === lk).map(veEnd));
+        let s = atraso + (ini - som.st), st = ini;   // atraso = ponto da lapela no início de `som`
+        const dur = veDurMidia({ m: m.id });
+        if (s < 0) { st -= s; s = 0; }
+        const e = Math.min(dur, s + (fim - st));
+        if (e - s < veFrame()) return;
+        const novo = { m: m.id, st, s, e, lk };
+        if (m.kind === 'video') novo.x = 'a';
+        const b = st + (e - s), base = cam.length ? Math.max(...cam.map(o => o.tr)) : som.tr;
+        const livre = k => !veTrkLocked(k) && veTrackFree(k, st, b, novo);
+        let tr = veTrackIndexes().find(k => k > base && livre(k));
+        if (tr == null) tr = veTrackIndexes().find(livre);
+        if (tr == null) { tr = veTrackCount(); veEnsureTrackIndex(tr); }
+        novo.tr = tr;
+        cam.forEach(o => { o.off = true; });
+        VE.clips.push(novo);
+        feitos++;
+    });
+    veRelayout();
+    veAfterEdit(VE.playhead);
+    veToast(`${feitos} tomada${feitos > 1 ? 's' : ''} com som da lapela` + (falhas ? ` · ${falhas} sem par na lapela` : ''));
+    return { feitos, falhas };
 }
 
 // Retângulo de seleção (arrastar na área vazia): pega o que ele tocar; Shift soma à seleção
@@ -3285,6 +3383,7 @@ function veClipMenu(i, x, y, doc) {
         <button class="ve-ctx-item" data-ctx="comp">Criar Comp…<kbd>Ctrl+Shift+C</kbd></button>
         <button class="ve-ctx-item" data-ctx="cenas" title="Acha os blocos de cena e põe cada um numa Comp que só organiza (o resultado não muda)">Agrupar cenas em Comps</button>
         ${veSelLista().includes(c) && new Set(veSelLista().map(o => o.lk || o)).size > 1 ? '<button class="ve-ctx-item" data-ctx="sinc">Sincronizar clipes (pelo áudio)</button>' : ''}
+        ${veSelLista().includes(c) && (veTemLapela() || veSelLista().some(o => veEhLapela(veMediaOf(o)))) && veSelLista().some(o => veTemSom(o) && !veEhLapela(veMediaOf(o))) ? '<button class="ve-ctx-item" data-ctx="lapela" title="Acha o som de cada tomada nas lapelas do projeto (nome com &quot;lapela&quot;), põe o trecho vinculado e desativa o som da câmera">Sincronizar com lapela</button>' : ''}
         <button class="ve-ctx-item" data-ctx="off">${veClipOff(c) ? '' : '✓ '}Ativar<kbd>Ctrl+Shift+E</kbd></button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
         ${typeof veMelMenuItens === 'function' && veTemSom(c) ? veMelMenuItens(veMediaOf(c), 'data-ctx') : ''}
@@ -3304,6 +3403,7 @@ function veClipMenu(i, x, y, doc) {
         } else if (it) {
             // Criar Comp: o clipe clicado já selecionado (com o grupo) não perde a seleção múltipla
             if (it.dataset.ctx === 'sinc') { veClipMenuFechar(); veSincronizarClipes(); return; }
+            if (it.dataset.ctx === 'lapela') { veClipMenuFechar(); veSincronizarLapela(); return; }
             if (it.dataset.ctx === 'cenas') { veClipMenuFechar(); veCompAgruparCenas(); return; }
             if (it.dataset.ctx === 'comp') {
                 if (!veSelLista().includes(VE.clips[i])) veSelDefinir([VE.clips[i]], VE.clips[i]);
@@ -6497,10 +6597,13 @@ function veOpenExport() {
     VE._expNomes = VE._expNomes || {};
     nome.value = VE._expNomes[VE.activeSequence] || base;
     VE._expBase = base;
-    // pasta: sempre a do projeto salvo (o botão escolhe outra só para esta exportação); sem projeto, a do vídeo
+    // pasta: a RENDER do card (método do Pailer: BRUTO, ASSETS, PROJETO, RENDER); sem ela, a do projeto salvo; sem
+    // projeto, a do vídeo. O botão escolhe outra só para esta exportação.
     const pastaProj = VE.projectPath ? VE.projectPath.replace(/[\\/][^\\/]*$/, '') : null;
     VE.dest = pastaProj;
+    VE.destManual = false;
     $ve('ve-dest-label').textContent = pastaProj || veT('Mesma pasta do vídeo original');
+    veDestRender();
     // qualidade: abre sempre em Máxima (pedido do Pailer, 2026-10-11); dá para mudar só nesta exportação
     document.querySelectorAll('#ve-export .ve-pills[data-name="quality"] .ve-pill').forEach(x => x.classList.toggle('active', x.dataset.v === 'high'));
     // codec, bits e taxa lembrados entre exportações
@@ -6597,12 +6700,41 @@ function veChooseDest() {
     window.pywebview.api.select_folder('video-cutter').then(r => {
         if (r && r.success) {
             VE.dest = r.path;
+            VE.destManual = true;
             $ve('ve-dest-label').textContent = r.path;
         }
     });
 }
 
+// pasta RENDER do card do projeto (ou do vídeo, se o projeto ainda não foi salvo): vira o destino padrão
+async function veDestRender() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.pasta_render) return;
+    const r = await api.pasta_render(VE.projectPath || VE.path || '');
+    if (r && r.path && !VE.destManual) { VE.dest = r.path; if ($ve('ve-dest-label')) $ve('ve-dest-label').textContent = r.path; }
+}
+
+// antes de exportar o projeto fica salvo (na pasta PROJETO do card): salvo e mudado = salva junto; nunca salvo = pergunta
+async function veSalvarAntesDeExportar() {
+    if (VE.projectPath && !/\.vcnvt$/i.test(VE.projectPath)) return VE.dirty ? await veSaveProject() : true;
+    const op = await appConfirm({ titulo: veT('Salvar o projeto antes de exportar'),
+        texto: veT('O projeto editável ainda não foi salvo. Salve na pasta PROJETO da peça para o render sair na pasta RENDER ao lado.'),
+        botoes: [{ rotulo: veT('Exportar sem salvar'), valor: 'nao' }, { rotulo: veT('Salvar e exportar'), valor: 'sim', tipo: 'primario' }] });
+    if (op !== 'sim') return op === 'nao';
+    if (!(await veSaveProject())) return false;
+    if (!VE.destManual) {
+        const pastaProj = VE.projectPath.replace(/[\\/][^\\/]*$/, '');
+        VE.dest = pastaProj;
+        $ve('ve-dest-label').textContent = pastaProj;
+        await veDestRender();
+    }
+    return true;
+}
+
 async function veStartExport() {
+    if (VE.exportRunning) return;
+    if (!(await veSalvarAntesDeExportar())) return;
+    if (!VE.destManual) await veDestRender();   // evita destino antigo se a consulta ao abrir o painel ainda estava pendente
     VE.exportRunning = true;
     document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.add('rodando');
     $ve('ve-export-form').hidden = true;

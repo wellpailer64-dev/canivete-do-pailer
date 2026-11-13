@@ -21,7 +21,7 @@ Comece em `Instructions/agente/fluxo-peca-cliente.md`; fichas em `Instructions/a
 - Vetor: `VKN.curto = true`, `VKN.revisar()` antes de abrir imagem; imagem só no fim, em folha reduzida. Cliente: `tools/briefing.py "<pasta>"`, `tools/imgprep.py`.
 
 ## Testar
-- Modo agente: `python main.py --agente` (CDP 9222). Fechar o app aberto do usuário exige o ok dele; clique simulado só no app de teste.
+- Modo agente: `py -3.13 main.py --agente` (CDP na porta identificada por `tools/porta_agente.py`). Quando o Pailer pedir trabalho no app aberto, prefira API, CLI e atalhos; preserve o projeto e o trabalho em andamento. Fechar o app dele exige o ok dele; testes usam o app de teste.
 - App de teste, sempre no disco D: `APPDATA=D:\kanivete_testes\appdata TEMP=D:\kanivete_testes\tmp TMP=D:\kanivete_testes\tmp LOCALAPPDATA=D:\kanivete_testes\localappdata python main.py --agente=9333`; testes `testes/*.py` com o mesmo ambiente. Scripts avulsos em `D:\kanivete_testes\scripts`.
 - Antes de release: reprodução/áudio → `testes/teste_play.py`; exportação, camadas, efeitos, cor → `testes/teste_export.py`; Photo → `teste_imagem.py`; Vetor → `teste_vetor.py`; ponte → `teste_ponte.py`.
 - Bug novo de exportação: caso novo em `CASOS` que reprova sem a correção.
