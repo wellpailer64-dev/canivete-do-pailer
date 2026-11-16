@@ -516,3 +516,6 @@ Segunda opinião = BEN2 (mesmo de "Selecionar assunto") no quadro do cache (`qua
 Falta = BEN2 dentro de uma faixa de 5% em volta do recorte, fora dele e fora das outras pessoas (outros clipes com Roto na mesma mídia);
 pedaço cujo BEN2 continua para longe da faixa (moto, placa) é descartado. Ponto verde no miolo de cada pedaço (máx. 4 por quadro),
 piores quadros afastados viram quadros-base. Caso Carlinhos: topo da cabeça e orelhas 1,4–3,6% → 0,0–0,3% numa rodada.
+
+## MCP de vídeo: ver, medir e desfazer (lote 12)
+Tira de quadros (`kanivete_tira_quadros`), `consultar_timeline`, `analisar_mix`, pontos de restauração + lote `transacional`, e `kanivete_imagem_do_dia_video` (MagnetUS, `tools/agente/imagem_dia_video.py`, modelo em `D:/kanivete_biblioteca/modelos/magnetus_imagem_dia_video/`). Detalhe e cuidados: `Instructions/agente/roadmap-mcp-video.md` (seção "Lote 12"). Testes: `D:/Kanivete/Plugins/kanicode/tests/test_mcp_kanivete.py` e `testes/teste_imagem_dia_video.py`.

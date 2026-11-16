@@ -207,8 +207,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `vetor-transformar.js`: `repetir` (repetir transformação), `transformar_cada` (transformar cada), `distribuir_espaco` (distribuir espaçamento)
 - `vetor-vinculos.js`: `vinculos` (vínculos), `revincular` (substituir imagem), `atualizar_vinculo` (atualizar vínculo)
 
-## 7. Photo Kanivete — `window.KNV` (82 métodos; detalhes em `frontend/js/imagem-api.js`)
-`novo`, `doc`, `camadas`, `ativar`, `info`, `renomear`, `cmd`, `nova`, `colocar`, `transformar`, `girar`, `escalar`, `caixa`, `alinhar`, `encostar`, `caixaGrupo`, `mover`, `moverPara`, `modo`, `ajuste`, `objetoInteligente`, `atenuar`, `colarDentro`, `substituirTexto`, `preenchimentoGenerativo`, `expansaoGenerativa`, `variacaoGenerativa`, `substituirCeu`, `preencherConteudo`, `preenchimento`, `preenchimentoDegrade`, `duplicar`, `removerFundo`, `borrachaMagica`, `gerar`, `selecionar`, `selecionarPoligono`, `preencher`, `degrade`, `pincel`, `lote`, `definirPadrao`, `salvar`, `abrir`, `fecharDoc`, `fecharTudo`, `texto`, `efeito`, `formas`, `revisarPeca`, `revisarGabarito`, `revisarDirecao`, `revisar`, `mapa`, `layoutGuias`, `novaGuia`, `guias`, `limparGuias`, `guiasDaForma`, `fatiasDasGuias`, `ajustar`, `cena`, `cenaFonte`, `exportar`, `marca`, `instalarFonte`, `fontes`, `ver`, `variacoes`, `etapa`, `referencia`, `comparar`, `receita`, `levarParaEditor`, `exportarRapido`, `recursosNovos`, `png`, `cor`, `dialogos`, `automacao`, `dialogo`, `responder`
+## 7. Photo Kanivete — `window.KNV` (86 métodos; detalhes em `frontend/js/imagem-api.js`)
+`novo`, `doc`, `camadas`, `ativar`, `info`, `definirVisibilidade`, `renomear`, `conferir`, `cmd`, `nova`, `colocar`, `transformar`, `girar`, `escalar`, `caixa`, `alinhar`, `encostar`, `caixaGrupo`, `mover`, `moverPara`, `modo`, `ajuste`, `objetoInteligente`, `atenuar`, `colarDentro`, `substituirTexto`, `preenchimentoGenerativo`, `expansaoGenerativa`, `variacaoGenerativa`, `substituirCeu`, `preencherConteudo`, `preenchimento`, `preenchimentoDegrade`, `duplicar`, `removerFundo`, `borrachaMagica`, `gerar`, `selecionar`, `selecionarPoligono`, `preencher`, `forma`, `degrade`, `pincel`, `lote`, `definirPadrao`, `salvar`, `abrir`, `fecharDoc`, `fecharTudo`, `texto`, `ajustarTexto`, `efeito`, `formas`, `revisarPeca`, `revisarGabarito`, `revisarDirecao`, `revisar`, `mapa`, `layoutGuias`, `novaGuia`, `guias`, `limparGuias`, `guiasDaForma`, `fatiasDasGuias`, `ajustar`, `cena`, `cenaFonte`, `exportar`, `marca`, `instalarFonte`, `fontes`, `ver`, `variacoes`, `etapa`, `referencia`, `comparar`, `receita`, `levarParaEditor`, `exportarRapido`, `recursosNovos`, `png`, `cor`, `dialogos`, `automacao`, `dialogo`, `responder`
 
 **Editor — Cena 3D `window.VE3DAPI`** (16): `nova`, `modelo`, `aparencia`, `partes`, `duplicar`, `renomear`, `zerar`, `definir`, `kf`, `doVetor`, `limparKf`, `cena`, `remover`, `info`, `renderizar`, `quadro`
 
@@ -318,6 +318,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/remover-fundo.md` — Remover fundo (recorte) — velocidade × qualidade (2026-10-06)
 - `Instructions/agente/repertorio-visual.md` — Repertório visual aprovado pelo Pailer
 - `Instructions/agente/ritmo-cortes-audio.md` — Ritmo, cortes e áudio — referência de montagem profissional
+- `Instructions/agente/roadmap-mcp-video.md` — Roadmap: comandos do Editor de Vídeo no MCP (`kanivete_executar_comando`, domínio `video`)
 - `Instructions/agente/tecnicas-de-montagem.md` — Técnicas de montagem: cortes, transições, storytelling e tempo de tela
 - `Instructions/agente/teste-4k.md` — Teste de 4K (estresse do Editor de Vídeo)
 - `Instructions/agente/worker.md` — Canivete Worker — o assistente local (para o Claude delegar operações)
@@ -492,6 +493,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_harmonizar.py` — Harmonização: análise, isolamento, ajustes editáveis, prévia, cancelamento e histórico; sem IA
 - `testes/teste_illustrator.py` — Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
+- `testes/teste_imagem_dia_video.py` — Testa tools/agente/imagem_dia_video.py com assets mínimos gerados na hora (card fictício no disco D:)
 - `testes/teste_jcut.py` — J-cut após o corte de respiros, no app de teste
 - `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
 - `testes/teste_kani_maos.py` — Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da
