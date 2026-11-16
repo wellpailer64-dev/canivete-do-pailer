@@ -102,6 +102,27 @@ def _threads_python():
     return out
 
 
+def _clientes_cdp(procs):
+    """Processos de fora ligados à porta de depuração (CDP) do navegador do WebView2: [(pid, nome, linha de comando curta)].
+    Em 2026-11-16 o processo principal do WebView foi a 3,5 GB com um cliente playwright preso a uma página ocupada e voltou a
+    150 MB no instante em que o cliente morreu."""
+    try:
+        nav = next((p for p in procs if _tipo(p) == "navegador"), None)
+        if not nav:
+            return []
+        portas = {c.laddr.port for c in nav.net_connections(kind="tcp") if c.status == "LISTEN"}
+        meus = {p.pid for p in procs} | {os.getpid()}
+        out, vistos = [], set()
+        for c in psutil.net_connections(kind="tcp"):
+            if c.status == "ESTABLISHED" and c.raddr and c.raddr.port in portas and c.pid and c.pid not in meus and c.pid not in vistos:
+                vistos.add(c.pid)
+                q = psutil.Process(c.pid)
+                out.append((q.pid, q.name(), " ".join(q.cmdline())[:140]))
+        return out
+    except Exception:
+        return []
+
+
 def _incidente(motivo, procs, total, cresce):
     agora = time.time()
     if agora - _estado["ultimo_incidente"] < 60:
@@ -112,7 +133,7 @@ def _incidente(motivo, procs, total, cresce):
         "livre_mb": round(psutil.virtual_memory().available / 1048576),
         "processos": [{"pid": p.pid, "tipo": _tipo(p), "mb": round(_mb(p)), "cpu_s": round(sum(p.cpu_times()[:2]), 1)} for p in procs if p.is_running()],
         "python_mb": round(psutil.Process(os.getpid()).memory_info().rss / 1048576),
-        "midia": _pedidos_midia(), "threads_python": _threads_python(),
+        "clientes_cdp": _clientes_cdp(procs), "midia": _pedidos_midia(), "threads_python": _threads_python(),
     }
     try:
         with open(arquivo_log(), "a", encoding="utf-8") as f:
@@ -143,6 +164,13 @@ def _conter(procs, motivo):
     if not _estado["contencao"]:
         _estado["contencao"] = agora
         _pedir_salvar()
+        pesado = max(procs, key=_mb)
+        if _tipo(pesado) == "navegador":   # o gordo é o processo principal: costuma ser um cliente CDP (playwright) preso
+            for pid, nome, cmd in _clientes_cdp(procs):
+                if "playwright" in cmd.lower():
+                    print(f"[vigia] contenção ({motivo}): encerrando cliente CDP {pid}", flush=True)
+                    _seguro(psutil.Process(pid).kill)
+            return
         # o mais pesado entre as páginas e a placa; o Chromium recria o processo da placa sozinho
         candidatos = sorted([p for p in procs if _tipo(p) in ("renderer", "gpu-process")], key=_mb, reverse=True)
         alvo = candidatos[0] if candidatos else None
