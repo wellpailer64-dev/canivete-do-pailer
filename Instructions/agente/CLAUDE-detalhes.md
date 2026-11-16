@@ -519,3 +519,9 @@ piores quadros afastados viram quadros-base. Caso Carlinhos: topo da cabeça e o
 
 ## MCP de vídeo: ver, medir e desfazer (lote 12)
 Tira de quadros (`kanivete_tira_quadros`), `consultar_timeline`, `analisar_mix`, pontos de restauração + lote `transacional`, e `kanivete_imagem_do_dia_video` (MagnetUS, `tools/agente/imagem_dia_video.py`, modelo em `D:/kanivete_biblioteca/modelos/magnetus_imagem_dia_video/`). Detalhe e cuidados: `Instructions/agente/roadmap-mcp-video.md` (seção "Lote 12"). Testes: `D:/Kanivete/Plugins/kanicode/tests/test_mcp_kanivete.py` e `testes/teste_imagem_dia_video.py`.
+
+## Vigia do WebView2 (`Functions/vigia_webview.py`, 2026-11-16)
+Causa do dia: um `msedgewebview2` do app foi a 14 GB (25 MB/s, app parado), a RAM livre caiu a 0,7 GB e o PC todo travou; a página nem respondia ao CDP e a causa não foi reproduzida (tira_quadros, troca de sequência, abrir V1 e reproduzir: memória estável). Por isso o app agora se vigia sozinho.
+- Thread do Python mede a árvore msedgewebview2 a cada 3 s. Incidente (≥5 GB, ≥12 MB/s por 20 s acima de 2,5 GB, ou RAM livre <1,5 GB): linha JSON em `%APPDATA%/CaniveteDoPailer/vigia_webview.log` com processos (tipo, MB, CPU), pedidos de mídia dos últimos 60 s (`media_server.estatisticas()`) e a pilha de cada thread do Python. **Incidente novo: ler esse log primeiro, não reinvestigar do zero.**
+- Contenção (≥9 GB ou RAM livre <1,5 GB com WebView grande): pede `veAutosave(true,true)` (5 s de prazo), mata o renderer/gpu mais pesado; se continuar 20 s depois, mata a árvore toda. Teste: `KANIVETE_VIGIA_ALTO_MB=700 KANIVETE_VIGIA_CRITICO_MB=1300` no app de teste. `KANIVETE_VIGIA=0` desliga.
+- `media_server`: pedido `Range: bytes=N-` (sem fim) devolve no máximo 64 MB (206); o player pede o resto sozinho.

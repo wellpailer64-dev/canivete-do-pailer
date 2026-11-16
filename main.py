@@ -6477,6 +6477,11 @@ def main():
             _agente_registrar(porta_instancia=_porta_inst)
 
     def _splash_sound():
+        try:   # vigia do WebView2: grava evidências e contém o descontrole de memória (Functions/vigia_webview.py)
+            from Functions import vigia_webview
+            vigia_webview.iniciar(lambda: window.evaluate_js("typeof veAutosave==='function' && veAutosave(true,true)"))
+        except Exception as e:
+            print("[vigia] não iniciou:", e)
         try:   # criações do chat da Kani da sessão anterior (Functions/kani_criar.py): não acumulam
             from Functions import kani_criar
             threading.Thread(target=kani_criar.limpar, daemon=True).start()

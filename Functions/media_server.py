@@ -6,11 +6,13 @@ confiável caminhos file:/// (espaços, acentos, pastas diferentes no .exe). Aqu
 arquivo é registrado com um token aleatório e servido com suporte a Range (seek do <video>).
 Só escuta em 127.0.0.1 e só entrega arquivos registrados.
 """
+import collections
 import mimetypes
 import os
 import re
 import secrets
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote
 
@@ -22,6 +24,8 @@ _versoes = globals().get("_versoes", {})   # caminho → (token, (mtime, tamanho
 _memoria = globals().get("_memoria", {})    # token -> (bytes, tipo): arquivos que só existem na memória (camadas do Editor de Imagem)
 _envios = globals().get("_envios", {})      # sessão -> {chave: bytes}: o que a página manda por POST /u/<sessão>/<chave> (salvar PSD)
 _lock = globals().get("_lock") or threading.Lock()
+_pedidos = globals().get("_pedidos") or collections.deque(maxlen=3000)   # (instante, token, início, bytes) dos últimos pedidos
+_PEDACO_MAX = 64 * 1024 * 1024   # pedido "bytes=N-" (sem fim) devolve no máximo isto; o player pede o resto sozinho
 _server = globals().get("_server")
 _port = globals().get("_port", 0)
 
@@ -133,7 +137,12 @@ class _Handler(BaseHTTPRequestHandler):
                     self.end_headers()
                     return
                 status = 206
+        if status == 206 and not (m.group(2) if rng and m else ""):   # faixa aberta: não despeja o arquivo inteiro de uma vez
+            end = min(end, start + _PEDACO_MAX - 1)
         length = end - start + 1
+        if not head:
+            tk = re.match(r"^/m/([A-Za-z0-9_-]+)/", self.path)
+            _pedidos.append((time.time(), tk.group(1)[:8] if tk else "?", start, length))
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Accept-Ranges", "bytes")
@@ -157,6 +166,20 @@ class _Handler(BaseHTTPRequestHandler):
                     restante -= len(bloco)
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             pass
+
+
+def estatisticas(janela_s=60):
+    """O que o servidor entregou nos últimos `janela_s` s: total de pedidos/bytes e os arquivos mais pedidos (diagnóstico do vigia)."""
+    corte = time.time() - janela_s
+    por = {}
+    for t, tk, ini, n in list(_pedidos):
+        if t >= corte:
+            d = por.setdefault(tk, {"pedidos": 0, "mb": 0.0})
+            d["pedidos"] += 1
+            d["mb"] += n / 1048576
+    top = sorted(por.items(), key=lambda kv: -kv[1]["pedidos"])[:5]
+    return {"janela_s": janela_s, "pedidos": sum(v["pedidos"] for v in por.values()), "mb": round(sum(v["mb"] for v in por.values())),
+            "top": [{"token": k, "pedidos": v["pedidos"], "mb": round(v["mb"])} for k, v in top]}
 
 
 def _ensure_server():
