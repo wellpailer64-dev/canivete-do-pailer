@@ -2,6 +2,12 @@
 
 Vale para arte e vídeo de cliente do Pandalab. Siga na ordem. Cliente com ficha: ler `Instructions/agente/clientes/<cliente>.md` no passo 2.
 
+## DESTINO OBRIGATÓRIO (regra do Pailer, 2026-11-16)
+Toda arte ou edição nova precisa de destino ANTES do primeiro arquivo: cliente > mês > pasta da peça na sequência > BRUTO/ASSETS/PROJETO/RENDERS.
+Tudo nasce lá (projeto, assets, prévias de aprovação, render). Nunca em `D:/kanivete_testes`, tmp ou raiz.
+Sem destino claro: PERGUNTAR ao Pailer, nunca presumir. Ao fechar a tarefa, conferir que a pasta existe e nada ficou solto.
+Falha de origem: entregas da Magnet Us de nov/2026 soltas em `D:/kanivete_testes/pecas`.
+
 ## Método de pastas (toda demanda, do sistema ou local — 2026-11-12)
 1. Quem é o cliente? Tem pasta? (`mapa_clientes.json` do Pandalab). Abrir a pasta do mês das produções.
 2. Peça nova = pasta nova na sequência da anterior (`06 - ESTATICO FLYER BLACK FRIDAY`), com `01 - BRUTO`, `02 - ASSETS`,

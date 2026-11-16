@@ -69,7 +69,42 @@ const KNV = {
         const c = ieCanvas(b.w, b.h); ieCtx(c).drawImage(L.c, -b.x, -b.y);
         L.c = c; L.x += b.x; L.y += b.y; ieInvalidar(L);
     },
+    // mostra/oculta uma camada pelo id numérico, com um passo de histórico (Ctrl+Z desfaz) — usado pelo MCP (escrita reversível)
+    definirVisibilidade(id, visivel) {
+        const d = IE.doc; if (!d) throw new Error('sem documento');
+        const achado = ieAchar(d, id); const L = achado && achado.L;
+        if (!L) throw new Error(`camada ${id} não existe`);
+        const antes = L.visivel !== false; visivel = !!visivel;
+        if (antes === visivel) return { id, antes, depois: visivel, mudou: false };
+        L.visivel = visivel;
+        if (L.tipo === 'grupo') ieInvalidar(L);
+        ieAgendar(L.tipo === 'ajuste' ? null : ieRCamada(L), d);
+        ieMudouDoc(d); ieUiCamadas();
+        ieHist(ieT(visivel ? 'Mostrar camada' : 'Ocultar camada'), d);
+        window.kvAgenteFx?.((visivel ? 'mostrou ' : 'ocultou ') + '“' + String(L.nome || id).slice(0, 36) + '”', `.ie-cam[data-id="${id}"]`, { agente: window.kvAgenteAtual, dominio: 'photo', comando: 'definir_visibilidade' });
+        return { id, antes, depois: visivel, mudou: true };
+    },
     renomear(nome) { const L = ieAtiva(IE.doc); L.nome = nome; L._nomeAuto = false; ieUiCamadas(); return KNV.info(); },
+
+    // conferência automática (leitura): caixa visível de cada camada de texto/pixel visível; avisa estouro do quadro, margem curta e textos que se tocam
+    conferir({ margem = 24, folga = 3 } = {}) {
+        const d = IE.doc, caixas = [], avisos = [];
+        iePercorrer(d.camadas, L => {
+            if (L.visivel === false || !L.c || (L.tipo !== 'texto' && !L.txt)) return;
+            const b = ieLimites(L.c); if (!b) return;
+            caixas.push({ nome: L.nome, x: Math.round(L.x + b.x), y: Math.round(L.y + b.y), w: b.w, h: b.h });
+        });
+        for (const c of caixas) {
+            if (c.x < 0 || c.y < 0 || c.x + c.w > d.w || c.y + c.h > d.h) avisos.push(`"${c.nome}" estoura o quadro`);
+            else if (c.x < margem || c.y < margem || c.x + c.w > d.w - margem || c.y + c.h > d.h - margem) avisos.push(`"${c.nome}" a menos de ${margem}px da borda`);
+        }
+        for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
+            const a = caixas[i], b = caixas[j];
+            if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) avisos.push(`"${a.nome}" e "${b.nome}" se sobrepõem`);
+            else if (folga > 0 && a.x < b.x + b.w + folga && b.x < a.x + a.w + folga && a.y < b.y + b.h + folga && b.y < a.y + a.h + folga) avisos.push(`"${a.nome}" e "${b.nome}" encostam (menos de ${folga}px de folga)`);
+        }
+        return { quadro: [d.w, d.h], textos: caixas, avisos, ok: !avisos.length };
+    },
 
     // ── comandos de menu, com os valores do diálogo já preenchidos: KNV.cmd('f:respingos', {r: 8, suave: 3}) ──
     // nomes: os de IE_CMDS / IE_AJUSTES ('aj:matiz', 'aj:niveis'...) / IE_FILTROS ('f:gaussiano'...) — os mesmos do menu
@@ -322,6 +357,22 @@ const KNV = {
         return !!IE.doc.sel;
     },
     preencher(cor) { return IE_CMDS.preencher(IE.doc, cor).then(() => KNV.info()); },
+    // forma pronta numa camada nova (já ativa): tipo 'ret' | 'eli' | 'pilula'; raio = cantos arredondados (px; pilula = metade da altura)
+    async forma({ x, y, w, h, cor, nome, tipo = 'ret', raio = 0 } = {}) {
+        const doc = IE.doc;
+        await KNV.nova(nome || 'Forma');
+        const L = ieAtiva(doc); ieAtivar(L.id, doc); doc.mascaraAlvo = false;
+        const r = tipo === 'pilula' ? Math.min(w, h) / 2 : Math.max(0, Math.min(raio, Math.min(w, h) / 2));
+        ieSelAplicar(doc, k => {
+            k.fillStyle = '#fff'; k.beginPath();
+            if (tipo === 'eli') k.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+            else if (r > 0) k.roundRect(x, y, w, h, r); else k.rect(x, y, w, h);
+            k.fill();
+        }, 'nova', null, 0);
+        await IE_CMDS.preencher(doc, cor);
+        ieSelNada();
+        return KNV.info();
+    },
     // degradê na camada ativa: de/ate = [x, y]; tipo 'linear' | 'radial'; cor2 = null → frente para transparente
     degrade(de, ate, cor1, cor2 = null, tipo = 'linear', opac = 100) {
         const g = IE_FERR.degrade, o = IE.op.degrade, antes = { ...o }, c0 = [...IE.cor];
@@ -398,6 +449,28 @@ const KNV = {
         const L = ieNovaCamada(doc, { tipo: 'texto', nome: nome || t.split('\n')[0].slice(0, 30), txt: tx, sujoPx: true });
         ieInserirAcima(doc, L, ieAtiva(doc));
         ieAtivar(L.id, doc);
+        ieTextoRender(L);
+        ieCamadaMudou(L);
+        ieHist(ieT('Texto'));
+        ieUiCamadas();
+        await KNV._quadro();
+        return KNV.info();
+    },
+
+    // Ajusta o texto da camada ATIVA sem recriar: esp = espaçamento de letras (milésimos de em; negativo aperta),
+    // ent = entrelinha em px (0 = automática 120%), tam, cor, alin, fonte/estilo, t (texto). Posição: mover/transformar.
+    async ajustarTexto({ t, tam, cor, alin, esp, ent, fonte, estilo } = {}) {
+        const L = ieAtiva(IE.doc);
+        if (!L || L.tipo !== 'texto' || !L.txt) throw new Error('a camada ativa não é de texto');
+        const tx = L.txt;
+        if (t != null) tx.s = String(t);
+        if (tam != null) tx.tam = tam;
+        if (cor != null) tx.cor = cor;
+        if (alin != null) tx.alin = alin;
+        if (esp != null) tx.esp = esp;
+        if (ent != null) tx.ent = ent;
+        if (fonte != null) ieAplicarEstiloFonte(tx, fonte, ieEstiloDe(fonte, estilo || 'Regular'));
+        await ieGarantirFonte(tx);
         ieTextoRender(L);
         ieCamadaMudou(L);
         ieHist(ieT('Texto'));

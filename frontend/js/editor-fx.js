@@ -38,6 +38,36 @@ const VE_FX = {
             return b;
         },
     },
+    blur_radial: {
+        nome: 'Desfoque radial (centro nítido)', cat: 'Desfoque e nitidez', tag: 'Radial Blur',
+        params: [
+            { k: 'amt', nome: 'Intensidade', min: 0, max: 100, step: 0.5, def: 20, un: '%' },
+            { k: 'raio', nome: 'Centro nítido / raio', min: 0, max: 95, step: 1, def: 35, un: '%' },
+            { k: 'suave', nome: 'Suavidade da transição', min: 5, max: 100, step: 1, def: 50, un: '%' },
+            { k: 'x', nome: 'Centro X', min: 0, max: 100, step: 1, def: 50, un: '%' },
+            { k: 'y', nome: 'Centro Y', min: 0, max: 100, step: 1, def: 50, un: '%' },
+        ],
+        neutro: v => !(v.amt > 0),
+        draw(a, v, env) {
+            const b = VE_FX.blur.draw(a, v, env);
+            if (b === a) return a;
+            const { w, h } = env, hd = Math.hypot(w, h) / 2;
+            const f0 = Math.max(0, Math.min(95, v.raio ?? 35)) / 100;
+            const f1 = f0 + (1 - f0) * Math.max(5, Math.min(100, v.suave ?? 50)) / 100;
+            const cx = Math.max(0, Math.min(100, v.x ?? 50)) * w / 100;
+            const cy = Math.max(0, Math.min(100, v.y ?? 50)) * h / 100;
+            const T = veFxCanvas(3, w, h), x = T.ctx;
+            x.clearRect(0, 0, w, h); x.drawImage(a.cv, 0, 0);
+            const gr = x.createRadialGradient(cx, cy, f0 * hd, cx, cy, f1 * hd);
+            gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000');
+            // Mistura pré-multiplicada: mantém também a transparência das duas imagens.
+            x.globalCompositeOperation = 'destination-out'; x.fillStyle = gr; x.fillRect(0, 0, w, h);
+            b.ctx.globalCompositeOperation = 'destination-in'; b.ctx.fillStyle = gr; b.ctx.fillRect(0, 0, w, h);
+            b.ctx.globalCompositeOperation = 'lighter'; b.ctx.drawImage(T.cv, 0, 0);
+            x.globalCompositeOperation = 'source-over'; b.ctx.globalCompositeOperation = 'source-over';
+            return b;
+        },
+    },
     ca: {
         nome: 'Aberração cromática', cat: 'Estilizar', tag: 'Chromatic',
         params: [

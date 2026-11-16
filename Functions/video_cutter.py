@@ -3627,6 +3627,19 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                 # pré-multiplicado (como o canvas da prévia): numa camada com transparência (texto, logo), o preto dos
                 # pixels transparentes entrava no desfoque e deixava a borda escura (medido: branco virava cinza 119)
                 out.append(f"format=rgba,premultiply=inplace=1,gblur=sigma={min(sigma, 1000):.3f}:steps=3,unpremultiply=inplace=1")
+        elif t == "blur_radial":
+            sigma = _num(v.get("amt"), 0, 100, 20) * max(2, min(mw, mh)) / 2000.0
+            if sigma >= 0.05:
+                f0 = _num(v.get("raio"), 0, 95, 35) / 100.0
+                faixa = (1 - f0) * _num(v.get("suave"), 5, 100, 50) / 100.0
+                cx, cy = (_num(v.get(k), 0, 100, 50) / 100.0 for k in ("x", "y"))
+                # Mesma rampa do canvas, em frações da meia diagonal; mistura também o alfa pré-multiplicado.
+                q = f"clip((2*hypot(X-W*{cx:.6f},Y-H*{cy:.6f})/hypot(W,H)-{f0:.6f})/{faixa:.6f},0,1)"
+                r = f"{tag}f{j}br"
+                out.append(f"format=gbrap,premultiply=inplace=1,split=2[{r}o][{r}b];"
+                           f"[{r}b]gblur=sigma={min(sigma, 1000):.3f}:steps=3[{r}d];"
+                           f"[{r}o][{r}d]blend=all_expr='A*(1-({q}))+B*({q})',"
+                           "unpremultiply=inplace=1,format=rgba")
         elif t == "ca":
             # aberração cromática (frontend/js/editor-fx.js "ca"): cada canal ampliado a partir do centro e
             # recortado ao tamanho; o alfa fica o original

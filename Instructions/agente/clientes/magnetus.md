@@ -20,6 +20,7 @@ Em Enquete e Imagem do Dia, cada prancheta traz um monitor: `horizontal` (FEED 1
 - Monitor = o de proporção mais próxima da do exame (telas: horizontal 1,71; quadrado 1,34; em pé 0,59).
 - Preservar a região clínica, sem cortar anatomia. Em Imagem do Dia em vídeo, remover os detalhes periféricos da captura do aparelho e ampliar o exame limpo até preencher toda a altura da tela do monitor; barras pretas laterais são aceitas (ajuste do Pailer em 06/11/2026).
 - Raio-X nunca passa por upscale de IA, mesmo pequeno: só ampliação comum. A qualidade é a que o cliente enviou.
+- Imagem do Dia em vídeo: ferramenta MCP `kanivete_imagem_do_dia_video {card}` monta o projeto a partir do modelo aprovado (assets BASE STORY e VIDEO NO MONITOR já em `02 - ASSETS`; não gera, não exporta, não entrega). Detalhe em `roadmap-mcp-video.md` (Lote 12).
 
 ## Enquete do Dia: comando único
 `py -3.13 tools/peca.py enquete --pasta "<card>" --nome "NOME" --exame IMG [--seta X,Y] [--apagar X,Y,W,H] [--refazer]`

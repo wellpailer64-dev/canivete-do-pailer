@@ -89,6 +89,9 @@ def _modulo(pid):
 def chamar(pid, funcao, args=None):
     """Roda `funcao` do plugin (só se estiver em API_KANIVETE). Devolve {success, dados} ou {success: False, error}."""
     try:
+        m = _manifesto(pid)
+        if m and m.get("desligado"):   # plugin desligado no Kanivete (kanivete.json "desligado": true): nada dele roda aqui
+            return {"success": False, "error": f"plugin '{pid}' desligado no Kanivete"}
         mod = _modulo(pid)
         if funcao not in getattr(mod, "API_KANIVETE", ()):
             return {"success": False, "error": f"'{funcao}' não está liberada no plugin '{pid}'"}

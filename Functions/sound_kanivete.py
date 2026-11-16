@@ -635,7 +635,7 @@ def lufs_trecho(arq, de=0.0, dur=None):
     """Loudness integrada (LUFS) de um trecho do arquivo — para igualar o volume dos clipes sem gerar arquivo."""
     import re
     cmd = [ffmpeg(), "-hide_banner", "-nostdin", "-ss", f"{float(de):.3f}"] + (["-t", f"{float(dur):.3f}"] if dur else []) + ["-i", arq, "-vn", "-af", _ESTEREO(arq) + ",ebur128", "-f", "null", "-"]   # medido como entra na mixagem
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, creationflags=NO_WINDOW)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800, creationflags=NO_WINDOW)
     m = re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr or "")
     if not m:
         return {"success": False, "error": "não mediu"}
@@ -648,7 +648,7 @@ def silencios(arq, de=0.0, dur=None, limiar_db=-40, min_s=0.6):
     import re
     cmd = [ffmpeg(), "-hide_banner", "-nostdin", "-ss", f"{float(de):.3f}"] + (["-t", f"{float(dur):.3f}"] if dur else []) + \
           ["-i", arq, "-vn", "-af", f"silencedetect=noise={float(limiar_db)}dB:d={float(min_s)}", "-f", "null", "-"]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, creationflags=NO_WINDOW)
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800, creationflags=NO_WINDOW)
     ini = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", r.stderr or "")]
     fim = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", r.stderr or "")]
     total = float(dur) if dur else _ffprobe_dur(arq)[0]

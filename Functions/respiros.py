@@ -44,8 +44,35 @@ def _energia_db(arq, ini, dur):
     return 20 * np.log10(np.maximum(rms, 1e-6))
 
 
-def detectar(arq, ini=0.0, dur=None, preset="normal", min_pausa=None, sobra=None, sobra_longa=None):
-    """→ {success, cortes: [[a, b], ...] (s da fonte, relativos a `ini`), removido, pausas, piso_db, voz_db}"""
+def _fator_ritmo(forte, a, b, jan=5.0):
+    """fração de voz na janela em volta da pausa: fala rápida (muita voz) = pausa menor; lenta = maior"""
+    import numpy as np
+    i0, i1 = max(0, int((a - jan) / HOP)), min(len(forte), int((b + jan) / HOP))
+    fr = float(forte[i0:i1].mean()) if i1 > i0 else 0.6
+    return float(np.clip(1.0 - (fr - 0.6) * 1.0, 0.8, 1.2))
+
+
+def _respiracoes(suav, piso, lim_voz, a, b):
+    """[(ini, fim)] em segundos de respiração dentro da pausa a..b: som baixo, bem acima do piso e bem abaixo da voz, 0,10-0,9 s"""
+    i0, i1 = int(a / HOP), min(len(suav), int(b / HOP))
+    if i1 <= i0:
+        return []
+    m = (suav[i0:i1] > piso + 8) & (suav[i0:i1] < lim_voz - 3)
+    out, ini = [], None
+    for j, v in enumerate(list(m) + [False]):
+        if v and ini is None:
+            ini = j
+        elif not v and ini is not None:
+            d = (j - ini) * HOP
+            if 0.10 <= d <= 0.9:
+                out.append(((i0 + ini) * HOP, (i0 + j) * HOP))
+            ini = None
+    return out
+
+
+def detectar(arq, ini=0.0, dur=None, preset="normal", min_pausa=None, sobra=None, sobra_longa=None, dinamico=True):
+    """dinamico=True: a pausa que fica cresce com o tamanho da pausa e encolhe em fala rápida; respiração colada na palavra sai.
+    → {success, cortes: [[a, b], ...] (s da fonte, relativos a `ini`), removido, pausas, piso_db, voz_db}"""
     import numpy as np
     p = dict(PRESETS.get(preset, PRESETS["normal"]))
     for k, v in (("min_pausa", min_pausa), ("sobra", sobra), ("sobra_longa", sobra_longa)):
@@ -101,9 +128,19 @@ def detectar(arq, ini=0.0, dur=None, preset="normal", min_pausa=None, sobra=None
         elif tipo == "fim":
             ca, cb = a + 0.35, b
         else:
-            fica = p["sobra_longa"] if L > 1.2 else p["sobra"]
+            if dinamico:
+                # pausa curta deixa menos, pausa longa (fim de frase) deixa mais; fala rápida encurta, lenta alonga
+                fica = float(np.interp(L, [p["min_pausa"], 1.2], [p["sobra"] * 0.8, p["sobra_longa"]])) * _fator_ritmo(forte, a, b)
+            else:
+                fica = p["sobra_longa"] if L > 1.2 else p["sobra"]
             cauda = fica * 0.55            # mais cauda da palavra que ataque da próxima
             ca, cb = a + cauda, b - (fica - cauda)
+            if dinamico:
+                for r0, r1 in _respiracoes(suav, piso, lim_voz, a, b):
+                    if r0 < ca + 0.02 and r1 > a + 0.07:       # respiração logo depois da palavra: não fica na cauda
+                        ca = max(a + 0.07, min(ca, r0 - 0.02))
+                    if r1 > cb - 0.02 and r0 < b - 0.06:      # respiração antes da próxima palavra: sai inteira
+                        cb = max(cb, min(r1 + 0.03, b - 0.06))
         if cb - ca >= 0.10:
             # a emenda cai no ponto mais quieto perto das bordas (sem estalo nem pedaço de som)
             def quieto(t, folga=0.03):

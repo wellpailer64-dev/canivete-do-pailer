@@ -107,6 +107,16 @@ function veTxLayout(x) {
     return { linhas, larg, asc, desc, lh, tw, th, m, w: Math.ceil(tw + 2 * m), h: Math.ceil(th + 2 * m) };
 }
 
+// "ótima=#FFD400; grátis=#00e676" -> { 'ótima': '#FFD400', ... } (null se vazio)
+function veTxPaleta(s) {
+    const r = {};
+    String(s || '').split(/[;\n]/).forEach(p => {
+        const i = p.lastIndexOf('=');
+        if (i > 0 && /^#[0-9a-f]{3,8}$/i.test(p.slice(i + 1).trim())) r[p.slice(0, i).trim().toLowerCase()] = p.slice(i + 1).trim();
+    });
+    return Object.keys(r).length ? r : null;
+}
+
 function veTxRGBA(hex, op) {
     const h = String(hex || '#000000').replace('#', '');
     const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16) || 0;
@@ -153,8 +163,22 @@ function veTxDesenho(x, f) {
             ctx.strokeText(l, px, y);
             sombra(false);
         } else sombra(true);
-        ctx.fillStyle = x.cor;
-        ctx.fillText(l, px, y);
+        const pal = veTxPaleta(x.pal);
+        if (pal) {   // cor por palavra: cada trecho com a sua cor, alinhado como a linha inteira
+            const w = ctx.measureText(l).width;
+            let xi = x.alin === 'left' ? px : x.alin === 'right' ? px - w : px - w / 2;
+            ctx.textAlign = 'left';
+            l.split(/(\s+)/).forEach(seg => {
+                if (!seg) return;
+                ctx.fillStyle = pal[seg.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')] || x.cor;
+                ctx.fillText(seg, xi, y);
+                xi += ctx.measureText(seg).width;
+            });
+            ctx.textAlign = x.alin === 'left' ? 'left' : x.alin === 'right' ? 'right' : 'center';
+        } else {
+            ctx.fillStyle = x.cor;
+            ctx.fillText(l, px, y);
+        }
         sombra(false);
     });
     return { cv, w: L.w, h: L.h };
@@ -571,6 +595,7 @@ function vePpHtml(a) {
                 <small class="ve-pp-dica">Largura da caixa: as linhas quebram dentro dela (0 = texto de ponto, sem quebra). Com a ferramenta Texto (T), clique e arraste no monitor para criar já com a caixa.</small>`) +
             vePpSec('Aparência', `
                 <div class="ve-pp-cores">${vePpCor('tx.cor', 'Preenchimento')}</div>
+                <div class="ve-pp-l"><label title="palavra=#cor; outra=#cor">Cor por palavra</label><input type="text" class="ve-pp-texto" data-pp="tx.pal" placeholder="ótima=#FFD400"></div>
                 <div class="ve-pp-grupo">${vePpChk('tx.cOn', 'Contorno')}${vePpCor('tx.cCor', '')}
                     <div class="ve-pp-sub" data-ppse="tx.cOn">${vePpNum('tx.cLarg', 'Largura', 1, 40, 0.5, 'px')}</div></div>
                 <div class="ve-pp-grupo">${vePpChk('tx.fOn', 'Fundo')}${vePpCor('tx.fCor', '')}

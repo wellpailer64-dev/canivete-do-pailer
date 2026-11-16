@@ -1973,3 +1973,25 @@ body:has(#page-home.active) .update-banner { backdrop-filter: none; background: 
 .ve-start-mais .ve-btn, .sk-start-mais .sk-sbtn { background: rgba(30, 30, 32, .9) !important; }
 /* sugestão ao soltar um arquivo na Home: a área "Solte qualquer arquivo" saiu; vira cartão logo abaixo dos banners */
 #page-home > .home-suggest { margin: 0; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 12px; background: rgba(18, 16, 17, .92); }
+
+/* retorno visual das ações do agente (kvAgenteFx em agente.js): pulso na cor de destaque da ferramenta */
+@keyframes kv-agente-pulso { 0% { box-shadow: 0 0 0 0 var(--primary); background-color: color-mix(in srgb, var(--primary) 35%, transparent); }
+    70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; background-color: transparent; } }
+.kv-agente-pulso { animation: kv-agente-pulso 1.4s ease-out 1; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .kv-agente-pulso { animation: none; outline: 2px solid var(--primary); } }
+
+/* cursor animado do agente (kvAgenteFx em agente.js): seta + bolinha com a marca, na cor do agente */
+.kv-cursor { position: fixed; left: 0; top: 0; z-index: 100001; pointer-events: none; opacity: 0; will-change: transform; --kv-cor: var(--primary); }
+.kv-cursor.visivel { opacity: 1; }
+.kv-cursor.saindo { opacity: 0; transition: opacity .4s; }
+.kv-seta { display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+.kv-seta path { fill: var(--kv-cor); }
+.kv-bola { position: absolute; left: 15px; top: 13px; width: 16px; height: 16px; border-radius: 50%; background: var(--kv-cor); color: #fff;
+    font: 700 9px/16px 'Segoe UI', sans-serif; text-align: center; border: 1.5px solid rgba(255,255,255,.9); box-shadow: 0 2px 6px rgba(0,0,0,.45); }
+.kv-rotulo { position: absolute; left: 36px; top: 14px; white-space: nowrap; padding: 1px 7px; border-radius: 999px; background: rgba(20,20,24,.82);
+    color: #fff; font: 600 10px 'Segoe UI', sans-serif; border: 1px solid var(--kv-cor); opacity: 0; transition: opacity .2s; }
+.kv-cursor.clicando .kv-rotulo, .kv-cursor.visivel .kv-rotulo { opacity: 1; }
+.kv-cursor.clicando::after { content: ''; position: absolute; left: 0; top: 0; width: 10px; height: 10px; margin: -4px 0 0 -4px; border-radius: 50%;
+    border: 2px solid var(--kv-cor); animation: kv-anel .5s ease-out 1; }
+@keyframes kv-anel { from { transform: scale(.4); opacity: 1; } to { transform: scale(2.8); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .kv-cursor.clicando::after { animation: none; } }

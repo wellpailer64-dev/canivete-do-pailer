@@ -570,7 +570,7 @@ async function vkCmd(nome, args = {}, origem = 'ui') {
         if (VK.doc && VK._antes) vkHistorico(c.desc || nome);   // comando que zerou _antes (abrir, salvar, exportar) não entra no histórico
         VK.log.push({ t: Date.now(), origem, nome, args: JSON.stringify(args).slice(0, 300) });
         if (VK.log.length > 300) VK.log.shift();
-        if (origem !== 'ui' && typeof vkAvisoAgente === 'function') vkAvisoAgente(`${origem === 'worker' ? 'Worker' : 'Claude'}: ${c.desc || nome}`);
+        if (origem !== 'ui' && origem !== 'mcp' && typeof vkAvisoAgente === 'function') vkAvisoAgente(`${origem === 'worker' ? 'Worker' : 'Claude'}: ${c.desc || nome}`);
         vkMudou();
         return r;
     } catch (e) {

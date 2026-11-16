@@ -153,6 +153,27 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from onda_voz import FADE, Onda  # noqa: E402
 OND = {k: Onda(AUD(k)) for k in FALADAS}
 FADE_INI, FADE_FIM = set(), set()   # (fonte, segundo da fonte) das pontas sem vale
+# Respiros dinâmicos (opt-in: "respiros": "dinamico" no roteiro ou KANI_RESPIROS=dinamico): a pausa que fica depende do tipo
+# (frase > vírgula > meio) e do ritmo da fala, e a respiração colada na palavra sai (tools/agente/respiros.py).
+RESP_DIN = (CFG.get("respiros") or os.environ.get("KANI_RESPIROS", "")) == "dinamico"
+_RESP_CACHE = {}
+
+
+def _resp_trechos(k):
+    """trechos [(ini, fim)] da fonte a manter, do plano de respiros (uma vez por fonte)"""
+    if k not in _RESP_CACHE:
+        import respiros as _R
+        _RESP_CACHE[k] = _R.plano(OND[k], list(WS[k]))[0]
+    return _RESP_CACHE[k]
+
+
+def _resp_corte(k, w_b, w_prox):
+    """(fim do trecho, início do seguinte) do plano para o vão entre as palavras w_b e w_prox, ou None se o plano não corta ali"""
+    tr = _resp_trechos(k)
+    for j in range(len(tr) - 1):
+        if w_b[0] <= tr[j][1] <= w_prox[0] + 0.1 and tr[j + 1][0] <= w_prox[1]:
+            return tr[j][1], tr[j + 1][0]
+    return None
 
 
 def achar(k, frase, desde=0.0):
@@ -231,7 +252,7 @@ def cortes(k, ini, fim):
         elif ws[i - 1][1] - ws[atual][0] > (3.0 if pont else 4.6):
             ps.append((atual, i - 1, False)); atual = i    # troca de enquadramento: mesmo tempo da fonte, nada se perde
     ps.append((atual, i1, True))
-    out, emenda = [], None
+    out, emenda, ini_plano = [], None, None
     for a, b, pula in ps:
         comeco = emenda if emenda is not None else max(0.0, ws[a][0] - FOLGA_INI)
         final = fim_voz(k, ws[b][1], ws[b + 1][0] if b + 1 < len(ws) else None) if pula else round((ws[b][1] + ws[b + 1][0]) / 2, 3)
@@ -250,13 +271,22 @@ def cortes(k, ini, fim):
         if emenda is None:   # início que pula: abre num vale, antes da primeira onda (e depois do rabo da palavra anterior).
             # Depois da trava acima: a transcrição pôs o "E" de "E quanto" em cima do rabo de "Sensacional" e a trava
             # devolvia o início para dentro da voz (Casa Morumbi, 2026-11-13); a onda manda.
-            comeco, ok = OND[k].ajustar_inicio(comeco, ws[a][0], ws[a - 1][1] if a > 0 else None)
+            if RESP_DIN and ini_plano is not None and ini_plano < ws[a][1] - 0.05:
+                comeco, ok = ini_plano, True      # o plano de respiros já abre num vale, depois da respiração
+            else:
+                comeco, ok = OND[k].ajustar_inicio(comeco, ws[a][0], ws[a - 1][1] if a > 0 else None)
             if not ok:
                 FADE_INI.add((k, round(comeco, 3)))
+        ini_plano = None
         if pula:             # fim que pula: fecha num vale, depois da última onda da palavra
-            final, ok = OND[k].ajustar_fim(final, ws[b][1], ws[b + 1][0] if b + 1 < len(ws) else None)
-            if not ok:
-                FADE_FIM.add((k, round(final, 3)))
+            pl = _resp_corte(k, ws[b], ws[b + 1]) if RESP_DIN and b < i1 else None
+            if pl and pl[0] > comeco + 0.1:
+                final, ini_plano = min(pl[0], round(lim, 3)), pl[1]
+                final = max(final, comeco + 0.1)
+            else:
+                final, ok = OND[k].ajustar_fim(final, ws[b][1], ws[b + 1][0] if b + 1 < len(ws) else None)
+                if not ok:
+                    FADE_FIM.add((k, round(final, 3)))
         out.append((k, a, b, round(comeco, 3), round(final, 3)))
         emenda = None if pula else final
     return out

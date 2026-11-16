@@ -80,6 +80,89 @@ function veAgAviso(texto, erro) {
     setTimeout(() => el.remove(), 5000);
 }
 
+// ── retorno visual das ações do agente (MCP e ponte): um cursor com a bolinha do agente voa até onde a ação acontece ──
+// Quem altera o documento chama kvAgenteFx(texto, seletor, {agente, dominio, comando}); o editor anima sozinho (zero tokens).
+// Cor e marca por agente; o rótulo é minúsculo e some logo. Sem "reduzir movimento": o cursor aparece direto no lugar.
+const KV_AGENTES = {
+    claude: { cor: '#D97757', marca: '✦', nome: 'Claude' },
+    codex: { cor: '#10A37F', marca: '◎', nome: 'Codex' },
+    pickle: { cor: '#4D6BFE', marca: '◆', nome: 'DeepSeek' },
+    kani: { cor: '#7CE08A', marca: '●', nome: 'Kani' },
+};
+// onde o cursor pousa quando a ferramenta não diz: comandos de camada vão à lista; o resto, à área de trabalho do editor
+const KV_ALVOS = {
+    photo: { camadas: '.ie-cam.ativa', area: '#ie-canvas', cmds: /^(nova_camada|renomear_camada|definir_visibilidade|ativar_camada|duplicar_camada|mover_na_pilha|modo_mesclagem)$/ },
+    vetor: { camadas: '.vk-camada.ativa, .vk-lcamada.ativa', area: '#vk-canvas', cmds: /^(nova_camada|camada|mover_para_camada)$/ },
+    video: { camadas: null, area: '#ve-tl', cmds: /^$/ },
+    cena3d: { camadas: null, area: '#ve-tl', cmds: /^$/ },
+    som: { camadas: null, area: '#sk-tl', cmds: /^$/ },
+    lux: { camadas: null, area: '#page-lux-kanivete canvas', cmds: /^$/ },
+    slider: { camadas: '.sd-slide.ativo, .sd-mini.ativo', area: '#sd-palco', cmds: /^(slide_novo|slide_duplicar|slide_apagar|slide_mover|slide_layout|slide_fundo)$/ },
+};
+const kvCursor = { el: null, x: null, y: null, fim: 0, t: 0 };
+
+function kvAgenteCursorEl() {
+    if (kvCursor.el && kvCursor.el.isConnected) return kvCursor.el;
+    const el = document.createElement('div');
+    el.className = 'kv-cursor';
+    el.innerHTML = '<svg class="kv-seta" width="22" height="22" viewBox="0 0 22 22"><path d="M3 2 L3 17 L7.2 13.2 L10 19.5 L12.6 18.3 L9.8 12 L15.5 12 Z" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>'
+        + '<span class="kv-bola"></span><span class="kv-rotulo"></span>';
+    document.body.appendChild(el);
+    kvCursor.el = el;
+    return el;
+}
+
+function kvAgentePonto(seletor, dominio, comando) {
+    const alvos = KV_ALVOS[dominio] || {};
+    const lista = [seletor, alvos.cmds && alvos.cmds.test(comando || '') ? alvos.camadas : null, alvos.area].filter(Boolean);
+    for (const sel of lista) {
+        const el = document.querySelector(sel);
+        const r = el && el.getBoundingClientRect();
+        if (r && r.width > 4 && r.height > 4) {
+            // linha de lista: aponta para o rótulo; área grande: um ponto confortável dentro dela
+            const grande = r.width > 300 && r.height > 200;
+            return { el, x: r.left + (grande ? r.width * 0.5 : Math.min(r.width * 0.35, 120)), y: r.top + (grande ? r.height * 0.45 : r.height / 2) };
+        }
+    }
+    return null;
+}
+
+window.kvAgenteFx = function (texto, seletor, op = {}) {
+    try {
+        const info = KV_AGENTES[String(op.agente || window.kvAgenteAtual || 'claude').toLowerCase()] || KV_AGENTES.claude;
+        const ponto = kvAgentePonto(seletor, op.dominio, op.comando);
+        if (!ponto) { if (texto) veAgAviso(texto); return; }   // sem onde pousar: cai no aviso antigo
+        const el = kvAgenteCursorEl();
+        el.style.setProperty('--kv-cor', info.cor);
+        el.querySelector('.kv-bola').textContent = info.marca;
+        el.querySelector('.kv-rotulo').textContent = String(texto || '').replace(/^executou /, '').slice(0, 42);
+        const reduzir = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const primeira = kvCursor.x == null || !el.classList.contains('visivel');
+        // chega de um canto discreto da própria área na primeira vez; depois sai de onde parou
+        if (primeira) { kvCursor.x = ponto.x - 90; kvCursor.y = ponto.y - 70; }
+        el.style.transition = 'none';
+        el.style.transform = `translate(${kvCursor.x}px, ${kvCursor.y}px)`;
+        void el.offsetWidth;
+        el.classList.add('visivel');
+        el.classList.remove('saindo');
+        const dist = Math.hypot(ponto.x - kvCursor.x, ponto.y - kvCursor.y);
+        el.style.transition = reduzir ? 'none' : `transform ${Math.min(0.9, 0.25 + dist / 1400)}s cubic-bezier(.22,.8,.3,1), opacity .25s`;
+        el.style.transform = `translate(${ponto.x}px, ${ponto.y}px)`;
+        kvCursor.x = ponto.x; kvCursor.y = ponto.y;
+        // chegou: clique (anel) e pulso no elemento
+        clearTimeout(kvCursor.t);
+        setTimeout(() => {
+            el.classList.remove('clicando'); void el.offsetWidth; el.classList.add('clicando');
+            if (ponto.el) {
+                ponto.el.classList.remove('kv-agente-pulso'); void ponto.el.offsetWidth;
+                ponto.el.classList.add('kv-agente-pulso');
+                setTimeout(() => ponto.el.classList.remove('kv-agente-pulso'), 1600);
+            }
+        }, reduzir ? 0 : 320);
+        kvCursor.t = setTimeout(() => { el.classList.add('saindo'); setTimeout(() => el.classList.remove('visivel', 'saindo'), 400); }, 2600);
+    } catch (e) { /* retorno visual nunca pode quebrar a ação */ }
+};
+
 // A ação do agente vira um passo do Ctrl+Z e avisa a prévia: antes, mudar um clipe sem mexer no tamanho dele (ex.: o
 // trecho da fonte) deixava o monitor tocando o trecho renderizado ANTIGO (quiz Carlinhos: preto que já tinha sido
 // corrigido, 2026-10-13). Se a própria ação já gravou o passo (veRippleRemove etc.), não grava de novo.
