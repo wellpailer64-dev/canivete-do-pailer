@@ -113,7 +113,7 @@ for q in seqs:
     for tr_ in sorted({c["tr"] for c in vis}):
         lst = sorted([c for c in vis if c["tr"] == tr_], key=lambda c: c["st"])
         for x, y in zip(lst, lst[1:]):
-            if y["st"] < x["st"] + x["e"] - x["s"] - 0.01:
+            if y["st"] < x["st"] + (x["e"] - x["s"]) / (x.get("v") or 1) - 0.01:   # velocidade conta (veLen)
                 relato("REPROVADO", "trilha dividida", f"V{tr_ + 1}: '{x.get('nome') or os.path.basename(M[x['m']].get('path') or M[x['m']].get('name', ''))}' e "
                        f"'{y.get('nome') or os.path.basename(M[y['m']].get('path') or M[y['m']].get('name', ''))}' juntos em {y['st']:.2f} s; cada elemento na sua trilha")
                 break
