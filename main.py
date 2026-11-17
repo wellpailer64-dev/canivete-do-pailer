@@ -935,7 +935,8 @@ def ve_tamanhos_midia(paths):
     def um(p):
         try:
             i = video_cutter.probe(p)
-            return p, {"width": i.get("width"), "height": i.get("height")}
+            # has_audio: o som do clipe só entra no mix com ele (veTemSom); vídeo ainda na fila ficava mudo no export
+            return p, {"width": i.get("width"), "height": i.get("height"), "has_audio": bool(i.get("has_audio"))}
         except Exception:
             return p, None
     with ThreadPoolExecutor(max_workers=8) as ex:

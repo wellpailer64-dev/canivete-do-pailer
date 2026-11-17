@@ -2761,7 +2761,8 @@ function veTemSom(c) {
     if (!m || veMediaOffline(m) || c.x === 'v') return false;              // vídeo cujo áudio foi separado
     if (m.kind === 'audio') return true;
     if (m.kind !== 'video') return false;
-    return m.id === 0 ? !!(VE.info && VE.info.has_audio) : !!(m.info && m.info.has_audio);
+    // ainda na fila de preparação: vale o ffprobe do export (veMidiasTamanhoGarantir)
+    return m.id === 0 ? !!(VE.info && VE.info.has_audio) : m.info ? !!m.info.has_audio : !!m._somProbe;
 }
 // Põe no player o vídeo da mídia. Cada player usa a URL com uma marca própria (tag): com a mesma URL o WebView
 // divide o carregamento entre eles. Devolve true se trocou de arquivo.
@@ -3044,12 +3045,19 @@ function veMediaSize(c) {
 
 // Antes de exportar: todo vídeo do projeto com o tamanho de verdade. O que ainda estava na fila de preparação caía no
 // tamanho da sequência e o "caber no quadro" virava 100% — 4K saía ampliado 2× (documentário do Gil, 2026-10-11).
+// Também o "tem som": sem a info, veTemSom dava falso e o som do clipe saía do mix calado — export do Graffiti Contra
+// Enchente V2 (2026-11-12) mudo na entrevista da Cátia e no show, vídeos que ainda estavam na fila ao exportar.
 async function veMidiasTamanhoGarantir() {
     const falta = (VE.media || []).filter(m => m && m.kind === 'video' && m.id && !m.removido && m.path
-        && !(m.info && m.info.width) && !(m.w && m.h));
+        && ((!(m.info && m.info.width) && !(m.w && m.h)) || (!m.info && m._somProbe == null)));
     if (!falta.length || !window.pywebview || !window.pywebview.api.ve_tamanhos_midia) return;
     const r = await window.pywebview.api.ve_tamanhos_midia([...new Set(falta.map(m => m.path))]) || {};
-    for (const m of falta) { const t = r[m.path]; if (t && t.width) { m.w = t.width; m.h = t.height; } }
+    for (const m of falta) {
+        const t = r[m.path];
+        if (!t || !t.width) continue;
+        if (!(m.info && m.info.width) && !(m.w && m.h)) { m.w = t.width; m.h = t.height; }
+        if (!m.info) m._somProbe = !!t.has_audio;
+    }
 }
 
 // ── adicionar imagem ──
