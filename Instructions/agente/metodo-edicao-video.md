@@ -22,15 +22,20 @@ Detalhes: API e histórico em `guia-edicao.md`; teoria em `tecnicas-de-montagem.
 5. Uma folha de quadros ANTES de exportar. Exportar só com a folha certa.
 Script avulso que se repete vira ferramenta. Defeito achado no olho vira regra em `conferir_edicao.py`.
 
-## Ajuste ao vivo no app aberto (regra desde 2026-11-11)
-Com o app do Pailer aberto e a timeline dele na tela, o ajuste entra direto nela, pela porta 9222, e aparece na hora:
-`py -3.13 "D:/Kanivete/Plugins/kanicode/plugins/kanivete/kanivete.py" js "<código>" --porta 9222`
-- Antes de mexer: ler `VE.clips` / `VE.media` (somente leitura) e confirmar o nome da sequência ativa (`VE.sequences`, `VE.activeSequence`).
-- Antes de alterar: `veSnapshot()` (ponto de desfazer). Criar clipe clonando um vizinho já existente, então `VE.clips.push`, sort, `veRelayout()` e `veAfterEdit(VE.playhead)`.
-- Conferir por leitura depois de cada alteração. Nunca regerar o projeto nem reabrir do disco por cima.
-- Não salvar sozinho: quem salva é o Pailer, depois de ouvir/ver. Se o disco e o app divergirem, a versão do app vale.
-- Só depois de salvo: `conferir_edicao.py` e a folha de quadros.
-- Um app só; nada de clique simulado no app do Pailer.
+## Ajuste ao vivo no app aberto (regra desde 2026-11-11; MCP primeiro desde 2026-11-17)
+Com o app do Pailer aberto, o ajuste entra direto na timeline dele e aparece na hora. **Caminho padrão: MCP do Kanivete**
+(`mcp__kanivete__kanivete_executar_comando` / `kanivete_executar_lote`, domínio `video`; carregar com ToolSearch `+kanivete`).
+Ele segue a porta do app ligado, entra no Ctrl+Z e devolve erro claro. Roteiro curto:
+1. Achar: `consultar_timeline {de, ate}` (o que está no trecho) ou `linha_do_tempo {de, ate}`; ver: `kanivete_tira_quadros {tempos}`.
+2. Mudar em lote transacional: `montar_timeline`, `trocar_imagem` (troca a cena mantendo lugar, duração e cor), `som_clipe`
+   (liga o som de depoimento), `abaixar_musica` (ducking sob as falas), `mover_clipe`, `aparar_clipe`, `keyframe`, `criar_cor_solida`.
+3. Conferir: `revisar_edicao` (avisa fala sem som e mídia sem leitura) e `analisar_mix`; salvar: `salvar_projeto`; exportar:
+   `tools/agente/exportar_conferencia.py` por `tarefas_soltas.py`.
+- JS solto (`kanivete.py js`) só para o que o MCP ainda não faz; quando precisar, anote a lacuna em
+  `Instructions/agente/roadmap-mcp-video.md` para virar comando. Nunca clonar clipe de depoimento de um vizinho `x:'v'` (entra mudo).
+- Fala de mídia bruta (escolher frase de depoimento): `py -3.13 tools/agente/falas_midia.py arquivo.mp4` (tempo por palavra, com cache).
+- Nunca regerar o projeto nem reabrir do disco por cima. Se o disco e o app divergirem, a versão do app vale.
+- Pronto só com `conferir_edicao.py` sem REPROVADO. Um app só; nada de clique simulado no app do Pailer.
 
 ## Assets editáveis, não destrutivos e reutilizáveis (regra desde 2026-11-11)
 Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos, transição) precisa poder ser alterado depois.

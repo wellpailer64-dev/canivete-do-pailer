@@ -35,6 +35,8 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Corrigir cor de vídeo pelos escopos (branco estourado, preto esmagado, cor puxada, pele vermelha): `py -3.13 tools/agente/cor_auto.py video.mp4 --look '{...grade do cliente...}' --folha prefixo` → valores do Luz e Cor.
 - Onde a música deve começar (pula intro, acha drop e seções calmo/agitado): `py -3.13 tools/agente/musica_ponto.py musica.mp3 [--min-cena 60]`; o `reel_fala.py` já usa.
 - Conferir, sempre primeiro em projeto pronto: `tools/agente/conferir_edicao.py projeto --sem-ouvir`.
+- Timeline aberta do Pailer: MCP do Kanivete primeiro (`consultar_timeline`, `trocar_imagem`, `som_clipe`, `abaixar_musica`, `revisar_edicao`); JS solto só para lacuna.
+- Frase de depoimento bruto com tempo por palavra: `py -3.13 tools/agente/falas_midia.py arquivo.mp4 [--de s --ate s]` (cache).
 - Palavra comida no corte (onda encostada no início ou no fim): `tools/agente/checar_cortes.py projeto [--sem-ouvir]`; ponta no vale: `tools/agente/onda_voz.py` (`Onda(arq).ajustar_fim/ajustar_inicio`).
 - Trocar arquivo por outra versão: `tools/agente/trocar_midia.py projeto "antigo" novo.mp4 --aplicar`.
 - Asset (lettering, GC, título) editável na timeline aberta: HTML → Comp nativa com `py -3.13 tools/agente/comp_html.py cena.html --nome "X (Comp)" --fonte PASTA --alvo X.mov`; fluxo em `metodo-edicao-video.md` › Assets editáveis. `.mov` sempre com `<nome>.fonte.json` ao lado.
