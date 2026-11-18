@@ -1,10 +1,10 @@
 // =========================================================
-// Modo agente (Instructions/modo-agente.md): o que o Claude usa para ver e mexer no app aberto
+// Modo agente (Instructions/modo-agente.md): leitura e ações identificadas no app aberto
 //   window.__veLog      → os últimos avisos, erros e resultados de exportação que apareceram (veAgLog)
 //   veLogTexto(n)       → as n últimas linhas do registro, em texto
 //   veAgenteMidia(cmd, [args]) → ferramentas de leitura de mídia (Functions/agente_midia.py) num processo à parte:
 //                         'analisar' <projeto> [--nao-usados-em NOME] | 'folha' | 'storyboard' | 'transcrever' | 'batidas'
-//   veAgente(acao, fn)  → ação do Claude: mostra o aviso "✦ Claude: ação", registra e roda fn (o desfazer
+//   veAgente(acao, fn, {agente}) → mostra o autor da ação, registra e roda fn (o desfazer
 //                         continua valendo, como qualquer edição)
 // =========================================================
 
@@ -63,8 +63,9 @@ function veAgEmbrulhar() {
 document.addEventListener('DOMContentLoaded', () => setTimeout(veAgEmbrulhar, 0));
 window.addEventListener('load', veAgEmbrulhar);
 
-// ── aviso "✦ Claude: ..." (canto de cima, some sozinho) ──
-function veAgAviso(texto, erro) {
+// ── aviso do agente (canto de cima, some sozinho) ──
+function veAgAviso(texto, erro, agente) {
+    const info = kvAgenteInfo(agente || KV_AG_ATIVOS.at(-1)?.agente);
     let box = document.getElementById('ve-agente-avisos');
     if (!box) {
         box = document.createElement('div');
@@ -74,7 +75,8 @@ function veAgAviso(texto, erro) {
     }
     const el = document.createElement('div');
     el.className = 've-agente-aviso' + (erro ? ' erro' : '');
-    el.textContent = '✦ Claude: ' + texto;
+    el.textContent = `${info.marca} ${info.nome}: ${texto}`;
+    if (!erro) el.style.borderColor = info.cor;
     box.appendChild(el);
     setTimeout(() => el.classList.add('saindo'), 4500);
     setTimeout(() => el.remove(), 5000);
@@ -85,9 +87,40 @@ function veAgAviso(texto, erro) {
 // Cor e marca por agente; o rótulo é minúsculo e some logo. Sem "reduzir movimento": o cursor aparece direto no lugar.
 const KV_AGENTES = {
     claude: { cor: '#D97757', marca: '✦', nome: 'Claude' },
-    codex: { cor: '#10A37F', marca: '◎', nome: 'Codex' },
+    codex: { cor: '#FFFFFF', marca: '◎', nome: 'ChatGPT' },
     pickle: { cor: '#4D6BFE', marca: '◆', nome: 'DeepSeek' },
     kani: { cor: '#7CE08A', marca: '●', nome: 'Kani' },
+    agente: { cor: '#C4C4C4', marca: '●', nome: 'Agente' },
+};
+const KV_AG_ATIVOS = [];
+
+function kvAgenteInfo(agente) {
+    const nome = String(agente || '').trim().toLowerCase();
+    const chave = ({ chatgpt: 'codex', openai: 'codex', deepseek: 'pickle' })[nome] || nome;
+    const conhecida = Object.prototype.hasOwnProperty.call(KV_AGENTES, chave) ? chave : 'agente';
+    return { chave: conhecida, ...KV_AGENTES[conhecida] };
+}
+
+window.kvComAgente = async function (agente, fn, op = {}) {
+    const info = kvAgenteInfo(agente), contexto = { agente: info.chave };
+    const inicio = Date.now(), atividade = op.atividade !== false;
+    KV_AG_ATIVOS.push(contexto);
+    window.kvAgenteAtual = info.chave;
+    const renovar = () => {
+        if (atividade && Date.now() - inicio < 120000 && typeof agenteBorda === 'function') agenteBorda(true, info.chave);
+    };
+    renovar();
+    const timer = atividade ? setInterval(renovar, 2000) : null;
+    try {
+        return await fn();
+    } finally {
+        clearInterval(timer);
+        KV_AG_ATIVOS.splice(KV_AG_ATIVOS.indexOf(contexto), 1);
+        const atual = KV_AG_ATIVOS.at(-1);
+        if (atual) window.kvAgenteAtual = atual.agente;
+        else delete window.kvAgenteAtual;
+        if (atividade && typeof agenteBorda === 'function') agenteBorda(true, atual?.agente || info.chave);
+    }
 };
 // onde o cursor pousa quando a ferramenta não diz: comandos de camada vão à lista; o resto, à área de trabalho do editor
 const KV_ALVOS = {
@@ -129,13 +162,14 @@ function kvAgentePonto(seletor, dominio, comando) {
 
 window.kvAgenteFx = function (texto, seletor, op = {}) {
     try {
-        const info = KV_AGENTES[String(op.agente || window.kvAgenteAtual || 'claude').toLowerCase()] || KV_AGENTES.claude;
+        const info = kvAgenteInfo(op.agente || KV_AG_ATIVOS.at(-1)?.agente);
+        if (typeof agenteBorda === 'function') agenteBorda(true, info.chave);
         const ponto = kvAgentePonto(seletor, op.dominio, op.comando);
-        if (!ponto) { if (texto) veAgAviso(texto); return; }   // sem onde pousar: cai no aviso antigo
+        if (!ponto) { if (texto) veAgAviso(texto, false, info.chave); return; }   // sem onde pousar: cai no aviso antigo
         const el = kvAgenteCursorEl();
         el.style.setProperty('--kv-cor', info.cor);
         el.querySelector('.kv-bola').textContent = info.marca;
-        el.querySelector('.kv-rotulo').textContent = String(texto || '').replace(/^executou /, '').slice(0, 42);
+        el.querySelector('.kv-rotulo').textContent = `${info.nome}: ` + String(texto || '').replace(/^executou /, '').slice(0, 42);
         const reduzir = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const primeira = kvCursor.x == null || !el.classList.contains('visivel');
         // chega de um canto discreto da própria área na primeira vez; depois sai de onde parou
@@ -166,38 +200,43 @@ window.kvAgenteFx = function (texto, seletor, op = {}) {
 // A ação do agente vira um passo do Ctrl+Z e avisa a prévia: antes, mudar um clipe sem mexer no tamanho dele (ex.: o
 // trecho da fonte) deixava o monitor tocando o trecho renderizado ANTIGO (quiz Carlinhos: preto que já tinha sido
 // corrigido, 2026-10-13). Se a própria ação já gravou o passo (veRippleRemove etc.), não grava de novo.
-window.veAgente = async function (acao, fn) {
-    veAgLog('claude', acao);
-    veAgAviso(acao);
-    if (typeof fn !== 'function') return undefined;
-    const editor = typeof VE === 'object' && VE.ready && typeof veSnapshot === 'function';
-    const antes = editor ? veSnapshot() : null;
-    try {
-        const r = await fn();
-        if (antes != null && VE.ready && veSnapshot() !== antes) {
-            if (VE.history[VE.history.length - 1] !== antes) {
-                VE.history.push(antes);
-                if (VE.history.length > 200) VE.history.shift();
-                VE.future = [];
-                if (typeof veUpdateUndo === 'function') veUpdateUndo();
+window.veAgente = async function (acao, fn, op = {}) {
+    return kvComAgente(op.agente || KV_AG_ATIVOS.at(-1)?.agente, async () => {
+        const info = kvAgenteInfo(KV_AG_ATIVOS.at(-1)?.agente);
+        veAgLog(info.chave, acao);
+        veAgAviso(acao, false, info.chave);
+        if (typeof fn !== 'function') return undefined;
+        const editor = typeof VE === 'object' && VE.ready && typeof veSnapshot === 'function';
+        const antes = editor ? veSnapshot() : null;
+        const assinaturas = editor ? new Map(VE.clips.map(c => [c, JSON.stringify(c, (k, v) => (k && k[0] === '_' ? undefined : v))])) : null;
+        try {
+            const r = await fn();
+            if (antes != null && VE.ready && veSnapshot() !== antes) {
+                if (VE.history[VE.history.length - 1] !== antes) {
+                    VE.history.push(antes);
+                    if (VE.history.length > 200) VE.history.shift();
+                    VE.future = [];
+                    if (typeof veUpdateUndo === 'function') veUpdateUndo();
+                }
+                if (!VE.dirty) { VE.dirty = true; if (typeof veUpdateTitle === 'function') veUpdateTitle(); }
+                if (typeof veCacheInvalidate === 'function') veCacheInvalidate();
+                if (typeof vePrInvalidar === 'function') vePrInvalidar();
             }
-            if (!VE.dirty) { VE.dirty = true; if (typeof veUpdateTitle === 'function') veUpdateTitle(); }
-            if (typeof veCacheInvalidate === 'function') veCacheInvalidate();
-            if (typeof vePrInvalidar === 'function') vePrInvalidar();
+            if (assinaturas && VE.ready && typeof veAgPulsarMudancas === 'function') veAgPulsarMudancas(assinaturas, info.cor);
+            return r;
+        } catch (e) {
+            veAgLog('erro', `${info.nome}: ${acao} — ${(e && e.message) || e}`);
+            veAgAviso(`${acao} (falhou)`, true, info.chave);
+            throw e;
         }
-        return r;
-    } catch (e) {
-        veAgLog('erro', `Claude: ${acao} — ${(e && e.message) || e}`);
-        veAgAviso(`${acao} (falhou)`, true);
-        throw e;
-    }
+    });
 };
 
 // Ferramentas de leitura de mídia (rodam fora do editor, prioridade baixa); devolve o texto/JSON do comando
 window.veAgenteMidia = async function (cmd, args = []) {
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ve_agente_midia) throw new Error('API do agente indisponível');
-    veAgLog('claude', `analisando mídia: ${cmd} ${args.join(' ')}`.slice(0, 300));
+    veAgLog(kvAgenteInfo(KV_AG_ATIVOS.at(-1)?.agente).chave, `analisando mídia: ${cmd} ${args.join(' ')}`.slice(0, 300));
     const r = await api.ve_agente_midia(cmd, args);
     if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
     try { return JSON.parse(r.saida); } catch (e) { return r.saida; }

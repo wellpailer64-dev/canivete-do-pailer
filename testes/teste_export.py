@@ -623,6 +623,67 @@ CASOS = {
         v.k = { ['fx.' + a + '.amt']: [{ t: 0, v: 70, i: 'out' }, { t: 0.6, v: 0, i: 'lin' }, { t: 2.2, v: 0, i: 'in' }, { t: 3, v: 90, i: 'lin' }] };
         return [clip(0, 0, 0, 4, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } }), v];   // fundo parado: só o desfoque mexe
     """, ""),
+    # desfoque radial (blur_radial, centro nítido) em CLIPES de vídeo/foto, com --placa: shader próprio na placa (antes a
+    # timeline inteira caía na CPU: "vídeo com efeito fora do Luz e Cor"). Três clipes: o caso real do projeto do Pailer
+    # (amt 70, raio 30, suave 60, centro 50/50), centro fora do meio com queda curta e amt 0 (neutro: sem efeito, o
+    # clipe tem de sair idêntico à prévia e não pode forçar CPU)
+    "desfoqueradial": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const rad = v => [{ id: id(), t: 'blur_radial', on: true, v }];
+        const a = clip(1, 0.2, 0, 3, 'c.mp4', { p: { sc: 80, x: 540, y: 500, rot: 0, op: 100 }, fx: rad({ amt: 70, raio: 30, suave: 60, x: 50, y: 50 }) });
+        const b = clip(2, 0.5, 0, 2.5, 'b.mp4', { p: { sc: 60, x: 540, y: 1350, rot: 0, op: 100 }, fx: rad({ amt: 90, raio: 10, suave: 20, x: 15, y: 80 }) });
+        const c = clip(3, 1, 0, 2, 'foto3.jpg', { p: { sc: 25, x: 200, y: 1700, rot: 0, op: 100 }, fx: rad({ amt: 0, raio: 30, suave: 60, x: 50, y: 50 }) });
+        // fundo parado (foto): o 'principal' é o testsrc2 em movimento e o seek do navegador pega quadro vizinho
+        return [clip(0, 0, 0, 4, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } }), a, b, c];
+    """, ""),
+    # desfoque radial na CAMADA DE AJUSTE (alcança tudo que está por baixo, o centro é relativo ao quadro): numa
+    # camada a timeline toda com Luz e Cor junto (mistura de efeitos da placa na mesma camada) e noutra, num trecho,
+    # o centro no canto superior direito; mais um vídeo menor por cima com o efeito (centro relativo ao próprio clipe)
+    "desfoqueradialajuste": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const a1 = { tr: 2, st: 0, s: 0, e: 4, m: aj.id, fx: [
+            { id: id(), t: 'blur_radial', on: true, v: { amt: 60, raio: 30, suave: 60, x: 50, y: 50 } },
+            { id: id(), t: 'lc', on: true, v: Object.assign(veLcDefaults(), { ct: 20, sat: 120 }) }] };
+        a1.p = veDefProps(a1);
+        const a2 = { tr: 3, st: 1, s: 0, e: 2, m: aj.id, fx: [{ id: id(), t: 'blur_radial', on: true, v: { amt: 100, raio: 5, suave: 40, x: 85, y: 15 } }] };
+        a2.p = veDefProps(a2);
+        const pip = clip(1, 0.5, 0, 3, 'c.mp4', { p: { sc: 40, x: 540, y: 600, rot: 0, op: 100 },
+            fx: [{ id: id(), t: 'blur_radial', on: true, v: { amt: 50, raio: 0, suave: 100, x: 30, y: 60 } }] });
+        return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
+    """, ""),
+    # "Cor cinema" do projeto do Dago (2026-11-17): UMA camada de ajuste com Luz e Cor + Brilho + Aberração + Granulação, na
+    # ordem e com os parâmetros reais. A Granulação não tinha ajusteFF: o editor desenhava a camada de ajuste como vídeo
+    # vazio (2×2) e o export saía SEM nenhum dos quatro efeitos. Sob a camada: um clipe de vídeo com Brilho próprio (feito
+    # pelo exportador, placa e CPU, não por um .mov desenhado: desenhar o clipe longo estourou a memória no render do c10) e
+    # uma foto. A prévia e o export têm de bater (a granulação é ruído de desvio igual, nunca quadro idêntico)
+    "corcinema": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 3, 'foto3.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const v = clip(1, 0.3, 0, 2.4, 'c.mp4', { p: { sc: 70, x: 540, y: 760, rot: 0, op: 100 },
+            fx: [{ id: id(), t: 'mo_glow', on: true, v: { lim: 70, raio: 40, int: 35 } }] });
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const adj = { tr: 3, st: 0, s: 0, e: 3, m: aj.id, nome: 'Cor cinema', fx: [
+            { id: id(), t: 'lc', on: true, v: Object.assign(veLcDefaults(), { ct: 12, sh: -6, bl: -4, hi: -8, wh: 4, sat: 94, vib: 6, fade: 43, clar: 28, vig: 22,
+                cw: { s: [0.22, -0.26], h: [-0.14, 0.16] }, sharp: 39 }) },
+            { id: id(), t: 'mo_glow', on: true, v: { lim: 35.5, raio: 18.5, int: 60, usaCor: 1, cor: '#D4814A', soma: 1 } },
+            { id: id(), t: 'ca', on: true, v: { r: -2, g: 0, b: 2, raio: 106, foco: 43, suave: 62 } },
+            { id: id(), t: 'mo_grao', on: true, v: { amt: 8, tam: 1.5, cor: 0, anim: 1 } }] };
+        adj.p = veDefProps(adj);
+        return [fundo, v, adj];
+    """, """
+        // nenhum dos quatro pode ter virado camada desenhada vazia: a camada de ajuste fica no plano com os quatro efeitos
+        const pl = veExportPlan(false, null), aj = pl.camadas.find(c => c.tipo === 'ajuste');
+        if (!aj) throw new Error('a camada de ajuste Cor cinema não está no plano (virou vídeo desenhado vazio?)');
+        const ts = aj.fx.map(f => f.t).join(',');
+        if (ts !== 'lc,mo_glow,ca,mo_grao') throw new Error('efeitos da Cor cinema no plano: ' + ts);
+        // o clipe de vídeo com Brilho próprio: no plano como o próprio vídeo (path .mp4, Brilho em fx), nunca como mo.<hash>.mov
+        const cv = pl.camadas.find(c => c.tipo === 'video' && /c[.]mp4$/i.test(c.path || ''));
+        if (!cv) throw new Error('o clipe c.mp4 com Brilho virou vídeo desenhado (mo.*.mov) em vez de seguir pelo exportador');
+        if (!cv.fx.some(f => f.t === 'mo_glow')) throw new Error('o Brilho do clipe c.mp4 sumiu do plano');
+    """),
     # mesclagem com VÍDEO (com --placa: fundo e camada lado a lado num shader, _mesclar): Tela com fade e Sobrepor
     "mesclagemvideo": (1080, 1920, """
         const { clip } = __te;
@@ -1059,7 +1120,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
-    if nome in ("motion", "4kmotion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo", "onda", "ondavideo", "ondatexto", "ondavideo2", "ondagiro"):
+    if nome in ("motion", "4kmotion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo", "desfoqueradial", "desfoqueradialajuste", "onda", "ondavideo", "ondatexto", "ondavideo2", "ondagiro"):
         # motion: detalhes finos (anel, borda de máscara) quase não mexem na média: confere a pior região 30×30.
         # Contra o quadro exato do ffmpeg (o navegador, buscando no meio do quadro, às vezes entrega o vizinho: um
         # objeto rápido anda 30 px por quadro)

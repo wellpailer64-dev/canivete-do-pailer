@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Receita 2: tarja de cidade/local (ref. reel TEVEO). Troque o texto em #tarja e o horário do corte (animation-delay). -->
+<meta name="kv" content="w=1080;h=1920;fps=30;dur=2.4">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#000}
+.abs{position:absolute}
+#fundo{left:0;top:0;width:1080px;height:1920px}
+/* tarja: caixa translúcida (cor lisa + opacity) que cresce da esquerda para a direita (scaleX), texto sobe por cima */
+#cx{left:300px;top:1380px;width:480px;height:92px;background:#0f0f0f;opacity:.58;border-radius:8px;transform-origin:left center;
+    animation:abre .28s cubic-bezier(0.16,1,0.3,1) .35s both, fecha .2s ease-in 2.0s both}
+@keyframes abre{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes fecha{to{opacity:0}}
+/* ATENÇÃO: caixa translúcida = cor lisa + opacity (não rgba): rgba vira imagem fotografada no 1º quadro, e clip-path animado some */
+#tarja{left:300px;top:1380px;width:480px;height:92px;line-height:92px;text-align:center;color:#fff;font:700 44px 'Montserrat',Arial,sans-serif;
+    letter-spacing:7px;animation:sobe .3s cubic-bezier(0.16,1,0.3,1) .5s both, fecha .2s ease-in 2.0s both}
+@keyframes sobe{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+</style></head>
+<body>
+  <img id="fundo" class="abs" src="amostras/a3.jpg">
+  <div id="cx" class="abs"></div>
+  <div id="tarja" class="abs">SÃO PAULO</div>
+</body></html>

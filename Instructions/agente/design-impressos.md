@@ -13,4 +13,18 @@ Para cartões de visita, panfletos, folders e outras peças impressas, combine a
 - Use o PDF/X e as configurações aceitas pela gráfica; PDF/X-4 e X-1a têm requisitos diferentes de cor e transparência. Confira fontes incorporadas ou convertidas conforme o fluxo, cores especiais, transparências, TrimBox/BleedBox, sangria e marcas. A intenção de saída identifica a condição de impressão; por si só não converte as cores. Valide o PDF exportado, não apenas o arquivo editável.
 - No Vetor Kanivete consulte `Instructions/vetor-kanivete.md`: fechamento, separações, sobreimpressão e `verificar_pdf`. O Photo trabalha em sRGB; confirme a conversão e o fechamento adequados ao destino. Não afirme que um PDF está pronto para gráfica apenas por ter sido exportado.
 
+## Verniz localizado (padrão, como a FuturaIM pede)
+- Antes do envio, confira a central de ajuda atual da gráfica: as instruções publicadas podem mudar, e algumas são antigas.
+- Máscara em arquivo à parte da arte, em vetor, com só os elementos que recebem verniz. Sem gradiente, sombra ou lente. Foto: recortar e deixar só a área do verniz.
+- Cor da máscara: magenta 100% (M 100) na FuturaIM. Se a cor não estiver certa, o pedido sai só com laminação. Outras gráficas usam K 100% exclusivo: confirmar qual antes de fechar.
+- Traço mínimo 0,20 mm e texto mínimo 7 pt (adotado por ser o mais exigente; a fonte pode aceitar 0,09 mm).
+- PDF X-1a. Cada lado com sua máscara, nas páginas seguintes à arte.
+- O Vetor não gera a máscara sozinho: montar a máscara à parte e conferir no PDF exportado.
+
 Fontes técnicas: Adobe, [marcas e sangria](https://helpx.adobe.com/illustrator/desktop/save-and-export/export-files-to-different-formats/pdf-marks-bleeds-and-color-output-options.html), [intenções de saída](https://helpx.adobe.com/acrobat/using/output-intents-pdfs-acrobat-pro.html), [guia de impressão e cobertura de tinta](https://helpx.adobe.com/content/dam/help/en/indesign/pdf/CS6_PrintGuide.pdf). As especificações da gráfica prevalecem sobre exemplos genéricos.
+
+## Gabaritos e presets da FuturaIM
+- Oficiais em `D:/Kanivete/gabaritos/futuraim/<produto>/` (PDF + AI; `indice.json` liga formato, acabamento e link). Fonte: `futuraim.com.br/produto/<slug>?id=<variante>` → `/gabarito/<id>/<arquivo>`.
+- Página do PDF = corte + 2× sangria. Sangria: 1 mm em cartão (88×48), panfleto, postal, tag e folder de 1 dobra; 2 mm em adesivo de papel, ímã, etiqueta e folder de 2+ dobras; 1,5 mm em parte do vinil.
+- Vetor › Novo documento › categorias "FuturaIM · …" (`VK_NOVO_CAT` em `vetor-novo.js`). Folder = aberto, 2 faces (externa/interna) com guias de dobra iguais (carteira sem guias: painel interno é mais estreito, confira no gabarito). Adesivo redondo = linha de corte magenta na camada "Gabarito · não imprime" (fora do PDF).
+- Teste: `teste_vetor.py`, casos "FuturaIM".

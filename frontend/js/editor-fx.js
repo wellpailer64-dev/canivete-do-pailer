@@ -449,7 +449,7 @@ function veB3dCantos(v, w, h, folga = 0) {
 // Prévia: quadrilátero com textura em WebGL (a divisão por w da GPU dá a perspectiva certa, como o ffmpeg perspective)
 const VEB3D = { cv: null, gl: null };
 function veB3dGl() {
-    if (VEB3D.gl) return VEB3D.gl;
+    if (VEB3D.gl) return VEB3D.gl.isContextLost() ? null : VEB3D.gl;
     const cv = document.createElement('canvas'), gl = cv.getContext('webgl', { premultipliedAlpha: true, alpha: true });
     if (!gl) return null;
     const sh = (tipo, src) => { const s = gl.createShader(tipo); gl.shaderSource(s, src); gl.compileShader(s); return s; };
@@ -475,13 +475,14 @@ function veB3dGl() {
     gl.vertexAttribPointer(lu, 2, gl.FLOAT, false, 24, 16);
     VEB3D.cv = cv;
     VEB3D.gl = gl;
+    if (typeof veGpuObservar === 'function') veGpuObservar(cv, gl, () => { VEB3D.gl = null; VEB3D.cv = null; });
     return gl;
 }
 function veB3dDraw(a, v, env) {
     const { w, h } = env, b = veFxOther(a, w, h);
     b.ctx.clearRect(0, 0, w, h);
     const k = veB3dCantos(v, w, h), gl = k && veB3dGl();
-    if (!k || !gl) return b;
+    if (!k || !gl) return a;
     const cv = VEB3D.cv;
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
     gl.viewport(0, 0, w, h);
@@ -676,7 +677,7 @@ void main() {
 }`;
 const VEKEYGL = { gl: null, falhou: false };
 function veKeyGl() {
-    if (VEKEYGL.gl || VEKEYGL.falhou) return VEKEYGL.gl;
+    if (VEKEYGL.gl || VEKEYGL.falhou) return VEKEYGL.gl && !VEKEYGL.gl.isContextLost() ? VEKEYGL.gl : null;
     try {
         const cv = document.createElement('canvas');
         const gl = cv.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, alpha: true });
@@ -705,6 +706,7 @@ function veKeyGl() {
                  blur: prog(VE_KEY_FS_BLUR, ['src', 'dir', 'sig', 'R', 'tam']), out: prog(VE_KEY_FS_OUT, ['src', 'matte', 'status', 'tam']) },
             src: tex(), lut: tex(), T: [tex(), tex()], F: [gl.createFramebuffer(), gl.createFramebuffer()],
         });
+        if (typeof veGpuObservar === 'function') veGpuObservar(cv, gl, () => { VEKEYGL.gl = null; VEKEYGL.falhou = false; });
         return gl;
     } catch (e) {
         console.warn('[chroma key] sem placa (WebGL2), fica no processador:', e && e.message);

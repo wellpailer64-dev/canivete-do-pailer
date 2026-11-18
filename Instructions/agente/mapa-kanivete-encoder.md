@@ -117,6 +117,12 @@ timeline — um "pedaço de 3 s" assim renderiza 98 s de preto (foi o falso "cus
 Corte também a base (só os segmentos até T).
 
 ## 6. Como testar
+- `blur_radial` (17/11/2026): desfoque radial de centro nítido agora roda em shader no modo placa, em vídeo e ajuste.
+  `_shader_blur_radial` reutiliza as duas passadas gaussianas e mistura pela mesma distância/raio/suavidade da prévia.
+  Casos `desfoqueradial,desfoqueradialajuste` com `--placa --folha`: 62 quadros comparados, piores médias 1,7/3,5.
+  No clipe Brasativa/Dagô, o bloqueio era esse efeito no vídeo `novo_22_abraco_calcadao.mp4` (70/30/60, centro 50/50);
+  plano completo passou na admissão e trecho real de 2,9 s com quatro camadas concluiu em 1920×1080/30, `placa=true`.
+  Aplicado no app aberto com `pywebview.api.vk_recarregar('Functions.export_placa')`, sem reiniciar nem alterar timeline.
 - `py -3.13 testes/teste_export.py [--placa] [--casos a,b]`: prévia × export quadro a quadro. Casos `sinc` (som ×
   imagem) e `multiplicar`; `conferir_taxa` (regra da taxa). O `3d` reprova por uma falha antiga da prévia.
 - `py -3.13 testes/teste_fila.py`: fila e janela Ke.

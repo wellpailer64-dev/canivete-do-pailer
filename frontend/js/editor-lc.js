@@ -451,7 +451,7 @@ function veLcHalf(f32) {
 }
 
 function veLcGL() {
-    if (VELC.gl !== null) return VELC.gl;
+    if (VELC.gl !== null) return VELC.gl && !VELC.gl.gl.isContextLost() ? VELC.gl : false;
     try {
         const cv = document.createElement('canvas');
         const gl = cv.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false });
@@ -501,6 +501,7 @@ function veLcGL() {
         gl.samplerParameteri(linear, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.samplerParameteri(linear, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         VELC.gl = { cv, gl, P, img, lut, T, meio, linear, lutKey: null };
+        if (typeof veGpuObservar === 'function') veGpuObservar(cv, gl, () => { VELC.gl = null; });
     } catch (e) {
         console.warn('[Luz e Cor] WebGL2 indisponível:', e);
         VELC.gl = false;

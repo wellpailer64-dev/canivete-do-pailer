@@ -529,10 +529,24 @@ function veMoDesenhar(ctx, cv, c, src, pv, t, itens) {
 }
 
 // ─────────────────────────── exportação: camada desenhada ───────────────────────────
+// O efeito de desenho d (soDesenho) desta camada o exportador faz sozinho, sem desenhar a camada como vídeo? Camada de
+// ajuste: os ajusteFF. Clipe de vídeo comum e opaco: os clipeFF (Brilho). Desenhar um clipe longo como .mov estourou a
+// memória no render do c10 do Dago (2026-11-17); com alfa (imagem, texto, Comp) continua desenhado
+function veMoFFClipe(c, d) {
+    if (!d) return false;
+    if (veIsAdj(c)) return !!d.ajusteFF;
+    if (!d.clipeFF) return false;
+    const m = veMediaOf(c);
+    return !!m && m.kind === 'video' && !(m.info && m.info.alfa);
+}
 // Esta camada precisa ser desenhada quadro a quadro na exportação?
 function veMoTem(c) {
     if (!c || veIsAudio(c) || veMoEhNulo(c)) return false;
     if (veMoPrecisa(c)) return true;
+    // Camada de ajuste não tem pixel próprio: desenhada ela sai VAZIA (caixa 2×2) e leva embora TODOS os efeitos dela. Os
+    // que o ffmpeg faz (Luz e Cor, Brilho, Aberração, Granulação...) vão pelo plano; os que só a prévia faz ficam fora do
+    // export em vez de apagar os outros (Cor cinema do Dago: a Granulação tirou Luz e Cor, Brilho e Aberração, 2026-11-17)
+    if (veIsAdj(c)) return false;
     // parâmetro animado: os que a exportação faz sozinha (animaFF, ex. Desfoque) não precisam de camada desenhada
     const soFF = k => {
         const q = veMoChave(k);
@@ -542,7 +556,7 @@ function veMoTem(c) {
     };
     if (c.k && Object.keys(c.k).some(k => veMoChave(k) && veKfOn(c, k) && !soFF(k))) return true;
     // efeito só de desenho; numa camada de ajuste, os que o ffmpeg faz (ajusteFF) seguem pela exportação normal
-    return (c.fx || []).some(f => f.on !== false && VE_FX[f.t] && VE_FX[f.t].soDesenho && !(veIsAdj(c) && VE_FX[f.t].ajusteFF));
+    return (c.fx || []).some(f => f.on !== false && VE_FX[f.t] && VE_FX[f.t].soDesenho && !veMoFFClipe(c, VE_FX[f.t]));
 }
 // Não sai na exportação (nulo; camada usada como fosco: vai dentro da camada desenhada)
 function veMoFora(c) {
@@ -634,7 +648,21 @@ async function veMoFonte(c, T, f) {
     }
     const v = await veMoVideo(m);
     await veMoBuscar(v, veSrcAt(c, T));
+    // o seek venceu o tempo (ou a placa perdeu o decodificador) sem quadro: desenhar agora sairia transparente e o cache
+    // guardaria a camada vazia para sempre — cena10 do Dago ficou preta no export por isso (2026-11-17)
+    for (let k = 0; k < 100 && v.readyState < 2; k++) await new Promise(r => setTimeout(r, 50));
+    if (v.readyState < 2) throw new Error(veT('o vídeo da camada não entregou o quadro'));
     return v;
+}
+
+// Camada que deveria ter desenho (vídeo/imagem visível, sem máscara) e voltou do cache ou do render com a caixa vazia
+// (2×2, "nada desenhado"): cache envenenado por um render em branco
+function veMoSaiuVazia(c, r) {
+    const b = r && r.box;
+    if (!b || b.w > 2 || b.h > 2) return false;
+    const m = veMediaOf(c);
+    if (!m || !['video', 'image'].includes(m.kind) || veIsAdj(c)) return false;
+    return veStaticProps(c).op > 0 && !(c.mk && c.mk.length) && !c.fm;
 }
 
 // A mesma camada pedida de novo enquanto é desenhada (a prévia renderizada e a exportação ao mesmo tempo): espera a
@@ -651,7 +679,14 @@ async function veMoAssarUm(c, lista, como, aviso, aoDesenhar) {
     const sig = 'mo.' + veMoHash(veMoAssinatura(c, lista) + `|${W}x${H}@${fps}|${VE_MO_VERSAO}`);
     VEMO.emCurso = VEMO.emCurso || new Map();
     if (VEMO.emCurso.has(sig)) { if (aoDesenhar) aoDesenhar(); return VEMO.emCurso.get(sig); }
-    const p = veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k, aoDesenhar);
+    const p = (async () => {
+        let r = await veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k, aoDesenhar);
+        if (veMoSaiuVazia(c, r)) {   // cache envenenado: refaz em outro arquivo (o vazio fica de lado, sem apagar nada)
+            r = await veMoAssarSig(c, lista, como, aviso, sig + '.r', W, H, fps, k, aoDesenhar);
+            if (veMoSaiuVazia(c, r)) throw new Error(veT('a camada saiu vazia do desenho (o vídeo não entregou quadro)'));
+        }
+        return r;
+    })();
     VEMO.emCurso.set(sig, p);
     try { return await p; } finally { VEMO.emCurso.delete(sig); }
 }
@@ -1259,7 +1294,7 @@ Object.assign(VE_FX, {
     },
     // ajusteFF: numa camada de ajuste vai pelo ffmpeg (video_cutter._filtros_fx "mo_glow"): bloom do quadro inteiro
     mo_glow: {
-        nome: 'Brilho (Glow)', cat: 'Estilizar', tag: 'Glow', soDesenho: true, ajusteFF: true, margem: (v, env) => (env.c && veIsAdj(env.c) ? 0 : v.raio * 1.5),
+        nome: 'Brilho (Glow)', cat: 'Estilizar', tag: 'Glow', soDesenho: true, ajusteFF: true, clipeFF: true, margem: (v, env) => (env.c && veIsAdj(env.c) ? 0 : v.raio * 1.5),
         params: [{ k: 'lim', nome: 'Limite', min: 0, max: 100, step: 0.5, def: 50, un: '%' },
                  { k: 'raio', nome: 'Raio', min: 0, max: 500, step: 0.5, def: 30, un: 'px' },
                  { k: 'int', nome: 'Intensidade', min: 0, max: 400, step: 1, def: 100, un: '%' },
@@ -1286,8 +1321,10 @@ Object.assign(VE_FX, {
             return o;
         },
     },
+    // ajusteFF: numa camada de ajuste vai pelo exportador (video_cutter._filtros_fx e export_placa._shader_grao "mo_grao"): sem
+    // isso a camada inteira virava vídeo desenhado vazio e TODOS os efeitos dela (Luz e Cor, Brilho, Aberração) sumiam do export
     mo_grao: {
-        nome: 'Granulação', cat: 'Ruído e granulação', tag: 'Add Grain', soDesenho: true,
+        nome: 'Granulação', cat: 'Ruído e granulação', tag: 'Add Grain', soDesenho: true, ajusteFF: true,
         params: [{ k: 'amt', nome: 'Quantidade', min: 0, max: 100, step: 0.5, def: 25, un: '%' },
                  { k: 'tam', nome: 'Tamanho', min: 1, max: 12, step: 0.5, def: 1.5, un: 'px' },
                  { k: 'cor', nome: 'Grão colorido', tipo: 'bool', def: 0 },

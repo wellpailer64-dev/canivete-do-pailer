@@ -2,7 +2,7 @@
 // App JavaScript - Canivete do Pailer
 // =========================
 
-// ── Modo agente: borda laranja enquanto o Claude/um script está conectado (main.py → Functions/agente_borda.py) ──
+// ── Modo agente: borda na cor de quem está executando uma ação identificada ──
 // Fina e esfumaçada, das bordas para dentro, em todas as janelas (as soltas também: window.open é anotado aqui).
 // Não pega clique (pointer-events: none). Enquanto acesa, confere a cada 2 s se surgiu janela nova.
 const _janelasSoltas = new Set();
@@ -16,6 +16,12 @@ const _janelasSoltas = new Set();
 })();
 let _agenteBordaOn = false, _agenteBordaTimer = null;
 function _agenteBordaAplicar() {
+    const estado = agenteBorda.estado || {};
+    if (_agenteBordaOn && Date.now() >= estado.fim) {
+        _agenteBordaOn = false;
+        clearInterval(_agenteBordaTimer);
+        _agenteBordaTimer = null;
+    }
     const docs = [document];
     _janelasSoltas.forEach(w => { if (w.closed) { _janelasSoltas.delete(w); return; } try { if (w.document) docs.push(w.document); } catch (e) { } });
     docs.forEach(d => {
@@ -24,19 +30,28 @@ function _agenteBordaAplicar() {
             if (!_agenteBordaOn || !(d.body || d.documentElement)) return;
             el = d.createElement('div');
             el.id = 'agente-borda';
-            el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;opacity:0;transition:opacity .5s;'
-                + 'box-shadow:inset 0 0 18px 2px rgba(251,138,60,.5),inset 0 0 0 1px rgba(251,138,60,.45)';
+            el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;opacity:0;transition:opacity .5s;';
             (d.body || d.documentElement).appendChild(el);
             el.getBoundingClientRect();   // entra com a transição
+        }
+        if (estado.cor) {
+            const rgb = estado.cor.slice(1).match(/../g).map(parte => parseInt(parte, 16)).join(',');
+            el.style.boxShadow = `inset 0 0 18px 2px rgba(${rgb},.5),inset 0 0 0 1px rgba(${rgb},.45)`;
+            el.dataset.agente = estado.agente;
         }
         el.style.opacity = _agenteBordaOn ? '1' : '0';
     });
 }
-function agenteBorda(on) {
+function agenteBorda(on, agente) {
+    if (!agente || typeof kvAgenteInfo !== 'function') return;
+    const info = kvAgenteInfo(agente);
+    if (info.chave === 'agente') return;
+    if (!on && agenteBorda.estado && agenteBorda.estado.agente !== info.chave) return;
+    agenteBorda.estado = { agente: info.chave, cor: info.cor, fim: Date.now() + 6000 };
     _agenteBordaOn = !!on;
     _agenteBordaAplicar();
     clearInterval(_agenteBordaTimer);
-    _agenteBordaTimer = _agenteBordaOn ? setInterval(_agenteBordaAplicar, 2000) : null;
+    _agenteBordaTimer = _agenteBordaOn ? setInterval(_agenteBordaAplicar, 500) : null;
 }
 
 // ── Estado global ──────────────────────────────────────────────────────────

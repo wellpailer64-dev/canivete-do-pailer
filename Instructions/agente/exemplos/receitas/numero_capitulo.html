@@ -1,0 +1,18 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Receita 5: número de capítulo gigante (ref. reel TEVEO, "1" itálico pesado). Troque o dígito e a posição. -->
+<meta name="kv" content="w=1080;h=1920;fps=30;dur=2">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#000}
+.abs{position:absolute}
+#fundo{left:0;top:0;width:1080px;height:1920px;animation:zoom 2s linear both}
+@keyframes zoom{from{transform:scale(1)}to{transform:scale(1.06)}}
+#n{left:0;top:700px;width:1080px;text-align:center;color:#fff;font:italic 800 620px/1 'Montserrat',Arial,sans-serif;
+   text-shadow:0 12px 40px rgba(0,0,0,.45);animation:entra .45s cubic-bezier(0.34,1.56,0.64,1) .15s both, sai .2s ease-in 1.65s both}
+@keyframes entra{from{transform:scale(1.7) translateY(60px);opacity:0}to{transform:none;opacity:1}}
+@keyframes sai{to{transform:scale(.9);opacity:0}}
+</style></head>
+<body>
+  <img id="fundo" class="abs" src="amostras/a1.jpg">
+  <div id="n" class="abs">1</div>
+</body></html>

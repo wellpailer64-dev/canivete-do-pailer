@@ -44,10 +44,19 @@ function veGrafTamanho(c) {
 }
 
 // ── desenho (canvas no tamanho do gráfico; guardado enquanto nada mudar) ──
+function veGrRecuperar() {
+    VEGR.cache = new WeakMap();
+    VE_GR_GRAO = null;
+    veCacheSoltarPlaca();
+    if (VE.ready) veDrawMonitorSoon();
+}
+
 function veGrCanvas(w, h) {
     const cv = document.createElement('canvas');
     cv.width = Math.max(1, Math.round(w));
     cv.height = Math.max(1, Math.round(h));
+    cv.addEventListener('contextlost', veGrRecuperar);
+    cv.addEventListener('contextrestored', veGrRecuperar);
     return cv;
 }
 

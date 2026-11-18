@@ -414,6 +414,21 @@ function veCacheRelease(item) {
     if (item.cv) { item.cv.width = 0; item.cv.height = 0; }
 }
 
+function veGpuObservar(cv, gl, reiniciar) {
+    cv.addEventListener('webglcontextlost', evento => {
+        evento.preventDefault();
+        VE._gpuPerdidos = VE._gpuPerdidos || new Set();
+        VE._gpuPerdidos.add(gl);
+        veCacheSoltarPlaca();
+    });
+    cv.addEventListener('webglcontextrestored', () => {
+        if (VE._gpuPerdidos) VE._gpuPerdidos.delete(gl);
+        reiniciar();
+        veCacheSoltarPlaca();
+        if (VE.ready) veDrawMonitorSoon();
+    });
+}
+
 // Antes de exportar: os quadros guardados do monitor (ImageBitmap) moram na memória da PLACA — 4 GB de 8 com o cache
 // cheio, e a montagem na placa recusava ("memória livre insuficiente mesmo em blocos") e caía no processador (CULTSP 04,
 // 2026-10-23). Solta só esses quadros e os do original (proxy desligado); a prévia renderizada em disco fica.
@@ -568,6 +583,7 @@ function veCacheValeGuardar(itens, trans, falta) {
 
 function veCacheStore(cv, cw, ch, pv, itens, trans, falta) {
     const c = veCache();
+    if (VE._gpuPerdidos && VE._gpuPerdidos.size) return;
     if (!c.on || !veCacheValeGuardar(itens, trans, falta) || !cw || !ch) return;
     if (VE.exportRunning) return;   // renderizando: a placa fica para a exportação (veCacheSoltarPlaca)
     const f = veCacheFrame(), key = veCacheKey(f);
@@ -875,7 +891,7 @@ function veSeqCapturar() {
         guias: vePlain(VE.guias || [], []),
         playhead: VE.playhead || 0,
         view: { pps: VE.pps, x: VE.view || 0 },
-        w: VE.seqW, h: VE.seqH,   // Configurações da sequência (quadro)
+        w: VE.seqW, h: VE.seqH, fps: +(VE.fps || 30),   // Configurações da sequência (quadro e taxa; o fps também vale para a exportação)
         master: vePlain(VE.master || null, null),   // Hard Limiter no Master (editor-medidor.js)
     };
 }
@@ -893,6 +909,7 @@ function veSeqAplicar(seq, opts = {}) {
     VE.activeSequence = seq.id;
     veCacheInvalidate();
     if (seq.w > 0 && seq.h > 0) veSeqQuadro(seq.w, seq.h);
+    if (seq.fps > 0) VE.fps = +seq.fps;   // taxa salva com a timeline (tamanho_sequencia {fps})
     VE.clips = vePlain(seq.clips, []);
     if (typeof veOfxRegistrarClipes === 'function') veOfxRegistrarClipes(VE.clips);   // efeitos OFX do projeto (editor-ofx.js)
     veSanearSobrepostas();
@@ -949,7 +966,7 @@ function veEnsureSequence() {
 }
 
 function veCriarProjetoVazio(opts = {}) {
-    if (VE.ready) return true;
+    if (VE.ready && !opts.forcar) return true;   // forcar: MCP novo_projeto com uma timeline já aberta
     const w = Math.max(16, Math.round((opts.w || VE.seqW || 1920) / 2) * 2);
     const h = Math.max(16, Math.round((opts.h || VE.seqH || 1080) / 2) * 2);
     const fps = +(opts.fps || VE.fps || 30);
@@ -1355,7 +1372,9 @@ function veSplitAt(t, quiet, so) {
     const selC = VE.clips[VE.sel], lk = veLkMapa();
     alvo.forEach(c => {
         const src = veSrcAt(c, t);
-        VE.clips.push(veSemTin(lk({ ...c, st: t, s: src, e: c.e })));
+        // o pedaço da direita é um clipe NOVO: o id do MCP não pode ser herdado (dois clipes com o mesmo id)
+        const dir = veSemTin(lk({ ...c, st: t, s: src, e: c.e })); delete dir._mcpId;
+        VE.clips.push(dir);
         c.e = src;
         delete c.tout; delete c.atout;
     });
@@ -1745,6 +1764,7 @@ function veMoverGrupo(lista, dt, dtr, alt, legs) {
     if (legs && !alt) veFaixaLegsMover(legs, dd);
     const novos = lista.map(c => {
         const n = alt ? lk(JSON.parse(JSON.stringify(c))) : { ...c };
+        if (alt) delete n._mcpId;   // duplicata: id novo na próxima leitura (o original fica com o dele)
         n.st = c.st + dd; n.tr = c.tr + dtr;
         return n;
     });
@@ -1926,8 +1946,8 @@ function vePlaceClip(novo, exceto = -1) {
     veRelayout();
 }
 
-// cópia solta: não herda o vínculo (lk) do original
-const veCopiaClipe = c => { const n = JSON.parse(JSON.stringify(c)); delete n.lk; return n; };
+// cópia solta: não herda o vínculo (lk) do original nem o id do MCP (_mcpId): id de clipe é único (linha_do_tempo)
+const veCopiaClipe = c => { const n = JSON.parse(JSON.stringify(c)); delete n.lk; delete n._mcpId; return n; };
 
 // Alt+arrastar: uma cópia igual cai onde o clipe foi solto; o original fica
 function veDuplicarEm(i, tr, st) {
@@ -2057,7 +2077,7 @@ function veColarVarios(cs) {
     vePushHistory();
     const lk = veLkMapa(), novos = [];
     cs.forEach(c => {
-        const n = lk({ ...JSON.parse(JSON.stringify(c)), st: t + c.st });
+        const n = lk({ ...JSON.parse(JSON.stringify(c)), st: t + c.st }); delete n._mcpId;   // colado = clipe novo
         vePlaceClip(n);
         novos.push(n);
     });
@@ -2767,15 +2787,39 @@ function veTemSom(c) {
 // Põe no player o vídeo da mídia. Cada player usa a URL com uma marca própria (tag): com a mesma URL o WebView
 // divide o carregamento entre eles. Devolve true se trocou de arquivo.
 function veDeckCarregar(x, mid, tag) {
+    if (!x._veVigiaErro) {
+        x._veVigiaErro = true;
+        x.addEventListener('error', () => veDeckRecuperar(x));
+    }
     const m = VE.media[mid], url = m && m.url;
     // mesma mídia E mesmo arquivo: nada a fazer (Substituir mídia troca o arquivo e a URL: o player recarrega)
-    if (x._mid === mid && x._url === url && x.getAttribute('src')) return false;
+    if (x._mid === mid && x._url === url && x.getAttribute('src')) return veDeckRecuperar(x);
     if (!url) return false;
     x._mid = mid;
     x._url = url;
     x.crossOrigin = 'anonymous';   // quadro legível no WebGL (Luz e Cor, Básico 3D) mesmo sem o vídeo principal
     x.src = !tag || url.startsWith('blob:') ? url : url + (url.includes('?') ? '&' : '?') + 'camada=' + tag;
     x.load();
+    return true;
+}
+
+function veDeckRecuperar(player) {
+    if (!player.error || player.error.code !== 3) return false;
+    const fonte = player.getAttribute('src'), agora = Date.now();
+    if (!fonte || (player._veErroFonte === fonte && agora - player._veErroEm < 30000)) return false;
+    player._veErroFonte = fonte;
+    player._veErroEm = agora;
+    const tempo = player.currentTime;
+    player.addEventListener('loadedmetadata', () => {
+        if (player.getAttribute('src') !== fonte) return;
+        const clipe = player === veVideo() && VE.clips[VE.cur];
+        const alvo = clipe ? veSrcAt(clipe, VE.playhead) : tempo;
+        try { player.currentTime = alvo; } catch (erro) {}
+        if (player === veVideo() && VE.playing) player.play().catch(() => {});
+        veDrawMonitorSoon();
+    }, { once: true });
+    veCacheSoltarPlaca();
+    player.load();
     return true;
 }
 const veDeckTag = x => (x === VEDK.b ? 'b' : null);
@@ -4357,6 +4401,18 @@ function veExportPlan(emFaixa, faixa) {
     try { return Object.assign(veExportPlanClips(), { dur: VE.dur, faixa: f }); } finally { VE.clips = orig; VE.dur = dur0; }
 }
 
+function veExportPreparado(c) {
+    if (typeof veIsAdj === 'function' && veIsAdj(c)) {
+        const semSuporte = (c.fx || []).filter(efeito => efeito.on !== false && VE_FX[efeito.t] &&
+            VE_FX[efeito.t].soDesenho && !VE_FX[efeito.t].ajusteFF);
+        if (semSuporte.length) throw new Error(veT('Efeito sem suporte na exportação da camada de ajuste') + ': ' +
+            semSuporte.map(efeito => VE_FX[efeito.t].nome || efeito.t).join(', '));
+    }
+    const preparado = VE._txPng && VE._txPng.get(c._o || c);
+    if (preparado && preparado.mov && typeof veMoTem === 'function' && !veMoTem(c)) return null;
+    return preparado;
+}
+
 function veExportPlanClips() {
     // trilha oculta (olho) e clipe desativado não entram; o som é o do clipe de vídeo de cima (como na prévia), mudo = silêncio
     const isVid = c => !veIsImage(c) && !veIsAudio(c) && !veOculto(c);
@@ -4375,7 +4431,7 @@ function veExportPlanClips() {
         .filter(c => overlays.includes(c) || cobre(c))
         .sort((a, b) => a.tr - b.tr || (a._z || 0) - (b._z || 0) || a.st - b.st)
         .map(c => {
-            const p = veStaticProps(c), m = veMediaOf(c), pk = VE._txPng && VE._txPng.get(c._o || c);
+            const p = veStaticProps(c), m = veMediaOf(c), pk = veExportPreparado(c);
             // camada desenhada pelo motion (máscara, fosco, camada mãe, efeito animado...): vídeo do quadro inteiro, pronto
             if (pk && pk.mov) {
                 const o = c._o || c, s = Math.max(0, (c.s - o.s) / veVel(c));
@@ -5249,6 +5305,7 @@ function veApplyProject() {
             playhead: s.playhead || 0,
             view: s.view || { pps: 0, x: 0 },
             w: s.w, h: s.h,
+            fps: s.fps > 0 ? +s.fps : null,
             master: s.master && (s.master.lim || s.master.vol) ? s.master : null,   // limitador e volume do Mix (editor-mixer.js)
             ...(s.comp ? { comp: true, dur: +s.dur || 0 } : {}),
         };
@@ -5263,6 +5320,7 @@ function veApplyProject() {
     VE.activeSequence = d.activeSequence && VE.sequences.find(s => s.id === d.activeSequence) ? d.activeSequence : VE.sequences[0].id;
     VE.openSequences = [VE.activeSequence];
     veSeqAplicar(VE.sequences.find(s => s.id === VE.activeSequence), { silent: true });
+    if (d.fps > 0) VE.fps = +d.fps;   // projeto antigo: a taxa da timeline ficou só no topo do arquivo
     VE.dirty = false;
     veUpdateTitle();
     veRegistrarProjetoRecente(path, d);
@@ -5680,6 +5738,47 @@ function veDraw() {
     veRaf($ve('ve-tl'), () => { veDrawQueued = false; veRender(); });
 }
 
+// Reação visual do agente: clipe alterado por um comando (MCP ou agente) ganha um contorno na cor do agente que
+// some em ~1,1 s. Vive só na memória da tela (WeakMap + Set): não entra no projeto, no histórico nem no .vknv.
+const VE_AG_PULSO_MS = 1100;
+const VE_AG_PULSOS = new WeakMap();
+const VE_AG_ATIVOS = new Set();
+function veAgPulsar(clipes, cor) {
+    const t = performance.now();
+    (clipes || []).forEach(c => { if (c && typeof c === 'object') { VE_AG_PULSOS.set(c, { t, cor }); VE_AG_ATIVOS.add(c); } });
+    if (VE_AG_ATIVOS.size && !VE._agPulsoRodando) {
+        VE._agPulsoRodando = true;
+        const passo = () => {
+            const agora = performance.now();
+            // expira pelo tempo: clipe fora da tela nunca é desenhado e não pode manter o laço vivo
+            VE_AG_ATIVOS.forEach(c => { const p = VE_AG_PULSOS.get(c); if (!p || agora - p.t >= VE_AG_PULSO_MS) { VE_AG_PULSOS.delete(c); VE_AG_ATIVOS.delete(c); } });
+            veDraw();
+            if (VE_AG_ATIVOS.size) requestAnimationFrame(passo);
+            else VE._agPulsoRodando = false;
+        };
+        requestAnimationFrame(passo);
+    }
+}
+// compara cada clipe com a assinatura de antes (sem campos _ internos) e acende só os que mudaram ou surgiram
+function veAgPulsarMudancas(antes, cor) {
+    const assinar = c => JSON.stringify(c, (k, v) => (k && k[0] === '_' ? undefined : v));
+    const mudou = VE.clips.filter(c => antes.get(c) !== assinar(c));
+    if (mudou.length) veAgPulsar(mudou.slice(0, 40), cor);
+}
+function veAgPulsoDesenhar(ctx, c, x, y, w, h) {
+    const p = VE_AG_PULSOS.get(c);
+    if (!p) return;
+    const k = (performance.now() - p.t) / VE_AG_PULSO_MS;
+    if (k >= 1) { VE_AG_PULSOS.delete(c); VE_AG_ATIVOS.delete(c); return; }
+    ctx.save();
+    ctx.globalAlpha = 1 - k;
+    ctx.strokeStyle = p.cor || veAcc();
+    ctx.lineWidth = 2 + 2 * (1 - k);
+    veRoundRect(ctx, x - 1, y - 1, w + 2, h + 2, 3);
+    ctx.stroke();
+    ctx.restore();
+}
+
 function vePlaybackTimelineDue() {
     const key = [
         Math.round((VE.playhead - VE.view) * VE.pps * 2),
@@ -5925,6 +6024,7 @@ function veRender() {
             veRoundRect(ctx, cx, vy, cw, vh, 2); ctx.stroke();
             ctx.restore();
         }
+        if (!ghost) veAgPulsoDesenhar(ctx, c, cx, vy, cw, vh);   // reação do agente (pulso que some)
         if (!ghost && typeof veCnDesenhar === 'function') veCnDesenhar(ctx, c, 'v', cx, vy, cw, vh, st);   // linha de opacidade
         if (!ghost && veHasKf(c)) veDrawKfMarks(ctx, c, i, st, veKfMarkY(vr));
         if (img || c.x === 'v' || !veOcupaA(c)) {   // imagem, vídeo com o som separado ou sem som: sem linha de áudio
@@ -6002,6 +6102,7 @@ function veRender() {
         if (enh && !ghost) veMaDesenhar(ctx, cx, ay, cw, ah, enh);
         if (!ghost && typeof veCnDesenhar === 'function') veCnDesenhar(ctx, c, 'a', cx, ay, cw, ah, st);   // linha de volume
         if (!ghost && typeof veRmxEmendas === 'function') veRmxEmendas(ctx, c, cx, ay, cw, ah, st);   // ondinhas do Remix
+        if (!ghost) veAgPulsoDesenhar(ctx, c, cx, ay, cw, ah);   // reação do agente (pulso que some)
         ctx.restore();
         ctx.globalAlpha = 1;
 
@@ -7061,6 +7162,7 @@ function veInitEvents() {
     // o estado de reprodução é do editor (relógio próprio), não do <video>
     v.addEventListener('error', () => {
         if (!v.getAttribute('src')) return;
+        if (veDeckRecuperar(v)) return;
         veLoading(null);
         veToast('O player não conseguiu abrir este vídeo');
     });

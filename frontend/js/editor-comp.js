@@ -797,7 +797,7 @@ function veCompEssEvento(el, tipo) {
     veCompEssDefinir(c, el.dataset.pce, el.dataset.campo, el.value, true);
 }
 
-// Duplo clique numa faixa de Comp na timeline: abre a Comp
+// Duplo clique na timeline: Comp/cena abre sua edição; vídeo/áudio mostra a fonte inteira com o corte marcado.
 function veCompDuploClique(e) {
     if (!VE.ready || e.button !== 0 || VE.tool !== 'select') return;
     const { t, y } = veTimeFromEvent(e);
@@ -808,4 +808,5 @@ function veCompDuploClique(e) {
     if (veEhComp(m)) { e.preventDefault(); veCompAbrir(m); }
     else if (typeof ve3dEh === 'function' && ve3dEh(m)) { e.preventDefault(); ve3dTelaAbrir(VE.clips[i]); }   // Cena 3D: tela própria
     else if (typeof veRotoFx === 'function' && veRotoFx(VE.clips[i])) { e.preventDefault(); veRotoTelaAbrir(VE.clips[i]); }   // Pincel Roto
+    else if (m && (m.kind === 'video' || m.kind === 'audio')) { e.preventDefault(); veSrcOpen(m.id, VE.clips[i]); }
 }

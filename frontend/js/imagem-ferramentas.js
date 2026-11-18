@@ -185,6 +185,7 @@ function ieTracoAplicar(t, D, doc) {
     const lx = P.x - o.x, ly = P.y - o.y;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath(); ctx.rect(lx, ly, P.w, P.h); ctx.clip();
     ctx.clearRect(lx, ly, P.w, P.h);
     if (t.fundo) {
         ctx.fillStyle = '#fff';
@@ -192,7 +193,6 @@ function ieTracoAplicar(t, D, doc) {
         ctx.fillRect(lx, ly, P.w, P.h);
         ctx.globalAlpha = 1;
         if (t.base) ctx.clearRect(t.base.x - o.x, t.base.y - o.y, t.base.c.width, t.base.c.height);
-        ctx.beginPath(); ctx.rect(lx, ly, P.w, P.h); ctx.clip();
     }
     if (t.base) ctx.drawImage(t.base.c, P.x - t.base.x, P.y - t.base.y, P.w, P.h, lx, ly, P.w, P.h);
     // cobertura da região (traço ∩ seleção)

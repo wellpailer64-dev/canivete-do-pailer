@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Receita 3: tela dividida / colagem de janelas (ref. reel TEVEO 9 s, 20 s e 22 s). Cada .jan = recorte (máscara) com a foto
+     dentro, abrindo com clip-path em escalonado. Troque os retângulos para outros arranjos. -->
+<meta name="kv" content="w=1080;h=1920;fps=30;dur=2">
+<style>
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#101010}
+.abs{position:absolute}
+.jan{position:absolute;overflow:hidden}                      /* janela = pai com overflow:hidden (vira máscara "Recorte") */
+.jan img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+#j1{left:0;top:0;width:1080px;height:1000px}
+#j2{left:540px;top:0;width:540px;height:1000px}
+#j3{left:0;top:1000px;width:1080px;height:920px}
+#j1 img{animation:e1 .4s cubic-bezier(0.16,1,0.3,1) 0s both}
+#j2 img{animation:e2 .4s cubic-bezier(0.16,1,0.3,1) .12s both}
+#j3 img{animation:e3 .4s cubic-bezier(0.16,1,0.3,1) .24s both}
+@keyframes e1{from{transform:translateX(-1080px)}to{transform:none}}
+@keyframes e2{from{transform:translateY(-1000px)}to{transform:none}}
+@keyframes e3{from{transform:translateX(1080px)}to{transform:none}}
+</style></head>
+<body>
+  <div id="j1" class="jan"><img src="amostras/a2.jpg"></div>
+  <div id="j2" class="jan"><img src="amostras/a4.jpg"></div>
+  <div id="j3" class="jan"><img src="amostras/a3.jpg"></div>
+</body></html>

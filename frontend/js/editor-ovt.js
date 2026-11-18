@@ -208,7 +208,7 @@ void main() {
 
 const VEOVT = { cv: null, gl: null, u: null, falhou: false, arq: new Map(), jobs: new Map() };
 function veOvtGl() {
-    if (VEOVT.gl || VEOVT.falhou) return VEOVT.gl;
+    if (VEOVT.gl || VEOVT.falhou) return VEOVT.gl && !VEOVT.gl.isContextLost() ? VEOVT.gl : null;
     const cv = document.createElement('canvas'), gl = cv.getContext('webgl', { premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: true });
     if (!gl) { VEOVT.falhou = true; return null; }
     const sh = (tipo, src) => {
@@ -239,6 +239,7 @@ function veOvtGl() {
         .forEach(n => { VEOVT.u[n] = gl.getUniformLocation(pr, n); });
     VEOVT.cv = cv;
     VEOVT.gl = gl;
+    if (typeof veGpuObservar === 'function') veGpuObservar(cv, gl, () => { VEOVT.gl = null; VEOVT.cv = null; VEOVT.u = null; VEOVT.falhou = false; });
     return gl;
 }
 

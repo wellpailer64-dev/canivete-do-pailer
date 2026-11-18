@@ -655,6 +655,17 @@ with sync_playwright() as p:
         await vkDesfazer(); return {ms, h, nobj, depois: VK.doc.camadas.flatMap(c => c.itens).length}; }""")
     ok(r_["h"] == 1 and r_["ms"] < 3000 and r_["depois"] == r_["nobj"] - 300, f"lote: 1 ponto de desfazer, rápido e desfaz tudo ({r_})")
 
+    # presets FuturaIM: adesivo redondo = corte circular em camada que não imprime; folder = guias de dobra (sem duplicar entre faces)
+    fu = pg.evaluate("""async () => { const mm = v => Math.round(vkMM(v) * 10) / 10, r = {};
+        for (const [cat, nome] of [['FuturaIM · Adesivos e etiquetas', 'Adesivo redondo Ø4,8 cm'], ['FuturaIM · Folders', 'Folder 20×9,5 · 3 dobras sanfona']]) {
+            const S = vkNovoEstado(); vkNovoAplicarModelo(S, vkNovoModelos(cat).find(x => x[0] === nome)); S.perfil = 'FOGRA39'; await vkNovoCriar(S);
+            const g = VK.doc.camadas.find(c => c.nome.startsWith('Gabarito'));
+            r[nome] = { pr: VK.doc.pranchetas.map(p => [mm(p.w), mm(p.h)]), s: mm(VK.doc.sangria), guias: VK.doc.guias.map(x => mm(x.pos - VK.doc.pranchetas[0].x)), gab: g ? [g.imprimir, g.trava, g.itens.length] : null }; }
+        return r; }""")
+    ad, fo = fu["Adesivo redondo Ø4,8 cm"], fu["Folder 20×9,5 · 3 dobras sanfona"]
+    ok(ad["pr"] == [[48, 48]] and ad["s"] == 2 and ad["gab"] == [False, True, 1], f"FuturaIM adesivo redondo: 48 mm, sangria 2, corte não imprime ({ad})")
+    ok(fo["pr"] == [[372, 200], [372, 200]] and fo["s"] == 2 and fo["guias"] == [93, 186, 279] and fo["gab"] is None, f"FuturaIM folder 3 dobras: 2 faces, 3 guias ({fo})")
+
     pg.evaluate("c => VKN.abrir(c)", aknv)
     pg.wait_for_timeout(600)
     pg.locator("#vk").screenshot(path=a.print)

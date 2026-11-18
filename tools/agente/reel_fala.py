@@ -533,13 +533,32 @@ def identidade(clips, fim_fala, quando, v):
             som(a_["som"], fim_fala - 0.3)
 
 
+def _emendar(cs_):
+    """Sub-corte curto vira pisca no quadro: a transcrição estica a última palavra e o corte da pausa deixa um resto
+    ("Renato?" virou 0,06 s num reel de 17/11; "fazer" sozinho, 0,5 s). Cola no vizinho quando a fonte é contígua,
+    sem perder áudio; solto, fica como está. Curto = menos de 0,5 s."""
+    MIN = 0.5
+    out = []
+    for c in cs_:
+        if out and c[4] - c[3] < MIN and abs(c[3] - out[-1][4]) < 0.02:
+            kk, a, _, s0, _ = out[-1]
+            out[-1] = (kk, a, c[2], s0, c[4])
+        else:
+            out.append(c)
+    # o primeiro do trecho também não pode nascer curto: cola no seguinte
+    if len(out) > 1 and out[0][4] - out[0][3] < MIN and abs(out[0][4] - out[1][3]) < 0.02:
+        out[0] = (out[0][0], out[0][1], out[1][2], out[0][3], out[1][4])
+        del out[1]
+    return out
+
+
 def versao(v):
     clips, legs, mapa, zooms, t, n = [], [], [], [], 0.0, 0
     ult = None   # (fonte, s0, s1) do corte anterior
     for item in v["roteiro"]:
         k, ini, fim_ = item[:3]
         aj = item[3] if len(item) > 3 else {}   # {"fim": s} no tempo da fonte: quando a escuta mostrou palavra a mais ou a menos na ponta
-        cs_ = cortes(k, ini, fim_)
+        cs_ = _emendar(cortes(k, ini, fim_))
         if aj.get("fim") is not None:
             kk_, a_, b_, s0_, _ = cs_[-1]
             # o fim pedido também cai num vale: 19,53 s escrito à mão cortava "esposa" no meio (Casa Morumbi, 2026-11-13)
@@ -665,6 +684,12 @@ def versao(v):
                 x["e"] = round(x["s"] + y["st"] - x["st"], 3)
     sem_sobrepor()
     print(" polir:", polir(clips, media, DURS))
+    # polir estica o apoio para trás e ele chegava a começar em -0,14 s (17/11): nada antes do 0 no projeto
+    for c in clips:
+        if c.get("st", 0) < -1e-6:
+            c["e"] = round(c["e"] + c["st"], 3)
+            c["st"] = 0.0
+    clips[:] = [c for c in clips if c.get("e", 0) - c.get("s", 0) > 0.05 or c["tr"] not in (0, 1)]
     sem_sobrepor()
     apoios = sorted((c["st"], c["st"] + c["e"] - c["s"]) for c in clips if c["tr"] == 1 and c.get("x") == "v")
 
@@ -787,7 +812,9 @@ def versao(v):
         chave_ = quando(*v.get("momento_chave", CFG.get("momento_chave")))
         if chave_ is not None:
             som("impacto", chave_, GANHO["impacto"])
-    legs = _sem_destaque(legs, janelas)
+    # só no destaque grande (PINCEL): o azul cobre a faixa da legenda. Na tarja em pílula (y 1240) ela fica livre
+    # embaixo e as duas convivem, como nos reels aprovados do Gordinhos (04 e 05, 12/11; o corte deixava um flash de 0,5 s)
+    legs = _sem_destaque(legs, janelas) if PINCEL else legs
     trans = CFG.get("apoio_transicoes")    # ex.: ["push", "chicote", "pop"]: 1 em cada 3 apoios entra com transição rápida
     if trans:
         for j, c in enumerate(sorted((c for c in clips if c["tr"] == 1 and c.get("x") == "v"), key=lambda c: c["st"])):

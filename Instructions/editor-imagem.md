@@ -458,6 +458,9 @@ quando usada; desfazer recompõe o documento inteiro (só o que mudou); históri
 - Barra de status: a cor sob o mouse só é lida quando o mouse para (120 ms) e nunca durante a pincelada — ler 1 pixel da
   composição (canvas na placa de vídeo) força o navegador a sincronizar e travava cada movimento num documento grande.
 - Resultado no 8640×1440 pintando máscara: tarefas longas 8,2 s → 0,2–0,4 s por arraste. Teste `testes/teste_pincel.py`.
+- Pintura em máscara com fundo branco: `ieTracoAplicar` recorta a região antes de restaurar os pixels anteriores.
+  Sem esse recorte, cada movimento apagava o retângulo inteiro da máscara e recompunha só a área do pincel.
+  O teste do pincel confere a cada movimento a cobertura, a opacidade e a preservação dos pixels fora do traço.
 
 ## Teste
 `py -3.13 testes/teste_psd_pre.py [--photoshop]`: preenchimento novo (cor cheio/com máscara e degradês) → camada de preenchimento;

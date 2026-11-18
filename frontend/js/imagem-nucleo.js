@@ -946,7 +946,10 @@ function ieComporPedaco(doc, R) {
     if (R2 && (R2.w > R.w || R2.h > R.h)) {
         const t = ieCanvas(R2.w, R2.h), tc = ieCtx(t);
         tc.setTransform(1, 0, 0, 1, -R2.x, -R2.y);
-        ieComporLista(tc, doc.camadas, R2, { x: R2.x, y: R2.y, base: IE._fundoComp }, 0);
+        // R2 inclui a margem de amostragem, então o cache pode reaproveitar as camadas paradas sem perder o contexto do ajuste.
+        const cg = ieCongAtual(doc);
+        if (cg) ieComporCong(tc, doc, R2, cg);
+        else ieComporLista(tc, doc.camadas, R2, { x: R2.x, y: R2.y, base: IE._fundoComp }, 0);
         ctx.drawImage(t, R.x - R2.x, R.y - R2.y, R.w, R.h, R.x, R.y, R.w, R.h);
         ctx.restore();
         return;
@@ -996,7 +999,6 @@ function ieCongAtual(doc) {
     const chave = doc.id + '|' + doc.hist.i + '|' + [...ids].sort((a, b) => a - b).join(',');
     if (IE._cong && IE._cong.doc === doc && IE._cong.chave === chave) return IE._cong.ok ? IE._cong : null;
     IE._cong = { doc, chave, ids, ok: false };
-    if (typeof ieCrMargemDoc === 'function' && ieCrMargemDoc(doc)) return null;
     if (ieTodas(doc).some(L => L.visivel && L.vazamento && L.vazamento !== 'nenhum')) return null;
     const contem = L => ids.has(L.id) || (L.tipo === 'grupo' && L.filhos.some(contem));
     let falhou = false;

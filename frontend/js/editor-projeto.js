@@ -1488,7 +1488,7 @@ function vePjRenderLogo() {
 // ─────────────────────────── Source monitor (duplo clique no Project) ───────────────────────────
 const VESRC = { id: null, video: null, inPt: null, outPt: null };
 
-function veSrcOpen(id) {
+function veSrcOpen(id, clipe = null) {
     const m = VE.media[id];
     if (!m || (m.kind !== 'video' && m.kind !== 'audio')) return;
     if (veMediaOffline(m)) { vePjRelink(id); return; }
@@ -1562,17 +1562,51 @@ function veSrcOpen(id) {
             if (box && !box.contains(e.target) && ativo && box.contains(ativo)) ativo.blur();
         }, true);
     }
+    // Os botões desta janela têm atalhos próprios; não devolvem o foco à timeline no mouseup.
+    md.onmouseup = e => e.stopPropagation();
+    veStop();
+    VESRC.video.pause();
+    VESRC.video.removeAttribute('src');
+    VESRC.video.load();
     md.classList.toggle('ve-src-audio', m.kind === 'audio');
     VESRC.id = id;
-    VESRC.inPt = m.srcIn ?? null;
-    VESRC.outPt = m.srcOut ?? null;
+    // Na timeline, os limites são só uma referência: assistir nunca muda o corte nem as marcas da mídia.
+    VESRC.trecho = clipe ? { s: clipe.s, e: clipe.e } : null;
+    VESRC.inPt = clipe ? clipe.s : (m.srcIn ?? null);
+    VESRC.outPt = clipe ? clipe.e : (m.srcOut ?? null);
+    VESRC.buscar = clipe ? clipe.s : 0;
+    VESRC.video.onloadedmetadata = veSrcPosicionar;
+    const acoes = md.querySelector('.ve-src-actions');
+    if (!acoes.querySelector('[data-src="inicio"]')) {
+        const inicio = document.createElement('button'), corte = document.createElement('button');
+        inicio.className = corte.className = 've-btn ve-btn-sm';
+        inicio.dataset.src = 'inicio'; inicio.textContent = veT('Início do arquivo');
+        corte.dataset.src = 'corte'; corte.textContent = veT('Início do corte');
+        acoes.insertBefore(inicio, acoes.querySelector('.ve-top-spacer'));
+        acoes.insertBefore(corte, acoes.querySelector('.ve-top-spacer'));
+    }
+    acoes.querySelectorAll('[data-src="in"], [data-src="out"], [data-src="limpar"], [data-src="insert"], .ve-src-arrastes')
+        .forEach(el => { el.style.display = clipe ? 'none' : ''; });
+    acoes.querySelectorAll('[data-src="inicio"], [data-src="corte"]')
+        .forEach(el => { el.style.display = clipe ? '' : 'none'; });
+    md.querySelector('#ve-src-seek').title = clipe ? veT('A área colorida é o corte usado na timeline. Arraste para assistir ao arquivo inteiro.') : '';
     md.querySelector('#ve-src-title').textContent = vePjNome(m);
     const sub = md.querySelector('#ve-src-sub');
     if (sub) sub.textContent = [m.info?.width && m.info?.height ? `${m.info.width}×${m.info.height}` : '', veShort((m.info && m.info.duration) || m.dur || 0)].filter(Boolean).join(' · ');
+    if (sub && clipe) sub.textContent = veT('Trecho usado na timeline') + ' · ' + sub.textContent;
     md.hidden = false;
     veSrcEncaixar(md.querySelector('.ve-src-box'));
     veSrcLoad();
+    veSrcPosicionar();
     md.querySelector('.ve-src-box').focus();
+}
+
+function veSrcPosicionar() {
+    const v = VESRC.video;
+    if (!v || VESRC.buscar == null || v.readyState < 1) return;
+    v.currentTime = Math.max(0, Math.min(veSrcDur(), VESRC.buscar));
+    VESRC.buscar = null;
+    veSrcRender();
 }
 
 // posição e tamanho da janela Source: lembrados entre aberturas (só conveniência; sem localStorage, abre no meio)
@@ -1613,6 +1647,13 @@ function veSrcJanela(box) {
     new ResizeObserver(() => { if (!box.closest('[hidden]')) { clearTimeout(t); t = setTimeout(salvar, 300); } }).observe(box);
 }
 
+function veSrcUrl(m) {
+    if (!m) return null;
+    if (m.kind === 'audio') return m.urlOrig;
+    // A prévia parcial tem preto fora dos trechos usados; o Source espera a completa que já vem no fundo.
+    return /\.parcial\./i.test(m.url || '') ? null : m.url;
+}
+
 function veSrcLoad() {
     const m = VE.media[VESRC.id], v = VESRC.video, wait = $ve('ve-src-wait');
     if (!m || !v) return;
@@ -1638,8 +1679,10 @@ function veSrcLoad() {
         veSrcRender();
         return;
     }
-    wait.hidden = !!m.url;
-    if (m.url && v.getAttribute('src') !== m.url) { v.src = m.url; v.load(); }
+    const url = veSrcUrl(m);
+    wait.hidden = !!url;
+    wait.textContent = veT(m.url && !url ? 'Preparando prévia do arquivo completo...' : 'Preparando prévia...');
+    if (url && v.getAttribute('src') !== url) { v.src = url; v.load(); }
     if (!m.url && m.id && m.kind === 'video') veVideoPrepararSePrecisa(m);
     veSrcRender();
 }
@@ -1670,12 +1713,13 @@ function veSrcClose() {
     const md = $ve('ve-source');
     if (!md) return;
     VESRC.video?.pause();
+    VESRC.buscar = null;
     md.hidden = true;
 }
 
 function veSrcDur() {
     const m = VE.media[VESRC.id];
-    return (m && (m.info && m.info.duration || m.dur)) || VESRC.video.duration || 0;
+    return (m && (m.info && m.info.duration || m.dur)) || (VESRC.id === 0 ? VE.srcDur : 0) || VESRC.video.duration || 0;
 }
 
 function veSrcPayload() {
@@ -1702,17 +1746,23 @@ function veSrcClick(e) {
     const b = e.target.closest('[data-src]');
     if (!b) { if (e.target.id === 've-source') veSrcClose(); return; }
     const m = VE.media[VESRC.id], t = VESRC.video.currentTime || 0;
-    if (b.dataset.src === 'fechar') veSrcClose();
+    if (VESRC.trecho && ['in', 'out', 'limpar', 'insert'].includes(b.dataset.src)) return;
+    if (b.dataset.src === 'inicio' || b.dataset.src === 'corte') {
+        VESRC.buscar = b.dataset.src === 'inicio' ? 0 : (VESRC.trecho?.s ?? 0);
+        veSrcPosicionar();
+    }
+    else if (b.dataset.src === 'fechar') veSrcClose();
     else if (b.dataset.src === 'play') veSrcTogglePlay();
     else if (b.dataset.src === 'in') { VESRC.inPt = t; if (VESRC.outPt != null && VESRC.outPt <= t) VESRC.outPt = null; }
     else if (b.dataset.src === 'out') { VESRC.outPt = t; if (VESRC.inPt != null && VESRC.inPt >= t) VESRC.inPt = null; }
     else if (b.dataset.src === 'limpar') { VESRC.inPt = VESRC.outPt = null; }
     else if (b.dataset.src === 'insert') veSrcDrop(veSrcPayload(), null);
-    if (m) { m.srcIn = VESRC.inPt; m.srcOut = VESRC.outPt; }
+    if (m && !VESRC.trecho) { m.srcIn = VESRC.inPt; m.srcOut = VESRC.outPt; }
     veSrcRender();
 }
 
 function veSrcKey(e) {
+    e.stopPropagation();
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); veSrcClose(); return; }
     if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); veSrcTogglePlay(); return; }
     if (e.key.toLowerCase() === 'i') { e.preventDefault(); e.stopPropagation(); veSrcClick({ target: { closest: () => ({ dataset: { src: 'in' } }) } }); return; }
@@ -1846,10 +1896,17 @@ function veSrcRender() {
     md.querySelector('#ve-src-in').textContent = VESRC.inPt == null ? '--:--' : veShort(VESRC.inPt);
     md.querySelector('#ve-src-out').textContent = VESRC.outPt == null ? '--:--' : veShort(VESRC.outPt);
     md.querySelector('#ve-src-len').textContent = p.srcOut > p.srcIn ? `Trecho ${veShort(p.srcOut - p.srcIn)}` : '';
+    if (VESRC.trecho) {
+        const dentro = cur >= p.srcIn && cur < p.srcOut;
+        md.querySelector('#ve-src-len').textContent = veT(dentro ? 'Dentro do corte' : 'Fora do corte') + ' · ' + veT('Usado') + ' ' + veShort(p.srcOut - p.srcIn);
+    }
     const play = md.querySelector('#ve-src-play');
     if (play) play.textContent = VESRC.video.paused ? '▶' : '❚❚';
     const m = VE.media[VESRC.id], wait = md.querySelector('#ve-src-wait');
-    if (wait) wait.hidden = !!(m && (m.kind === 'audio' ? m.urlOrig : m.url));
+    const info = m?.info || (VESRC.id === 0 ? VE.info : null), sub = md.querySelector('#ve-src-sub');
+    if (sub) sub.textContent = [VESRC.trecho ? veT('Trecho usado na timeline') : '',
+        info?.width && info?.height ? info.width + '×' + info.height : '', veShort(dur)].filter(Boolean).join(' · ');
+    if (wait) wait.hidden = !!veSrcUrl(m);
     if (m && m.kind === 'audio') veSrcOnda();
 }
 

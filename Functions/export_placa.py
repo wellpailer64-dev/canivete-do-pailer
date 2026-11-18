@@ -268,9 +268,9 @@ def memoria_estimada(segmentos, lay, path):
 
 
 def _lc_ok(fx):
-    """Todos os efeitos ativos rodam em shader na placa (_passos_lc): Luz e Cor, Aberração cromática, Desfoque e o
+    """Todos os efeitos ativos rodam em shader na placa (_passos_lc): Luz e Cor, Aberração, Desfoque comum/radial e o
     Brilho da camada de ajuste — e a Ondulação (_onda_passos, depois deles)."""
-    return all(f.get("t") in ("lc", "ca", "blur", "mo_glow", "onda") or f.get("on") is False for f in fx or [])
+    return all(f.get("t") in ("lc", "ca", "blur", "blur_radial", "mo_glow", "mo_grao", "onda") or f.get("on") is False for f in fx or [])
 
 
 # Efeitos que a placa ainda não faz em shader mas o exportador de CPU faz com filtros do ffmpeg: no modo placa o quadro
@@ -281,7 +281,7 @@ def _lc_ok(fx):
 # Cortar, Luma Key, Cantos arredondados e Básico 3D (transições Dividir/Chicote viram esses efeitos) também
 # Ondulação (Wave Warp): sozinha ou com Luz e Cor/Aberração/Desfoque vai em shader (_onda_passos); junto de um efeito
 # que desce, desce com ele (geq a cada quadro, vc._filtro_onda) e sobe na caixa com a margem
-_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow", "crop", "luma", "rounded", "b3d", "onda", "zoom")
+_FX_HIBRIDO = ("key", "lc", "blur", "blur_radial", "bc", "ca", "mo_fill", "mo_inv", "mo_glow", "mo_grao", "crop", "luma", "rounded", "b3d", "onda", "zoom")
 
 
 def _fx_hibrido(fx):
@@ -474,12 +474,21 @@ def _opaca(c):
     return c["op"] >= 0.999
 
 
-def _passos_lc(g, fx, mw, mh, pasta, tag, fmt=_FMT_MEIO):
+def _passos_lc(g, fx, mw, mh, pasta, tag, fmt=_FMT_MEIO, esc=1.0):
     """Luz e Cor (uma ou mais instâncias) como passadas do libplacebo: LUT e o shader de Clareza/Vinheta/Nitidez.
     mw/mh = tamanho em que o efeito mede (a mídia, num clipe; o quadro, na camada de ajuste). fmt = formato de cada
-    passada (_FMT_CAM num clipe, _FMT_MEIO na camada de ajuste)."""
+    passada (_FMT_CAM num clipe, _FMT_MEIO na camada de ajuste). esc = quanto o quadro já foi reduzido em relação à mídia
+    (rw/mw num clipe): os efeitos em px da mídia (raio do Brilho) encolhem junto."""
     passos = []
     for j, f in enumerate(fx or []):
+        if f.get("on") is not False and f.get("t") == "blur_radial":
+            sh = _shader_blur_radial(f.get("v") or {}, mw, mh)
+            if sh:
+                arq = os.path.join(pasta, f"radial_{tag}_{j}.glsl")
+                with open(arq, "w", encoding="utf-8") as fh:
+                    fh.write(sh)
+                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
+            continue
         if f.get("on") is not False and f.get("t") == "blur":
             sh = _shader_blur((f.get("v") or {}).get("amt"), mw, mh)
             if sh:
@@ -489,10 +498,19 @@ def _passos_lc(g, fx, mw, mh, pasta, tag, fmt=_FMT_MEIO):
                 passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
             continue
         if f.get("on") is not False and f.get("t") == "mo_glow":
-            # só na camada de ajuste (num clipe o Brilho vira camada desenhada; o exportador de CPU também ignora)
-            sh = _shader_glow(f.get("v") or {}) if tag.startswith("a") else None
+            # camada de ajuste e clipe de vídeo opaco (o editor desenha como vídeo só o que tem alfa); raio em px da mídia
+            sh = _shader_glow(f.get("v") or {}, esc)
             if sh:
                 arq = os.path.join(pasta, f"glow_{tag}_{j}.glsl")
+                with open(arq, "w", encoding="utf-8") as fh:
+                    fh.write(sh)
+                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
+            continue
+        if f.get("on") is not False and f.get("t") == "mo_grao":
+            # Granulação: também só na camada de ajuste (num clipe ela vira camada desenhada)
+            sh = _shader_grao(f.get("v") or {}) if tag.startswith("a") else None
+            if sh:
+                arq = os.path.join(pasta, f"grao_{tag}_{j}.glsl")
                 with open(arq, "w", encoding="utf-8") as fh:
                     fh.write(sh)
                 passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
@@ -545,13 +563,36 @@ def _shader_blur(amt, W, H):
     return "\n".join(partes)
 
 
-def _shader_glow(v):
+def _shader_blur_radial(v, W, H):
+    """Desfoque das bordas com o mesmo sigma e rampa radial da prévia e do filtro de CPU.
+    As duas passadas gaussianas guardam a textura RADIAL; o quadro original só muda na mistura final."""
+    sh = _shader_blur(vc._num(v.get("amt"), 0, 100, 20), W, H)
+    if not sh:
+        return None
+    foco = vc._num(v.get("raio"), 0, 95, 35) / 100.0
+    faixa = (1 - foco) * vc._num(v.get("suave"), 5, 100, 50) / 100.0
+    cx, cy = (vc._num(v.get(chave), 0, 100, 50) / 100.0 for chave in ("x", "y"))
+    partes = []
+    for indice, passada in enumerate(sh.split("//!HOOK MAIN\n")[1:]):
+        entrada = "HOOKED" if indice == 0 else "RADIAL"
+        passada = passada.replace("HOOKED", entrada).replace(
+            f"//!BIND {entrada}\n", f"//!BIND {entrada}\n//!SAVE RADIAL\n//!COMPONENTS 4\n", 1)
+        partes.append("//!HOOK MAIN\n" + passada)
+    partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!BIND RADIAL\n//!DESC desfoque radial: mistura\n"
+                  f"vec4 hook() {{\n"
+                  f"    vec2 delta = (HOOKED_pos - vec2({cx:.6f}, {cy:.6f})) * HOOKED_size;\n"
+                  f"    float q = clamp((2.0 * length(delta) / length(HOOKED_size) - {foco:.6f}) / {faixa:.6f}, 0.0, 1.0);\n"
+                  f"    return mix(clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0), RADIAL_tex(HOOKED_pos), q);\n}}\n")
+    return "\n".join(partes)
+
+
+def _shader_glow(v, esc=1.0):
     """Brilho (editor-motion.js "mo_glow") da camada de ajuste com as contas do exportador de CPU (video_cutter._filtros_fx):
     o que passa do limite (canal a canal, esticado para 0..1), com cor = cor × luma, desfoque gaussiano σ = raio/2 em
     duas passadas e soma × intensidade por cima do quadro. Quatro passadas do libplacebo; o brilho fica na textura
     BRILHO (//!SAVE) e o MAIN só muda na soma. Antes descia o quadro inteiro para a CPU (20 min em blocos: 1h40)."""
     lim = vc._num(v.get("lim"), 0, 100) / 100.0
-    raio, inten = vc._num(v.get("raio"), 0, 500), vc._num(v.get("int"), 0, 400) / 100.0
+    raio, inten = vc._num(v.get("raio"), 0, 500) * esc, vc._num(v.get("int"), 0, 400) / 100.0
     if raio <= 0.01 or inten <= 0.001:
         return None
     k = 1.0 / max(1.0 / 255.0, 1.0 - lim)
@@ -587,6 +628,59 @@ def _shader_glow(v):
                   f"    vec4 o = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n"
                   f"    vec3 g = clamp(BRILHO_tex(HOOKED_pos).rgb, 0.0, 1.0);\n{mistura}    return o;\n}}\n")
     return "\n".join(partes)
+
+
+def _shader_grao(v):
+    """Granulação (editor-motion.js "mo_grao") da camada de ajuste: ruído por célula de `tam` px (cinza, ou um por canal em
+    "Grão colorido"; novo a cada quadro em "Muda a cada quadro", pelo contador `frame`) em Luz suave (soft-light W3C, como o
+    navegador e o geq do exportador de CPU, video_cutter._expr_grao) na opacidade min(1, quantidade/50). Com célula maior
+    que 1,5 px a prévia amplia o ruído com suavização: aqui, interpolação bilinear entre as células. None se não muda nada."""
+    amt = vc._num(v.get("amt"), 0, 100)
+    if amt <= 0:
+        return None
+    S = max(1.0, vc._num(v.get("tam"), 1, 12, 1.5))
+    a = min(1.0, amt / 50.0)
+    cor = 1 if v.get("cor") else 0
+    anim = 1 if v.get("anim", 1) else 0
+    corpo = """//!HOOK MAIN
+//!BIND HOOKED
+//!DESC granulacao
+uint pcg(uint x) {
+    uint s = x * 747796405u + 2891336453u;
+    uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+vec3 gr(ivec2 c, int q) {
+    uint h = pcg(uint(c.x + 70000) + pcg(uint(c.y + 70000) + pcg(uint(q))));
+    float g = float(h) / 4294967296.0;
+    if (COR == 0) return vec3(g);
+    return vec3(g, float(pcg(h ^ 0x9e3779b9u)) / 4294967296.0, float(pcg(h ^ 0x85ebca6bu)) / 4294967296.0);
+}
+vec3 suave(vec3 cb, vec3 cs) {
+    vec3 d = mix(sqrt(cb), ((16.0 * cb - 12.0) * cb + 4.0) * cb, lessThanEqual(cb, vec3(0.25)));
+    vec3 baixo = cb - (1.0 - 2.0 * cs) * cb * (1.0 - cb);
+    vec3 alto = cb + (2.0 * cs - 1.0) * (d - cb);
+    return mix(alto, baixo, lessThanEqual(cs, vec3(0.5)));
+}
+vec4 hook() {
+    vec4 o = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);
+    int q = ANIM == 1 ? frame : 0;
+    vec2 p = HOOKED_pos * HOOKED_size / TAM;
+    vec3 n;
+    if (TAM > 1.5) {
+        vec2 u = p - 0.5;
+        ivec2 i = ivec2(floor(u));
+        vec2 f = fract(u);
+        n = mix(mix(gr(i, q), gr(i + ivec2(1, 0), q), f.x), mix(gr(i + ivec2(0, 1), q), gr(i + ivec2(1, 1), q), f.x), f.y);
+    } else {
+        n = gr(ivec2(floor(p)), q);
+    }
+    o.rgb = mix(o.rgb, suave(o.rgb, n), ALFA);
+    return o;
+}
+"""
+    return (corpo.replace("COR", str(cor)).replace("ANIM", str(anim)).replace("TAM", f"{S:.4f}")
+            .replace("ALFA", f"{a:.5f}"))
 
 
 def _shader_opacidade(c, ini, fim, fps, desde=None):
@@ -1046,7 +1140,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
     # desfoque animado (fxk): sai da lista fixa e vai num shader com o sigma de cada quadro (_shader_blur_anim)
     ids_anim = {f.get("id") for f in c.get("fxk") or [] if f.get("id") and (f.get("p") or {})}
     fx_fixos = [f for f in c["fx"] if f.get("id") not in ids_anim]
-    efeito = "" if hib or key_gpu else "".join(p + "," for p in _passos_lc(g, fx_fixos, rw, rh, pasta, f"v{n_cam}", _FMT_CAM))
+    efeito = "" if hib or key_gpu else "".join(p + "," for p in _passos_lc(g, fx_fixos, rw, rh, pasta, f"v{n_cam}", _FMT_CAM, rw / c["mw"]))
     sh_bl = None if hib or key_gpu else _shader_blur_anim(c.get("fxk"), rw, rh, c["dur"], g.fps, pula)
     for j, sh in enumerate(sh_bl or []):
         arq = os.path.join(pasta, f"blanim_v{n_cam}_{j}.glsl")
@@ -1069,7 +1163,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
     if key_gpu:
         # recorte inteiro na placa (shader); a saída já é RGBA. Antes dele, os efeitos da lista que vêm antes (Luz e Cor…)
         ativos = [f for f in c["fx"] if f.get("on") is not False]
-        efeito = "".join(p + "," for p in _passos_lc(g, ativos[:-1], rw, rh, pasta, f"k{n_cam}", _FMT_CAM))
+        efeito = "".join(p + "," for p in _passos_lc(g, ativos[:-1], rw, rh, pasta, f"k{n_cam}", _FMT_CAM, rw / c["mw"]))
         arq = os.path.join(pasta, f"key_v{n_cam}.glsl")
         with open(arq, "w", encoding="utf-8") as fh:
             fh.write(_shader_key(ativos[-1].get("v") or {}))

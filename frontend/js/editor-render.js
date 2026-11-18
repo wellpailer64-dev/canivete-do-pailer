@@ -23,6 +23,8 @@ const VEPR = {
     hold: 0,
 };
 
+const VE_PR_VERSAO = 6;
+
 const VE_PR_PREFS_PADRAO = { dir: '', maxGB: 20, dias: 30, altura: 720, ramGB: 1.5, autoSeg: 3, proxyJunto: false };
 function vePrPrefs() {
     const p = (typeof PREFS !== 'undefined' && PREFS.cache) || {};
@@ -88,7 +90,7 @@ function vePrSig(a, b, visuais) {
         .map(l => ({ ...l, st: +(l.st - a).toFixed(4), en: +(l.en - a).toFixed(4) }));
     // 3: zoom animado de camada corrigido na exportação (trechos antigos saíram com a escala parada)
     // 5: filme desbotado (curva medida), vibração negativa e nitidez do Luz e Cor medidos contra o Lumetri (2026-10-05)
-    const partes = [5, VE.seqW, VE.seqH, VE.fps, vePrPrefs().altura, +(b - a).toFixed(4), VE.path || '', clips,
+    const partes = [VE_PR_VERSAO, VE.seqW, VE.seqH, VE.fps, vePrPrefs().altura, +(b - a).toFixed(4), VE.path || '', clips,
         legs, legs.length ? VE.legEstilo : null];
     return vePrHash(JSON.stringify(partes));
 }
@@ -101,7 +103,7 @@ function vePrImpressao() {
         const m = VE.media[id];
         return m ? [id, m.path || m.url || '', veMediaOffline(m), !!(m.comp && (m._aoVivo || !m.url))] : id;
     });
-    return vePrHash(JSON.stringify([VE.clips, med, VE.legendas || [], VE.legEstilo || null, VE.seqW, VE.seqH, VE.fps,
+    return vePrHash(JSON.stringify([VE_PR_VERSAO, VE.clips, med, VE.legendas || [], VE.legEstilo || null, VE.seqW, VE.seqH, VE.fps,
         +VE.dur.toFixed(4), vePrPrefs().altura, VE.path || '',
         // olho das trilhas: sem isso, ocultar a da camada de ajuste seguia tocando o trecho renderizado COM ela (2026-11-07)
         (typeof VE_TRK !== 'undefined' && VE_TRK.v || []).map(t => !!(t && t.hide))]));
@@ -529,13 +531,12 @@ function vePrefsCacheSalvar(patch) {
 function vePrAplicarRam() {
     if (typeof veCache !== 'function') return;
     const c = veCache();
-    c.maxBytes = Math.max(0.25, +vePrPrefs().ramGB || 1.5) * 1024 * 1024 * 1024;
+    c.maxBytes = Math.min(VE_CACHE_MAX_BYTES, Math.max(0.25, +vePrPrefs().ramGB || 1.5) * 1024 * 1024 * 1024);
     if (typeof veCacheEvict === 'function') veCacheEvict();
     if (typeof veCacheUpdateUi === 'function') veCacheUpdateUi();
 }
 
-// Opções do cache de quadros na RAM: de 512 MB até a RAM do PC menos 2 GB (para não tomar a memória toda).
-// Acima de 3 GB avisa: os quadros guardados (ImageBitmap) também ocupam a memória da placa de vídeo.
+// Os ImageBitmap também ocupam a placa: a preferência respeita o teto de segurança da prévia.
 const VE_RAM_OPCOES = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128];
 let VE_RAM_TOTAL_GB = 0;
 async function vePrefsRamOpcoes(sel, atual) {
@@ -543,13 +544,13 @@ async function vePrefsRamOpcoes(sel, atual) {
     if (!VE_RAM_TOTAL_GB) {
         try { const r = await window.pywebview.api.ve_encoder_estado(); VE_RAM_TOTAL_GB = (r && r.ram_total || 0) / 1024 ** 3; } catch (e) {}
     }
-    const teto = VE_RAM_TOTAL_GB ? Math.max(0.5, Math.floor(VE_RAM_TOTAL_GB - 2)) : 3;
+    const teto = Math.min(VE_CACHE_MAX_BYTES / 1024 ** 3, VE_RAM_TOTAL_GB ? Math.max(0.5, Math.floor(VE_RAM_TOTAL_GB - 2)) : 1.5);
     const vals = VE_RAM_OPCOES.filter(v => v <= teto);
     if (!vals.includes(teto)) vals.push(teto);
     if (atual && !vals.includes(atual) && atual <= teto) vals.push(atual);
     vals.sort((a, b) => a - b);
     sel.innerHTML = vals.map(v => `<option value="${v}">${v < 1 ? Math.round(v * 1024) + ' MB' : String(v).replace('.', ',') + ' GB'}`
-        + `${v === teto ? ' (máximo: RAM − 2 GB)' : ''}${v > 3 ? ' · usa memória da placa' : ''}</option>`).join('');
+        + `${v === teto ? ' (máximo seguro)' : ''}</option>`).join('');
     sel.value = String(Math.min(atual || 1.5, teto));
 }
 

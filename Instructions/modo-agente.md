@@ -7,6 +7,21 @@ Permite que um agente de IA ou script de automação **veja e use o painel** do 
 
 **O app do Pailer abre SEMPRE visível: use `py -3.13 D:/Kanivete/Plugins/kanicode/plugins/kanivete/kanivete.py abrir` e, para trazer à frente, `frente`.** Nunca `ShowWindow=0`: ele precisa ver o trabalho (2026-10-30, esta instrução escondeu o app dele). Por dentro: `Invoke-CimMethod -ClassName Win32_Process -MethodName Create`, com executável e projeto entre aspas e `Win32_ProcessStartup.ShowWindow=1`. O processo nasce pelo serviço WMI, independente da árvore de processos da tarefa. Não use `Start-Process` para deixar o app do usuário aberto: nesta sessão (2026-10-23), ele respondeu durante a tarefa e encerrou depois de cada resposta, sem registro novo de falha. A vinculação ao processo da tarefa é uma hipótese; confirmar a permanência também na interação seguinte. Não reiniciar sem autorização. Quando o Pailer pedir trabalho no app aberto, use API, CLI ou atalhos e identifique a instância com `tools/porta_agente.py`; preserve o projeto e não use o app dele para testes. Testes continuam na 9333.
 
+## Identidade, avisos e borda (17/11/2026)
+
+A porta ligada e as conexões de diagnóstico não acendem a borda. Ações identificadas usam Claude em laranja,
+ChatGPT/Codex em branco e DeepSeek/Pickle em azul; a luz expira após 6 s sem atividade. O MCP informa `--agente`
+antes de executar o comando e limpa o contexto ao terminar, inclusive em erro. Leituras do MCP não geram pulso de
+escrita. Servidores MCP já iniciados precisam de nova conexão para carregar código Python alterado.
+
+Na porta CDP, informe o autor explicitamente: `veAgente('ajustar o clipe', fn, {agente:'codex'})`, ou
+`await kvComAgente('pickle', async () => { /* comandos */ })`. Aliases `chatgpt` e `deepseek` são aceitos. A porta
+sozinha não identifica o modelo; sem identidade, o aviso diz `Agente` e não empresta o nome do último autor.
+`window.kvAgenteAtual` é contexto temporário do comando, não preferência persistente.
+
+Conferência isolada: `py -3.13 testes/teste_identidade_agente.py` (cores, avisos, ociosidade, erro, concorrência,
+janela solta, desfazer e um comando MCP completo). Não toca no projeto aberto.
+
 ## Como ligar
 
 ```

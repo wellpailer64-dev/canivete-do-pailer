@@ -43,6 +43,51 @@ with sync_playwright() as p:
     pg.evaluate("() => { if (typeof abrirFerramenta === 'function') abrirFerramenta('editor-imagem'); }")
     time.sleep(2)
 
+    r = pg.evaluate("""() => {
+        KNV.automacao(true, {padrao: 'primario'});
+        const resultados = [];
+        try {
+            for (const [nome, fundo, parcial, cor, opac] of [
+                ['preto em máscara branca', 255, false, '#000000', 100],
+                ['preto em máscara branca parcial', 255, true, '#000000', 45],
+                ['branco em máscara branca parcial', 255, true, '#ffffff', 70],
+                ['cinza em máscara preta', 0, true, '#808080', 60],
+            ]) {
+                KNV.novo(nome, 640, 400, 'branco');
+                const doc = IE.doc, camada = ieAtiva(doc);
+                const mascara = ieCanvas(parcial ? 180 : 640, parcial ? 150 : 400), ctx = ieCtx(mascara);
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, mascara.width, mascara.height);
+                ctx.clearRect(60, 50, 60, 50);
+                camada.m = {c: mascara, x: parcial ? 160 : 0, y: parcial ? 100 : 0, fundo};
+                ieInvalidar(camada); ieRaster(camada);
+                doc.mascaraAlvo = true; IE.cor = [cor, '#ffffff'];
+                Object.assign(IE.op.pincel, {tam: 80, dureza: 30, opac, fluxo: 70, espaco: 18,
+                    forma: 'redondo', angulo: 0, redondeza: 100, varTam: 0, varAng: 0, dispersao: 0});
+                const antes = ieCtx(ieMascaraRegiao(camada.m, ieRDoc(doc))).getImageData(0, 0, doc.w, doc.h).data;
+                let fora = 0, incorretos = 0, max = 0;
+                for (const [indice, ponto] of [{x: 180, y: 150}, {x: 220, y: 170}, {x: 285, y: 200}, {x: 370, y: 245}].entries()) {
+                    if (!indice) ieTracoIniciar(ponto, {}, doc, 'pincel'); else ieTracoPara(ponto);
+                    const atual = ieCtx(ieMascaraRegiao(camada.m, ieRDoc(doc))).getImageData(0, 0, doc.w, doc.h).data;
+                    const cobertura = ieCtx(IE_TRACO.traco).getImageData(0, 0, doc.w, doc.h).data;
+                    for (let pixel = 3; pixel < atual.length; pixel += 4) {
+                        const alfa = cobertura[pixel] / 255 * opac / 100;
+                        const esperado = antes[pixel] * (1 - alfa) + ieCinza(cor) * alfa;
+                        const dif = Math.abs(atual[pixel] - esperado);
+                        if (!cobertura[pixel] && atual[pixel] !== antes[pixel]) fora++;
+                        if (dif > 2) incorretos++;
+                        max = Math.max(max, dif);
+                    }
+                }
+                ieTracoFim();
+                resultados.push({nome, fora, incorretos, max});
+            }
+        } finally { KNV.automacao(false); }
+        return resultados;
+    }""")
+    for caso in r:
+        conferir(caso['fora'] == 0 and caso['incorretos'] == 0, caso['nome'] + ': respeita o brush a cada movimento',
+                 f"fora do traço {caso['fora']}, pixels incorretos {caso['incorretos']}, diferença máxima {caso['max']:.1f}")
+
     # 1. traço macio
     r = pg.evaluate("""async () => {
         KNV.automacao(true, {padrao: 'primario'});

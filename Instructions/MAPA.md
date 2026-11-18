@@ -293,6 +293,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/mapa-imagem.md` — Mapa do código — imagem (gerado por tools/mapa_codigo.py; nome:linha)
 - `Instructions/agente/mapa-kanivete-encoder.md` — Mapa do Kanivete Encoder (Ke)
 - `Instructions/agente/mapa-vetor.md` — Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)
+- `Instructions/agente/mcp-video-melhorias.md` — Registro de melhorias do MCP de Vídeo (`kanivete_executar_comando`, domínio `video`)
 - `Instructions/agente/metodo-edicao-video.md` — Método de Edição de Vídeo do Pailer
 - `Instructions/agente/missao-repertorio-motion.md` — Missão Repertório Motion (desde 2026-11-04)
 - `Instructions/agente/mockup-profissional.md` — Mockup profissional — o que os PSDs dos estúdios fazem (estudo 2026-10-15)
@@ -314,6 +315,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/ponte-premiere.md` — Ponte Kanivete ↔ Premiere Pro (plugin UXP "Kanivete Ponte")
 - `Instructions/agente/rastreador.md` — Rastreador de movimento (Tracker do After Effects) — FEITO v1 (2026-10-23)
 - `Instructions/agente/receita-gancho-texto-atras.md` — Receita: gancho com frase digitada ATRÁS das pessoas + transições curtas (2026-11-12, card Carlinhos "Mais um aprovado")
+- `Instructions/agente/receitas-efeitos-referencia.md` — Receitas de efeitos de referência (reels TEVEO e Yerba Madre) — 2026-11-16
 - `Instructions/agente/relatorio-aula-deepseek.md` — Relatório da aula do DeepSeek-V4.1-Flash
 - `Instructions/agente/remover-fundo.md` — Remover fundo (recorte) — velocidade × qualidade (2026-10-06)
 - `Instructions/agente/repertorio-visual.md` — Repertório visual aprovado pelo Pailer
@@ -457,6 +459,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/video_cutter.py` — video_cutter.py — Motor do Pocket Editor (editor de vídeo do Canivete do Pailer)
 - `Functions/videoconverter.py` — videoconverter.py — converte vídeos entre formatos, vídeo→GIF/MP3 e GIF→vídeo
 - `Functions/videodownloader.py` — Traduz os erros mais comuns do yt-dlp para o usuário
+- `Functions/vigia_webview.py` — Vigia do navegador embutido (WebView2) do KANIVETE
 - `Functions/vst3.py` — vst3.py — carregador PRÓPRIO de plugins de áudio VST3 do KANIVETE (Python puro + ctypes; sem compilador e sem
 - `Functions/webscraper.py` — 
 
@@ -474,6 +477,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_comp_cenas.py` — Agrupar cenas em Comps preserva exportação, monitor e desfazer (app em --agente=9333)
 - `testes/teste_conteudo.py` — Editar › Preenchimento sensível ao conteúdo do Photo Kanivete (LaMa) — app em --agente=9333
 - `testes/teste_copias_edicao.py` — Cópias de edição (Functions/otimizar.py): quadro-chave a cada ~0,25 s e refazer as antigas pelo editor
+- `testes/teste_cor_cinema.py` — Cor cinema (camada de ajuste com Luz e Cor + Brilho + Aberração + Granulação) no export, sem abrir o app do Pailer
 - `testes/teste_corte_alt.py` — Máscara de corte com Alt + clique na divisa entre duas camadas (como no Photoshop), com mouse de verdade no app de
 - `testes/teste_corte_generativo.py` — Corte C e expansão: testa em navegador isolado, com IA sintética
 - `testes/teste_dissolver.py` — Filtro > Dissolver (Liquify) com mouse de verdade (app em --agente=9333; não mexa no mouse durante)
@@ -491,6 +495,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_guias.py` — Teste das guias/fatias como no Photoshop, com mouse de verdade no app de teste (9333)
 - `testes/teste_hardware.py` — Núcleo de hardware (Functions/hardware.py): o PC lido, o plano de cada nível, o modo, o balanceador de memória e,
 - `testes/teste_harmonizar.py` — Harmonização: análise, isolamento, ajustes editáveis, prévia, cancelamento e histórico; sem IA
+- `testes/teste_identidade_agente.py` — Borda e avisos por agente, com navegador isolado e sem acessar o projeto aberto
 - `testes/teste_illustrator.py` — Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
 - `testes/teste_imagem_dia_video.py` — Testa tools/agente/imagem_dia_video.py com assets mínimos gerados na hora (card fictício no disco D:)
@@ -523,7 +528,9 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_psd_refs.py` — PSD salvo por cima (ida e volta) não pode trocar pixels entre camadas (2026-10-06: o carrossel do cliente voltou com
 - `testes/teste_psd_so.py` — Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)
 - `testes/teste_psd_texto.py` — Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)
+- `testes/teste_pulso_agente.py` — Reação visual do agente na timeline (pulso no clipe alterado), testada com o código real de editor.js em Node
 - `testes/teste_rastro.py` — Rastreador de movimento (editor-rastro.js + Functions/rastreador.py) no app de verdade, com GABARITO: um quadro
+- `testes/teste_recuperacao_gpu.py` — Perda real de contexto WebGL e recuperação do player, sem acessar o app aberto
 - `testes/teste_refino_mascara.py` — Refino de máscara: alfa, fundo externo, prévia, cancelamento, pixels preservados e histórico; sem IA
 - `testes/teste_remix.py` — Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46
 - `testes/teste_respiros.py` — Cortar respiros (editor-respiros.js + Functions/respiros.py) e onda em alta resolução (ve_peaks_faixa) no app de verdade

@@ -3604,6 +3604,23 @@ def _ca_foco(v):
     return f0, f0 + (1 - f0) * _num(v.get("suave"), 5, 100, 50) / 100.0
 
 
+def _expr_grao(amt, tam, colorido, anim):
+    """Filtro geq (lista de um filtro) da Granulação da camada de ajuste: Luz suave de um ruído por célula (_filtros_fx)."""
+    S = max(1.0, tam)
+    a = min(1.0, amt / 50.0)
+    n = "N" if anim else "0"
+    planos = []
+    for k in range(3):
+        sem = (k * 17.31) if colorido else 0.0
+        u = (f"st(0,mod(abs(sin(floor(X/{S:.4f})*12.9898+floor(Y/{S:.4f})*78.233+{n}*37.719+{sem:.3f})*43758.5453),1))")
+        cb = "(p(X,Y)/255)"
+        baixo = f"{cb}-(1-2*ld(0))*{cb}*(1-{cb})"
+        d = f"if(lte({cb},0.25),((16*{cb}-12)*{cb}+4)*{cb},sqrt({cb}))"
+        alto = f"{cb}+(2*ld(0)-1)*({d}-{cb})"
+        planos.append(f"'{u};255*clip({cb}+{a:.5f}*(if(lte(ld(0),0.5),{baixo},{alto})-{cb}),0,1)'")
+    return [f"format=gbrp,geq=r={planos[0]}:g={planos[1]}:b={planos[2]},format=rgba"]
+
+
 def _filtros_fx(fx, mw, mh, tag="x"):
     """Efeitos do clipe (mesma ordem e mesmas contas da prévia do editor, em frontend/js/editor-fx.js).
     Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere).
@@ -3714,9 +3731,10 @@ def _filtros_fx(fx, mw, mh, tag="x"):
             if m < 0.999:
                 e = f"(255-val)*{1 - m:.5f}+val*{m:.5f}"
                 out.append(f"format=rgba,lutrgb=r='{e}':g='{e}':b='{e}'")
-        elif t == "mo_glow" and tag.startswith("a"):
-            # Brilho (editor-motion.js "mo_glow") numa camada de ajuste: o que passa do limite (canal a canal), desfocado
-            # (sigma = raio/2) e somado ao quadro — a mesma conta da prévia
+        elif t == "mo_glow":
+            # Brilho (editor-motion.js "mo_glow") numa camada de ajuste ou num clipe de vídeo opaco (raio em px da mídia, que
+            # é o que mw/mh medem): o que passa do limite (canal a canal), desfocado (sigma = raio/2) e somado ao quadro —
+            # a mesma conta da prévia. Sem a margem que a prévia dá ao clipe (o brilho que sai da borda do vídeo)
             lim = _num(v.get("lim"), 0, 100) / 100.0 * 255
             raio, inten = _num(v.get("raio"), 0, 500), _num(v.get("int"), 0, 400) / 100.0
             if raio > 0.01 and inten > 0.001:
@@ -3739,6 +3757,15 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                     mist = "all_expr='255-(255-A)" + "".join(f"*(1-{a:.5f}*B/255)" for a in glow_passadas(inten)) + "'"
                 out.append(f"format=gbrp,split[{r}a][{r}b];[{r}b]{cadeia},format=gbrp[{r}c];"
                            f"[{r}a][{r}c]blend={mist},format=rgba")
+        elif t == "mo_grao" and tag.startswith("a"):
+            # Granulação (editor-motion.js "mo_grao") numa camada de ajuste: ruído por célula de `tam` px (cinza, ou um
+            # por canal em "Grão colorido"; novo a cada quadro em "Muda a cada quadro") em Luz suave (soft-light do
+            # navegador, fórmula W3C) por cima do quadro, na opacidade min(1, quantidade/50). O ruído é um hash do
+            # (célula, quadro) no próprio geq — o mesmo desenho da prévia só em estatística, não quadro a quadro.
+            amt = _num(v.get("amt"), 0, 100)
+            if amt > 0:
+                for e in _expr_grao(amt, _num(v.get("tam"), 1, 12, 1.5), bool(v.get("cor")), bool(v.get("anim", 1))):
+                    out.append(e)
         elif t == "crop":
             l, tp, r, bt = (_num(v.get(k), 0, 100) / 100.0 for k in ("l", "t", "r", "b"))
             # a área cortada fica transparente (a camada de baixo aparece), sem mudar o tamanho
@@ -3846,7 +3873,9 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                     out.append(f"format=gbrp,vignette=angle={ang:.5f}:dither=0,format=rgba")
             if nit_depois:
                 out.append(_NIT_NO_YUV + f"unsharp=5:5:{nit_depois:.4f}:5:5:0")
-            elif ang > 0.001:
+            elif ang > 0.001 and not tag.startswith("a"):
+                # (camada de ajuste: a vinheta já foi aplicada acima, pela máscara; repetir aqui escurecia duas vezes quando
+                # a nitidez não vinha por último — a Cor cinema, com o Luz e Cor na frente do Brilho, saía com vinheta em dobro)
                 # vignette não trabalha com alfa: escurece o RGB e devolve o alfa original
                 r = f"{tag}f{j}"
                 out.append(f"format=rgba,split[{r}a][{r}b];[{r}a]format=gbrp,vignette=angle={ang:.5f}:dither=0[{r}c];"
