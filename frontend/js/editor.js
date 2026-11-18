@@ -3575,7 +3575,7 @@ function veCamVisiveis(t, lista, cur) {
     if (cobre > 0) vis = vis.slice(cobre);
     return vis.filter(c => {
         const m = veMediaOf(c);
-        return !veIsImage(c) && !c._tr && (c._o || c) !== cur && m && m.url && !veMediaOffline(m) && !(m.comp && m._aoVivo) &&
+        return !veIsImage(c) && !veTrPerto(c, t) && (c._o || c) !== cur && m && m.url && !veMediaOffline(m) && !(m.comp && m._aoVivo) &&
             !(typeof veCompPassa === 'function' && veCompPassa(c));   // Comp que só organiza: as de dentro têm os players
     });
 }

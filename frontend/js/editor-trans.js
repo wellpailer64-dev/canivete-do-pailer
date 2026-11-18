@@ -702,6 +702,15 @@ function veTransSoltar(fica) {
     });
 }
 
+// Cópia de transição cuja PRÓPRIA transição está perto de t (essa tem player de transição em veTransPlayers).
+// Fora disso a cópia é um clipe comum e precisa do player de camada: com outra transição ativa no quadro (ex.:
+// a barra do GC entrando), o vídeo de baixo ficava sem nenhum player e a tela ia a PRETO (HDI v8, 2026-11-18)
+function veTrPerto(c, t) {
+    if (!c || !c._tr || !c._tr.length) return false;
+    const pre = VE_TR_PRE * Math.max(1, VE.rate);
+    return c._tr.some(([j]) => t >= j.ws - pre && t <= j.we + 0.05);
+}
+
 // Devolve Map(clipe original → player) dos clipes de transição perto da agulha
 function veTransPlayers(t, virt) {
     const mapa = new Map();
