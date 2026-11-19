@@ -1457,6 +1457,10 @@ function ieMenuContexto(ev, painelCamadas) {
         ...(painelCamadas ? ['-', ['Converter em objeto inteligente', 'objetoInteligente'], ...(ieAtiva(doc)?.conteudo ? [['Converter em camadas', 'converterEmCamadas']] : []),
             '-', ['Copiar estilo de camada', 'copiarEstilo'], ['Colar estilo de camada', 'colarEstilo'], ['Limpar estilo de camada', 'limparEstilo'],
             ...(ieAtiva(doc)?.ajuste?.t === 'cameraRaw' ? [['Copiar efeito Camera Raw', 'copiarCR']] : []), ...(IE.filtroCopiado?.length ? [['Colar efeito/filtro', 'colarCR']] : [])] : [])];
+    if (!painelCamadas) {   // área livre do canvas (fora de toda prancheta / do documento): criar prancheta nova
+        const p = ieTelaDoc(ev), pr = iePranchetas(doc), dentro = R => p.x >= R.x && p.y >= R.y && p.x < R.x + R.w && p.y < R.y + R.h;
+        if (pr.length ? !pr.some(L => dentro(L.prancheta)) : !dentro({ x: 0, y: 0, w: doc.w, h: doc.h })) itens.unshift(['Nova prancheta...', 'novaPrancheta'], '-');
+    }
     if (doc.sel) itens.unshift(['Desmarcar', 'selNada'], ['Inverter seleção', 'selInverter'], ['Camada via cópia', 'duplicar'], '-');
     pop.innerHTML = ieMenuHtml(itens);
     pop.hidden = false;

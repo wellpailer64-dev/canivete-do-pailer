@@ -812,8 +812,9 @@ function veRestore(snap) {
     // Comp criada nesta sessão: volta ou sai do Projeto junto com o clipe dela (as do arquivo aberto ficam)
     if (Array.isArray(d.comps)) VE.media.forEach(m => { if (m && m.comp && (m._criada || d.comps.includes(m.id))) m.removido = !d.comps.includes(m.id); });
     if (d.c3d) for (const [id, c] of Object.entries(d.c3d)) { const m = VE.media[+id]; if (m && m.c3d && JSON.stringify(m.c3d) !== JSON.stringify(c)) { m.c3d = c; if (typeof ve3dMudou === 'function') ve3dMudou(m); } }
-    VE.sel = -1;
-    VETX.legSel = -1;
+    // Desfazer mantém o clipe selecionado (e o painel aberto, como Luz e Cor) se ele ainda existe
+    if (!(VE.sel >= 0 && VE.sel < VE.clips.length)) VE.sel = -1;
+    if (!(VETX.legSel >= 0 && VETX.legSel < VE.legendas.length)) VETX.legSel = -1;
     veCacheInvalidate();   // poda o cache RAM e recalcula os trechos renderizados (o do estado anterior volta a valer)
     veRelayout();
     veAfterEdit(VE.playhead);   // como no Premiere, desfazer não mexe na agulha

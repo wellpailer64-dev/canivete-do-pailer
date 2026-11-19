@@ -102,7 +102,7 @@ function ieTracoIniciar(p, ev, doc, tipo) {
     if (tipo === 'carimbo') {
         if (ev.altKey) { IE.carimboFonte = { x: p.x, y: p.y }; IE.carimboOff = null; ieToast(ieT('Origem do carimbo definida')); return; }
         if (!IE.carimboFonte) { ieToast(ieT('Alt+clique para escolher de onde copiar')); return; }
-        if (!op.alinhado || !IE.carimboOff) IE.carimboOff = { x: IE.carimboFonte.x - p.x, y: IE.carimboFonte.y - p.y };
+        if (!op.alinhado || !IE.carimboOff) IE.carimboOff = { x: Math.round(IE.carimboFonte.x - p.x), y: Math.round(IE.carimboFonte.y - p.y) };
     }
     const o = ieGravavel(L, alvo);
     const fundo = alvo === 'm' ? (L.m.fundo || 0) : 0;
@@ -136,12 +136,15 @@ function ieTracoDab(t, x, y) {
     const ctx = ieCtx(t.traco);
     const dx = x - ponta.width / 2, dy = y - ponta.height / 2;
     if (t.tipo === 'carimbo') {
+        // posição e deslocamento inteiros: a cópia sai pixel a pixel, sem reamostrar (meio pixel borrava cada pincelada)
+        const xi = Math.round(dx), yi = Math.round(dy), ox = Math.round(IE.carimboOff.x), oy = Math.round(IE.carimboOff.y);
         const d = ieCanvas(ponta.width, ponta.height), dc = ieCtx(d);
-        dc.drawImage(t.fonte, -(dx + IE.carimboOff.x), -(dy + IE.carimboOff.y));
+        dc.imageSmoothingEnabled = false;
+        dc.drawImage(t.fonte, -(xi + ox), -(yi + oy));
         dc.globalCompositeOperation = 'destination-in';
         dc.drawImage(ponta, 0, 0);
         ctx.globalAlpha = t.op.fluxo / 100;
-        ctx.drawImage(d, dx, dy);
+        ctx.drawImage(d, xi, yi);
     } else {
         ctx.globalAlpha = t.op.fluxo / 100;
         ctx.drawImage(ponta, dx, dy);
@@ -914,7 +917,7 @@ const iePintor = (tipo, nome, tecla, icone) => ({
             IE._pincelAjuste = { x0: ev.clientX, tam0: IE.op[tipo].tam, p0: IE.mouse || p };
             return;
         }
-        if (tipo === 'pincel' && typeof iePincelPopup === 'function') iePincelPopup(ev);
+        if (typeof iePincelPopup === 'function') iePincelPopup(ev);
     },
     rightMove(p, ev) {
         const a = IE._pincelAjuste;
@@ -971,21 +974,106 @@ const IE_BORRACHA_MAGICA = {
         if (!ieChecarPintavel(L, 'apagar')) return;
         if (p.x < 0 || p.y < 0 || p.x >= doc.w || p.y >= doc.h) return;
         const o = IE.op.borrachaMagica;
-        const img = ieAmostra(doc, o.todas, L), d = img.data, W = img.width, H = img.height;
-        const tolMax = o.tol + (o.suave ? Math.max(4, o.tol * 0.5) : 0);
-        const reg = ieRegiao(img, p.x, p.y, tolMax, o.contiguo);   // o que a cor alcança (com a faixa suave)
-        const i0 = (Math.floor(p.y) * W + Math.floor(p.x)) * 4, r0 = d[i0], g0 = d[i0 + 1], b0 = d[i0 + 2];
-        const cob = ieCanvas(W, H), cx = ieCtx(cob), ci = cx.createImageData(W, H), c = ci.data;
-        for (let i = 0; i < reg.length; i++) {
-            if (!reg[i]) continue;
-            const k = i * 4, dif = Math.max(Math.abs(d[k] - r0), Math.abs(d[k + 1] - g0), Math.abs(d[k + 2] - b0));
-            const a = ieApagarCor(dif, o.tol, o.suave);
-            if (a > 0) { c[k] = c[k + 1] = c[k + 2] = 255; c[k + 3] = Math.round(a * 255); }
+        const img = ieAmostra(doc, o.todas, L), d = img.data, W = img.width, H = img.height, N = W * H;
+        const m = ieBMagicaMascara(d, W, H, p.x, p.y, o);
+        const opac = o.opac / 100, alvo = ieModPinturaAlvo(doc, L);
+        // caminho preciso: apaga direto na camada e tira a cor do fundo que ficou misturada na borda (sem auréola)
+        if (alvo === 'c' && L.c && !doc.sel) {
+            const g = ieGravavel(L), Rantes = ieRCamada(L), lw = g.c.width, lh = g.c.height, ox = g.x || 0, oy = g.y || 0;
+            const ctx = ieCtx(g.c), li = ctx.getImageData(0, 0, lw, lh), ld = li.data, [r0, g0, b0] = m.cor;
+            let mudou = false;
+            for (let y = 0; y < lh; y++) {
+                const dy = y + oy;
+                if (dy < 0 || dy >= H) continue;
+                for (let x = 0; x < lw; x++) {
+                    const dx = x + ox;
+                    if (dx < 0 || dx >= W) continue;
+                    const a = m.a[dy * W + dx] * opac;
+                    if (a <= 0) continue;
+                    const k = (y * lw + x) * 4;
+                    if (!ld[k + 3]) continue;
+                    mudou = true;
+                    if (a >= 0.999) { ld[k + 3] = 0; continue; }
+                    const fica = 1 - a;
+                    if (o.suave && m.a[dy * W + dx] < 1) {   // descontamina: C = fica·F + a·fundo → F
+                        ld[k] = ieClamp(Math.round((ld[k] - a * r0) / fica), 0, 255);
+                        ld[k + 1] = ieClamp(Math.round((ld[k + 1] - a * g0) / fica), 0, 255);
+                        ld[k + 2] = ieClamp(Math.round((ld[k + 2] - a * b0) / fica), 0, 255);
+                    }
+                    ld[k + 3] = Math.round(ld[k + 3] * fica);
+                }
+            }
+            if (!mudou) return;
+            ctx.putImageData(li, 0, 0);
+            L.sujoPx = true;
+            ieCamadaMudou(L, Rantes);
+            ieHist(ieT('Borracha mágica'));
+            return;
         }
+        const cob = ieCanvas(W, H), cx = ieCtx(cob), ci = cx.createImageData(W, H), c = ci.data;
+        for (let i = 0; i < N; i++) { const a = m.a[i]; if (a > 0) { const k = i * 4; c[k] = c[k + 1] = c[k + 2] = 255; c[k + 3] = Math.round(a * 255); } }
         cx.putImageData(ci, 0, 0);
-        iePintarCobertura(doc, L, cob, ieRDoc(doc), 'Borracha mágica', { opac: o.opac / 100, borracha: true });
+        iePintarCobertura(doc, L, cob, ieRDoc(doc), 'Borracha mágica', { opac, borracha: true });
     },
 };
+
+// Máscara da borracha mágica (0..1 por pixel): cor de referência = média 3×3 do clique (ignora ruído/JPEG); distância
+// perceptual (redmean, escala 0..255) em vez do maior canal; preenchimento até tol + faixa suave; depois a borda
+// ganha um anti-serrilhado de 1 px (desfoque só na fronteira) e os furinhos isolados do ruído são fechados.
+function ieBMagicaMascara(d, W, H, px, py, o) {
+    const N = W * H, X = Math.floor(px), Y = Math.floor(py);
+    let sr = 0, sg = 0, sb = 0, sa = 0, n = 0;
+    for (let y = Math.max(0, Y - 1); y <= Math.min(H - 1, Y + 1); y++) for (let x = Math.max(0, X - 1); x <= Math.min(W - 1, X + 1); x++) {
+        const k = (y * W + x) * 4; sr += d[k]; sg += d[k + 1]; sb += d[k + 2]; sa += d[k + 3]; n++;
+    }
+    const r0 = sr / n, g0 = sg / n, b0 = sb / n, a0 = sa / n;
+    const tol = o.tol, faixa = o.suave ? Math.max(6, tol * 0.6) : 0, tolMax = tol + faixa;
+    const dist = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+        const k = i * 4;
+        if (a0 < 8) { dist[i] = d[k + 3]; continue; }   // clicou no vazio: régua é a transparência
+        const dr = d[k] - r0, dg = d[k + 1] - g0, db = d[k + 2] - b0, rm = (d[k] + r0) / 2;
+        dist[i] = Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db) / 3 + Math.abs(d[k + 3] - a0) * 0.5;
+    }
+    let a = new Float32Array(N);
+    const val = v => v <= tol ? 1 : (v >= tolMax ? 0 : 1 - (v - tol) / faixa);
+    if (o.contiguo) {
+        const vis = new Uint8Array(N), pilha = [Y * W + X];
+        if (X < 0 || Y < 0 || X >= W || Y >= H) return { a, cor: [r0, g0, b0] };
+        vis[pilha[0]] = 1;
+        while (pilha.length) {
+            const i = pilha.pop(), v = dist[i];
+            if (v >= tolMax) continue;
+            a[i] = val(v);
+            if (v > tol) continue;   // a faixa suave entra, mas não espalha (não vaza para dentro do objeto)
+            const x = i % W;
+            if (x > 0 && !vis[i - 1]) { vis[i - 1] = 1; pilha.push(i - 1); }
+            if (x < W - 1 && !vis[i + 1]) { vis[i + 1] = 1; pilha.push(i + 1); }
+            if (i >= W && !vis[i - W]) { vis[i - W] = 1; pilha.push(i - W); }
+            if (i < N - W && !vis[i + W]) { vis[i + W] = 1; pilha.push(i + W); }
+        }
+    } else for (let i = 0; i < N; i++) if (dist[i] < tolMax) a[i] = val(dist[i]);
+    if (!o.suave) { for (let i = 0; i < N; i++) a[i] = a[i] >= 0.5 ? 1 : 0; return { a, cor: [r0, g0, b0] }; }
+    // fecha pontinhos de ruído: pixel não apagado cercado (≥7 de 8) por apagado vira apagado, e o inverso
+    const b = new Float32Array(a);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        let s = 0;
+        for (let j = -1; j <= 1; j++) for (let q = -1; q <= 1; q++) if (j || q) s += a[i + j * W + q] > 0.5 ? 1 : 0;
+        if (a[i] <= 0.5 && s >= 7) b[i] = 1; else if (a[i] > 0.5 && s <= 1) b[i] = 0;
+    }
+    a = b;
+    // anti-serrilhado: só onde há fronteira, troca pelo desfoque 3×3 ponderado (tenda) — miolo continua 0 ou 1
+    const out = new Float32Array(a);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x, v = a[i];
+        const mn = Math.min(v, a[i - 1], a[i + 1], a[i - W], a[i + W]), mx = Math.max(v, a[i - 1], a[i + 1], a[i - W], a[i + W]);
+        if (mx - mn < 0.02) continue;
+        const s = 4 * v + 2 * (a[i - 1] + a[i + 1] + a[i - W] + a[i + W]) + a[i - W - 1] + a[i - W + 1] + a[i + W - 1] + a[i + W + 1];
+        out[i] = Math.max(v * 0.5, s / 16);   // não "devolve" fundo já apagado com força
+    }
+    return { a: out, cor: [r0, g0, b0] };
+}
 
 // Borracha de plano de fundo: pincel que só apaga a cor que está debaixo da mira (amostra contínua ou só no clique),
 // com tolerância; "proteger a cor de frente" deixa intacta a cor escolhida (ex.: o cabelo). O tamanho grande pega a
@@ -1000,6 +1088,17 @@ const IE_BORRACHA_FUNDO = {
         IE.bfundo = { L, Rantes: ieRCamada(L), amostra: null, ult: null };
         IE_BORRACHA_FUNDO.dab(p, doc);
     },
+    // Alt + botão direito arrastando: tamanho, igual ao pincel
+    rightDown(p, ev) { IE._pincelAjuste = ev.altKey ? { x0: ev.clientX, tam0: IE.op.borrachaFundo.tam, p0: IE.mouse || p } : null; },
+    rightMove(p, ev) {
+        const a = IE._pincelAjuste;
+        if (!a) return;
+        IE.mouse = a.p0;
+        IE.op.borrachaFundo.tam = Math.round(ieClamp(a.tam0 + (ev.clientX - a.x0) / (IE.doc?.zoom || 1), 1, 2500));
+        ieOpcoesRender?.();
+        ieDesenharSobre();
+    },
+    rightUp() { IE._pincelAjuste = null; },
     move(p, ev, doc) {
         const b = IE.bfundo;
         if (!b) return;

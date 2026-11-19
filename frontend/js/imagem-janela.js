@@ -624,7 +624,7 @@ function ieJanTracoAmostra(cv, o) {
 function iePincelPopup(ev) {
     const pop = ieEl('ie-pop'), app = ieEl('ie');
     if (!pop || !app) return;
-    const alvo = 'pincel', o = IE.op[alvo];
+    const alvo = ieJanPincelAlvo(), o = IE.op[alvo];   // pincel, borracha ou carimbo
     const meus = ieJanLista('pinceis'), todos = [...IE_PINCEIS, ...meus.map(p => ({ ...p, meu: true }))];
     const campo = (k, r, min, max, un) => `<label class="ie-brp-faixa"><span>${ieEsc(ieT(r))}</span><input type="range" data-k="${k}" min="${min}" max="${max}" value="${o[k] ?? 0}"><input type="number" data-n="${k}" min="${min}" max="${max}" value="${o[k] ?? 0}"><em>${un}</em></label>`;
     const fechar = () => {
@@ -834,8 +834,8 @@ ieJanRegistrar('clone', 'Origem do clone', ['ferr', 'mouse'], corpo => {
     corpo.innerHTML = `<div class="ie-pn-info"><div><b>${ieJanH('Origem')}</b><br>X ${f ? Math.round(f.x) : '—'}<br>Y ${f ? Math.round(f.y) : '—'}</div>
         <div><b>${ieJanH('Deslocamento')}</b><br>X <input type="number" data-ox value="${off ? Math.round(-off.x) : 0}" ${off ? '' : 'disabled'}><br>Y <input type="number" data-oy value="${off ? Math.round(-off.y) : 0}" ${off ? '' : 'disabled'}></div></div>
         <label class="ie-ls-chk"><input type="checkbox" data-al ${o.alinhado ? 'checked' : ''}> ${ieJanH('Alinhado')}</label>
-        <label class="ie-ls-chk"><input type="checkbox" data-sob ${o.sobrepor ? 'checked' : ''}> ${ieJanH('Mostrar sobreposição')}</label>
-        <label class="ie-ls-faixa ie-pn-f"><span>${ieJanH('Opacidade')}</span><input type="range" data-sobop min="5" max="100" value="${o.sobreporOp ?? 50}"><span></span><em>%</em></label>
+        <label class="ie-ls-chk"><input type="checkbox" data-sob ${o.sobrepor !== false ? 'checked' : ''}> ${ieJanH('Mostrar sobreposição')}</label>
+        <label class="ie-ls-faixa ie-pn-f"><span>${ieJanH('Opacidade')}</span><input type="range" data-sobop min="5" max="100" value="${o.sobreporOp ?? 80}"><span></span><em>%</em></label>
         <div class="ie-pn-rod"><button class="ie-btn ie-btn-mini" data-zerar>${ieJanH('Redefinir deslocamento')}</button></div>
         <div class="ie-prop-nota">${ieJanH('Alt+clique com o Carimbo (S) escolhe a origem.')}</div>`;
     const dl = () => { const x = +corpo.querySelector('[data-ox]').value, y = +corpo.querySelector('[data-oy]').value; IE.carimboOff = { x: -x, y: -y }; };
@@ -850,14 +850,21 @@ ieJanRegistrar('clone', 'Origem do clone', ['ferr', 'mouse'], corpo => {
     F.sobre = function (ctx, doc) {
         sobre && sobre.call(this, ctx, doc);
         const o = IE.op.carimbo, p = IE.mouse;
-        if (!o.sobrepor || !p || !IE.carimboFonte) return;
+        if (o.sobrepor === false || !p || !IE.carimboFonte) return;   // prévia ligada por padrão (como no Photoshop)
         const off = IE.carimboOff || { x: IE.carimboFonte.x - p.x, y: IE.carimboFonte.y - p.y };
-        const r = o.tam / 2, s = ieDocTela(p.x, p.y, doc);
-        ctx.save();
-        ctx.beginPath(); ctx.arc(s.x, s.y, r * doc.zoom * 1.6, 0, Math.PI * 2); ctx.clip();
-        ctx.globalAlpha = (o.sobreporOp ?? 50) / 100;
+        // prévia com a mesma ponta da pintura (dureza, forma, ângulo): a borda macia aparece como vai ficar
+        const s = ieDocTela(p.x, p.y, doc), z = doc.zoom;
+        const ponta = iePonta(o.tam, o.dureza, o.forma || 'redondo', o.angulo || 0, o.redondeza ?? 100);
+        const L = Math.max(4, Math.ceil(ponta.width * z)), c = ieCanvas(L, L), x = ieCtx(c);
+        x.imageSmoothingEnabled = z < 1;
         const a = ieDocTela(-off.x, -off.y, doc);
-        ctx.drawImage(doc.comp, a.x, a.y, doc.w * doc.zoom, doc.h * doc.zoom);
+        x.drawImage(doc.comp, a.x - (s.x - L / 2), a.y - (s.y - L / 2), doc.w * z, doc.h * z);
+        x.globalCompositeOperation = 'destination-in';
+        x.imageSmoothingEnabled = true;
+        x.drawImage(ponta, 0, 0, L, L);
+        ctx.save();
+        ctx.globalAlpha = (o.sobreporOp ?? 80) / 100;
+        ctx.drawImage(c, s.x - L / 2, s.y - L / 2);
         ctx.restore();
     };
     F.cursorPincel = true;

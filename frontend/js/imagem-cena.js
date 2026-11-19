@@ -1336,12 +1336,13 @@ async function ieCenaExportar(pasta, { fmt = 'png', q = 92, base, escala = 1 } =
 async function ieExportarRapido(tudo, pastaAuto) {   // pastaAuto: automação (KNV.exportarRapido), sem a janela de salvar
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) return;
-    let pasta = pastaAuto;
+    let pasta = pastaAuto, nomeDigitado = '';
     if (!pasta) {
         const pastaDoc = doc.path ? doc.path.replace(/[\\/][^\\/]*$/, '') : '';
         const d = await api.ie_dialogo_salvar(String(doc.nome || 'peca').replace(/\.\w+$/, ''), 'png', pastaDoc);
         if (!d || !d.success || !d.path) return;
         pasta = d.path.replace(/[\\/][^\\/]*$/, '');
+        nomeDigitado = d.path.replace(/^.*[\\/]/, '').replace(/\.png$/i, '');
     }
     if (tudo && (doc.fatias || []).length) { const f = await ieCenaExportar(pasta, { fmt: 'png' }); ieToast(`${f.length} ${ieT('fatias exportadas')}`); return; }
     ieCompor(doc, ieRDoc(doc));
@@ -1358,6 +1359,7 @@ async function ieExportarRapido(tudo, pastaAuto) {   // pastaAuto: automação (
         }
     }
     if (!partes.length) { ieToast(ieT('Nada para exportar')); return; }
+    if (nomeDigitado && partes.length === 1) partes[0].nome = nomeDigitado;   // uma peça só: vale o nome digitado na janela
     const ini = await api.ie_salvar_inicio(null), itens = [];
     for (const [i, p] of partes.entries()) {
         const k = `rapido_${i}.png`;

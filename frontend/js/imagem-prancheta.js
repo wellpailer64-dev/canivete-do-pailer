@@ -499,6 +499,9 @@ Object.assign(IE_CMDS, {
             { id: 'w', rotulo: 'Largura (px)', tipo: 'numero', min: 1, max: 30000, valor: ultima ? ultima.prancheta.w : doc.w },
             { id: 'h', rotulo: 'Altura (px)', tipo: 'numero', min: 1, max: 30000, valor: ultima ? ultima.prancheta.h : doc.h }] });
         if (!v) return;
+        // documento sem pranchetas: a folha atual vira a Prancheta 1 (com o que tem dentro) e a nova vai ao lado, como 2
+        if (!iePranchetas(doc).length && doc.camadas.length)
+            ieNovaPrancheta(doc, { camadas: doc.camadas.slice(), x: 0, y: 0, w: doc.w, h: doc.h, fundo: null });
         ieNovaPrancheta(doc, { w: v.w, h: v.h });
         ieHist(ieT('Nova prancheta'));
     },

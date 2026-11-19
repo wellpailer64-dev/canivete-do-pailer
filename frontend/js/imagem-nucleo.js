@@ -490,7 +490,11 @@ function ieIrHist(i, doc = IE.doc) {
     const mudouTam = f.w !== doc.w || f.h !== doc.h, antes = doc.camadas;
     doc.w = f.w; doc.h = f.h;
     doc.camadas = ieRestaurarCamadas(f.camadas);
-    doc.ativa = f.ativa; doc.selIds = [...f.selIds]; doc.mascaraAlvo = !!f.mascaraAlvo;
+    // Desfazer não mexe na seleção: mantém a camada atual se ela ainda existe.
+    const existe = id => id != null && ieAchar(doc, id);
+    const selAtual = (doc.selIds || []).filter(existe);
+    if (existe(doc.ativa)) { doc.selIds = selAtual.length ? selAtual : [doc.ativa]; }
+    else { doc.ativa = f.ativa; doc.selIds = [...f.selIds]; doc.mascaraAlvo = !!f.mascaraAlvo; }
     doc.fatias = (f.fatias || []).map(x => ({ ...x })); doc.fatiaSel = f.fatiaSel ?? null;
     if (f.guias) doc.guias = f.guias.map(x => ({ ...x }));
     if (f.dems) { doc.dems = JSON.parse(JSON.stringify(f.dems)); doc.demAtivo = f.demAtivo; }
