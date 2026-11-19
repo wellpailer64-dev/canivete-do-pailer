@@ -774,3 +774,22 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-cr-props .ie-cr-abrir { align-self: stretch; }
 .ie-cr-sub { display: flex; align-items: center; justify-content: space-between; }
 .ie-cr-auto { height: 20px; padding: 0 8px; font-size: 10.5px; text-transform: none; letter-spacing: 0; }
+
+/* Tamanho da imagem (Alt+Ctrl+I) */
+.ie-tam { width: 640px; }
+.ie-tam-corpo { display: grid; grid-template-columns: 240px 1fr; gap: 18px; padding: 14px 16px; }
+.ie-tam-prev { display: grid; place-items: center; background: var(--bg-input); border-radius: 6px; min-height: 240px;
+    background-image: conic-gradient(#0002 25%, transparent 0 50%, #0002 0 75%, transparent 0); background-size: 14px 14px; }
+.ie-tam-prev canvas { max-width: 220px; max-height: 220px; box-shadow: 0 2px 10px #0006; }
+.ie-tam-campos { display: flex; flex-direction: column; gap: 8px; }
+.ie-tam-l { display: grid; grid-template-columns: 120px 1fr auto; gap: 8px; align-items: center; color: var(--text-2); }
+.ie-tam-l > span, .ie-tam-l > label { text-align: right; justify-content: flex-end; }
+.ie-tam-l b { grid-column: 2 / 4; color: var(--text); font-weight: 500; }
+.ie-tam-l input[type=number] { width: 90px; height: 26px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 6px; font: inherit; }
+.ie-tam-l select { height: 26px; min-width: 150px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; font: inherit; }
+.ie-tam-l > select[data-aj], .ie-tam-l > select[data-met] { grid-column: 2 / 4; }
+.ie-tam-l input:disabled, .ie-tam-l select:disabled { opacity: .45; }
+.ie-tam-par { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.ie-tam-elo { position: absolute; left: 12px; top: 50%; translate: 0 -50%; width: 22px; height: 22px; padding: 2px; border-radius: 4px; border: 1px solid var(--ie-linha-2); background: transparent; color: var(--text-2); cursor: pointer; }
+.ie-tam-elo.on { color: var(--primary); border-color: var(--primary); }
+.ie-tam-elo svg { width: 16px; height: 16px; }

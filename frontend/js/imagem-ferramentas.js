@@ -1628,6 +1628,7 @@ function ieTransformarPlano(o, M, fundo = 0) {
     const c = ieCanvas(x2 - x1, y2 - y1), x = ieCtx(c);
     if (fundo) { x.fillStyle = '#fff'; x.globalAlpha = fundo / 255; x.fillRect(0, 0, c.width, c.height); x.globalAlpha = 1; }
     x.imageSmoothingQuality = 'high';
+    if (IE._vizinho) x.imageSmoothingEnabled = false;   // Tamanho da imagem › Vizinho mais próximo (pixel art)
     x.setTransform(M[0], M[1], M[2], M[3], M[4] - x1, M[5] - y1);
     let src = o.c, sw = w, sh = h;
     // redução grande: em passos (fica mais nítido que um drawImage só)
@@ -1636,7 +1637,7 @@ function ieTransformarPlano(o, M, fundo = 0) {
         let k = 1;
         while (esc * k < 0.5 && sw / 2 >= 1 && sh / 2 >= 1) {
             const n = ieCanvas(Math.ceil(sw / 2), Math.ceil(sh / 2));
-            const nx = ieCtx(n); nx.imageSmoothingQuality = 'high';
+            const nx = ieCtx(n); nx.imageSmoothingQuality = 'high'; if (IE._vizinho) nx.imageSmoothingEnabled = false;
             nx.drawImage(src, 0, 0, sw, sh, 0, 0, n.width, n.height);
             src = n; sw = n.width; sh = n.height; k *= 2;
         }

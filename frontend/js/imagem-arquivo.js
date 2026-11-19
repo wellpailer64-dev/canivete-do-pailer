@@ -879,20 +879,102 @@ function ieMesclar(doc, camadas, nome) {
     return ieNovaCamada(doc, { nome, c, x: ieRInt(area).x, y: ieRInt(area).y, sujoPx: true });
 }
 
+// Tamanho da imagem (Alt+Ctrl+I), como no Photoshop: prévia, tamanho em K, Ajustar a (predefinições), largura/altura
+// com corrente e unidade (px, %, pol, cm, mm), resolução (px/pol ou px/cm) e Reamostrar (desligado: muda só a resolução)
+const IE_TAM_UN = { px: ['Pixels', 0], pct: ['Porcentagem', 0], in: ['Polegadas', 1], cm: ['Centímetros', 2.54], mm: ['Milímetros', 25.4] };
+const IE_TAM_AJ = [['', 'Personalizado'], ['orig', 'Tamanho original'], ['1080x1080', 'Feed 1080 × 1080'], ['1080x1350', 'Feed retrato 1080 × 1350'], ['1080x1920', 'Story/Reels 1080 × 1920'],
+    ['1920x1080', 'Full HD 1920 × 1080'], ['3840x2160', '4K 3840 × 2160'], ['a4-300', 'A4 300 ppi'], ['l-1000', 'Lado maior 1000 px'], ['l-2000', 'Lado maior 2000 px']];
 async function ieDimDialogo(doc) {
-    const v = await ieDialogo({
-        titulo: 'Tamanho da imagem',
-        campos: [{ id: 'w', rotulo: 'Largura (px)', tipo: 'numero', min: 1, max: 30000, valor: doc.w }, { id: 'h', rotulo: 'Altura (px)', tipo: 'numero', min: 1, max: 30000, valor: doc.h },
-            { id: 'prop', rotulo: 'Manter proporção', tipo: 'check', valor: true }, { id: 'dpi', rotulo: 'Resolução (ppi)', tipo: 'numero', min: 1, max: 2400, valor: doc.dpi }],
+    if (IE._auto) {   // automação: valores prontos, sem janela
+        const a = IE._auto; IE._auto = null;
+        return ieTamAplicar(doc, Math.round(a.w ?? doc.w), Math.round(a.h ?? doc.h), a.dpi || doc.dpi, a.reamostrar !== false, a.metodo);
+    }
+    const kb = (w, h) => { const k = w * h * 3 / 1024; return k >= 1024 ? (k / 1024).toFixed(1).replace('.', ',') + 'M' : k.toFixed(1).replace('.', ',') + 'K'; };
+    const st = { w: doc.w, h: doc.h, dpi: doc.dpi || 72, elo: true, ream: true, metodo: 'auto', uw: 'px', uh: 'px', ures: 'in' };
+    const box = ieEl('ie-modal');
+    const unOps = sel => Object.entries(IE_TAM_UN).map(([k, [n]]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${ieT(n)}</option>`).join('');
+    box.classList.remove('lado');
+    box.innerHTML = `<div class="ie-dlg ie-tam"><h3>${ieT('Tamanho da imagem')}</h3><div class="ie-tam-corpo">
+        <div class="ie-tam-prev"><canvas></canvas></div>
+        <div class="ie-tam-campos">
+            <div class="ie-tam-l"><span>${ieT('Tamanho da imagem')}:</span><b data-kb></b></div>
+            <div class="ie-tam-l"><span>${ieT('Dimensões')}:</span><b data-dim></b></div>
+            <div class="ie-tam-l"><span>${ieT('Ajustar a')}:</span><select data-aj>${IE_TAM_AJ.map(([v, n]) => `<option value="${v}">${ieT(n)}</option>`).join('')}</select></div>
+            <div class="ie-tam-par"><button class="ie-tam-elo on" data-elo title="${ieT('Manter proporção')}">${ieIco('elo')}</button>
+                <div class="ie-tam-l"><span>${ieT('Largura')}:</span><input type="number" data-w step="any"><select data-uw>${unOps('px')}</select></div>
+                <div class="ie-tam-l"><span>${ieT('Altura')}:</span><input type="number" data-h step="any"><select data-uh>${unOps('px')}</select></div></div>
+            <div class="ie-tam-l"><span>${ieT('Resolução')}:</span><input type="number" data-res step="any" min="1"><select data-ures><option value="in">${ieT('Pixels/polegada')}</option><option value="cm">${ieT('Pixels/centímetro')}</option></select></div>
+            <div class="ie-tam-l"><label class="ie-dlg-chk"><input type="checkbox" data-ream checked> ${ieT('Reamostrar')}:</label><select data-met><option value="auto">${ieT('Automático')}</option><option value="viz">${ieT('Vizinho mais próximo (bordas duras)')}</option></select></div>
+        </div></div>
+        <div class="ie-dlg-rod"><div class="ie-op-esp"></div><button class="ie-btn" data-r="0">${ieT('Cancelar')}</button><button class="ie-btn ie-btn-primario" data-r="1">OK</button></div></div>`;
+    box.hidden = false;
+    const q = s => box.querySelector(s), dlg = q('.ie-tam');
+    ieDlgArrastavel(dlg, q('h3'), 'dlg:tamImagem');
+    // prévia: a imagem composta, reduzida
+    ieCompor(doc, ieRDoc(doc));
+    const pc = q('.ie-tam-prev canvas'), k = Math.min(1, 220 / Math.max(doc.w, doc.h));
+    pc.width = Math.max(1, Math.round(doc.w * k)); pc.height = Math.max(1, Math.round(doc.h * k));
+    ieCtx(pc).drawImage(doc.comp, 0, 0, doc.w, doc.h, 0, 0, pc.width, pc.height);
+    const resIn = () => st.dpi;   // sempre guardado em px/pol
+    const paraUn = (px, un, base) => un === 'px' ? px : un === 'pct' ? px / base * 100 : px / resIn() * (IE_TAM_UN[un][1] || 1);
+    const deUn = (v, un, base) => un === 'px' ? v : un === 'pct' ? v * base / 100 : v / (IE_TAM_UN[un][1] || 1) * resIn();
+    const fmt = (v, un) => un === 'px' ? String(Math.round(v)) : String(+v.toFixed(2));
+    const pintar = (salvo) => {
+        if (salvo !== 'w') q('[data-w]').value = fmt(paraUn(st.w, st.uw, doc.w), st.uw);
+        if (salvo !== 'h') q('[data-h]').value = fmt(paraUn(st.h, st.uh, doc.h), st.uh);
+        if (salvo !== 'res') q('[data-res]').value = String(+(st.ures === 'cm' ? st.dpi / 2.54 : st.dpi).toFixed(2));
+        const W = Math.round(st.w), H = Math.round(st.h);
+        q('[data-kb]').textContent = `${kb(W, H)}${W !== doc.w || H !== doc.h ? ` (${ieT('era')} ${kb(doc.w, doc.h)})` : ''}`;
+        q('[data-dim]').textContent = `${W} px × ${H} px`;
+        q('[data-elo]').classList.toggle('on', st.elo);
+        q('[data-met]').disabled = !st.ream;
+    };
+    const lado = (qual, px) => {
+        if (qual === 'w') { st.w = px; if (st.elo) st.h = px * doc.h / doc.w; } else { st.h = px; if (st.elo) st.w = px * doc.w / doc.h; }
+    };
+    q('[data-w]').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0)) return; lado('w', deUn(v, st.uw, doc.w)); q('[data-aj]').value = ''; pintar('w'); });
+    q('[data-h]').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!(v > 0)) return; lado('h', deUn(v, st.uh, doc.h)); q('[data-aj]').value = ''; pintar('h'); });
+    q('[data-res]').addEventListener('input', e => {
+        const v = parseFloat(e.target.value); if (!(v > 0)) return;
+        const novo = st.ures === 'cm' ? v * 2.54 : v;
+        if (st.ream && (st.uw !== 'px' && st.uw !== 'pct')) {   // tamanho físico fixo: os pixels acompanham (como no Photoshop)
+            const f = novo / st.dpi; st.w *= f; st.h *= f;
+        }
+        st.dpi = novo; pintar('res');
     });
-    if (!v) return;
-    let w = Math.round(v.w), h = Math.round(v.h);
-    if (v.prop) { if (w !== doc.w) h = Math.round(doc.h * w / doc.w); else if (h !== doc.h) w = Math.round(doc.w * h / doc.h); }
+    q('[data-uw]').onchange = e => { st.uw = e.target.value; if (st.elo) { st.uh = st.uw; q('[data-uh]').value = st.uh; } pintar(); };
+    q('[data-uh]').onchange = e => { st.uh = e.target.value; if (st.elo) { st.uw = st.uh; q('[data-uw]').value = st.uw; } pintar(); };
+    q('[data-ures]').onchange = e => { st.ures = e.target.value; pintar(); };
+    q('[data-elo]').onclick = () => { st.elo = !st.elo; if (st.elo) st.h = st.w * doc.h / doc.w; pintar(); };
+    q('[data-ream]').onchange = e => {
+        st.ream = e.target.checked;
+        if (!st.ream) { st.w = doc.w; st.h = doc.h; st.elo = true; }   // sem reamostrar: pixels fixos, só a resolução muda
+        ['[data-w]', '[data-h]'].forEach(s => { q(s).disabled = !st.ream && (st.uw === 'px' || st.uw === 'pct'); });
+        pintar();
+    };
+    q('[data-met]').onchange = e => { st.metodo = e.target.value; };
+    q('[data-aj]').onchange = e => {
+        const v = e.target.value; if (!v) return;
+        if (v === 'orig') { st.w = doc.w; st.h = doc.h; }
+        else if (v === 'a4-300') { st.dpi = 300; st.elo = true; lado(doc.w >= doc.h ? 'w' : 'h', 11.69 * 300); }
+        else if (v.startsWith('l-')) { const n = +v.slice(2); st.elo = true; lado(doc.w >= doc.h ? 'w' : 'h', n); }
+        else { const [W, H] = v.split('x').map(Number); st.elo = false; st.w = W; st.h = H; }
+        pintar();
+    };
+    box.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') q('[data-r="1"]').click(); if (e.key === 'Escape') q('[data-r="0"]').click(); }));
+    pintar();
+    setTimeout(() => { const i = q('[data-w]'); i.focus(); i.select(); }, 30);
+    const ok = await new Promise(res => box.querySelectorAll('[data-r]').forEach(b => (b.onclick = () => res(b.dataset.r === '1'))));
+    box.hidden = true; box.innerHTML = '';
+    if (!ok) return;
+    return ieTamAplicar(doc, Math.round(st.w), Math.round(st.h), st.dpi, st.ream, st.metodo);
+}
+function ieTamAplicar(doc, w, h, dpi, ream = true, metodo = 'auto') {
     w = ieClamp(w, 1, 30000); h = ieClamp(h, 1, 30000);
-    doc.dpi = v.dpi || doc.dpi;
-    if (w === doc.w && h === doc.h) { ieHist(ieT('Resolução')); ieUiProps(); return; }
-    const M = [w / doc.w, 0, 0, h / doc.h, 0, 0];
-    ieTransformarTudo(doc, M, w, h);
+    doc.dpi = Math.round(dpi * 100) / 100 || doc.dpi;
+    if (!ream || (w === doc.w && h === doc.h)) { ieHist(ieT('Resolução')); ieUiProps(); return; }
+    IE._vizinho = metodo === 'viz';
+    try { ieTransformarTudo(doc, [w / doc.w, 0, 0, h / doc.h, 0, 0], w, h); } finally { IE._vizinho = false; }
     ieHist(ieT('Tamanho da imagem'));
 }
 
