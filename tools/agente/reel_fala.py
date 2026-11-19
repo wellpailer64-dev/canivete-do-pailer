@@ -289,7 +289,36 @@ def cortes(k, ini, fim):
                     FADE_FIM.add((k, round(final, 3)))
         out.append((k, a, b, round(comeco, 3), round(final, 3)))
         emenda = None if pula else final
+        orfs = voz_orfa(k, final, ws[b + 1][0]) if pula and b + 1 < len(ws) else []
+        for n_, (r0, r1) in enumerate(orfs):   # resto da palavra depois da hesitação: corte próprio (sem legenda: a > b), o vazio sai
+            o0, ok0 = OND[k].ajustar_inicio(max(final, r0 - FOLGA_INI), r0, final if n_ == 0 else orfs[n_ - 1][1])
+            o1, ok1 = OND[k].ajustar_fim(r1 + FOLGA_FIM, r1, orfs[n_ + 1][0] if n_ + 1 < len(orfs) else ws[b + 1][0])
+            o0 = max(o0, out[-1][4])
+            if not ok0:
+                FADE_INI.add((k, round(o0, 3)))
+            if not ok1:
+                FADE_FIM.add((k, round(o1, 3)))
+            out.append((k, b + 1, b, round(o0, 3), round(o1, 3)))
     return out
+
+
+def voz_orfa(k, t0, t1):
+    """Voz que a transcrição não pegou entre o fim do corte e a próxima palavra: "JS1" com hesitação ("J" 0,5 s "S1")
+    saiu como uma palavra só em 5,2-6,0 s; o corte fechou antes do "J" e o "S1" real (6,2-6,8 s) ficou no vão (Gordinhos,
+    2026-11-18). Devolve os trechos [(ini, fim)] de voz, separados onde há >= 0,25 s de silêncio (a hesitação sai).
+    Exige >= 0,25 s de silêncio até a próxima palavra (senão é o começo dela, adiantado) e >= 0,15 s de voz no total."""
+    e, lim = EN[k], LIM[k]
+    a, b = int(t0 * 100) + 1, min(int(t1 * 100), len(e))
+    v = np.nonzero(e[a:b] > lim * 2)[0]
+    if len(v) < 15 or t1 - (a + v[-1]) / 100 < 0.25:
+        return []
+    runs = [[v[0], v[0]]]
+    for x in v[1:]:
+        if x - runs[-1][1] > 25:
+            runs.append([x, x])
+        else:
+            runs[-1][1] = x
+    return [(round((a + r0) / 100, 3), round((a + r1) / 100 + 0.01, 3)) for r0, r1 in runs if r1 - r0 >= 6]
 
 
 def rosto(k, t, cache={}):
