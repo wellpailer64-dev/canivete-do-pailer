@@ -111,6 +111,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 - Vozes no mesmo nível entre cortes: quem está longe do celular (aluna x instrutor) sobe por ganho de corte com Hard Limiter; diferença acima de 6 dB reprova (2026-11-12).
 - Trilha pelo tom da peça: depoimento pede música animada e adulta, nunca com cara de infantil. Começar pela trilha que o Pailer usou em peça aprovada do mesmo cliente e formato (pastas `02 - ASSETS` dos meses anteriores) (2026-11-12).
 - Trilha perto de -21 dB na fala e -9 a -5 dB nos respiros. Uma música inteira por momento.
+- **Volume da trilha por fatia + Potência constante (preferência do Pailer, 2026-11-19).** Mudança grande de volume da música (baixo na fala → alto no respiro, ou o contrário): fatiar o clipe da música no ponto da troca, dar o ganho próprio a cada fatia e pôr a transição de áudio **Potência constante** no corte entre elas. Nunca degrau seco. Preferir isso a keyframe de volume: é mais fácil de corrigir depois.
 - Efeito sonoro só quando casa com o que se vê; nada em toda entrada de texto (2026-10-14).
 - Escolha e sincronização: `Instructions/agente/efeitos-sonoros-video.md`; ouvir os candidatos junto da imagem e da voz.
 
