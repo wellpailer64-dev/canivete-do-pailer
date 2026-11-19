@@ -1567,6 +1567,10 @@ function ieFormaPoligono(x, n, w, h, raio) {
 // grupo de formas da barra (como no Photoshop): cada uma é a ferramenta Forma com o tipo escolhido
 const IE_FORMAS_GRUPO = ['forma', 'formaEli', 'formaTri', 'formaPoli', 'formaLinha'];
 IE_FERR.forma = { ...IE_FORMA, nome: 'Retângulo', icone: 'fRet', ativar() { IE.op.forma.tipo = 'ret'; } };
+// Letreiro elíptico como ferramenta própria no grupo do Letreiro (como no Photoshop); a retangular volta ao retângulo
+IE_FERR.letreiroEli = { ...IE_LETREIRO, nome: 'Letreiro elíptico', icone: 'marqueeEli', ativar() { IE.op.letreiro.forma = 'eli'; } };
+IE_FERR.letreiro.nome = 'Letreiro retangular';
+IE_FERR.letreiro.ativar = () => { IE.op.letreiro.forma = 'ret'; };
 IE_FERR.formaEli = { ...IE_FORMA, nome: 'Elipse', icone: 'fEli', ativar() { IE.op.forma.tipo = 'eli'; } };
 IE_FERR.formaTri = { ...IE_FORMA, nome: 'Triângulo', icone: 'fTri', ativar() { IE.op.forma.tipo = 'tri'; } };
 IE_FERR.formaPoli = { ...IE_FORMA, nome: 'Polígono', icone: 'fPoli', ativar() { IE.op.forma.tipo = 'poli'; } };
