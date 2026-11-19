@@ -186,7 +186,7 @@ ieJanRegistrar('amostras', 'Amostras', ['cor'], corpo => {
             (async () => {
                 const antigas = ieJanLista('amostras');   // as que o usuário criou antes dos grupos
                 const ok = await ieAmostrasImportar('photoshop', true);
-                if (!ok) iePrefGravar('amostrasLista', ieAmBasicas());
+                if (!ok) { iePrefGravar('amostrasLista', ieAmBasicas()); iePrefGravar('amostrasPsPendente', true); }   // tenta o Photoshop de novo depois
                 if (antigas.length) iePrefGravar('amostrasLista', [...antigas.map(c => ({ c, n: '' })), ...ieJanLista('amostrasLista')]);
                 ieAmCarregando = false;
                 ieJanAtualizar('cor');
@@ -194,6 +194,10 @@ ieJanRegistrar('amostras', 'Amostras', ['cor'], corpo => {
         }
         corpo.innerHTML = `<div class="ie-vazio">${ieJanH('Carregando amostras...')}</div>`;
         return;
+    }
+    if (iePref('amostrasPsPendente', false) && !ieAmCarregando && !IE._amPsTentou) {   // 1ª leitura falhou: soma os grupos do Photoshop quando der
+        IE._amPsTentou = true; ieAmCarregando = true;
+        ieAmostrasImportar('photoshop', false).then(ok => { if (ok) iePrefGravar('amostrasPsPendente', false); ieAmCarregando = false; });
     }
     lista = [...lista];
     const q = (corpo._busca || '').trim().toLowerCase(), recentes = ieJanLista('coresRecentes');
