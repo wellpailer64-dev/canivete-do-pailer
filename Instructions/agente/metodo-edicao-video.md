@@ -106,7 +106,10 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 - Texto sobre imagem movimentada sempre com apoio: etiqueta ou película do tamanho do texto (2026-10-14, 2026-10-24).
 - Uma frase por cena; lettering fora do meio. GC sobre o rosto da pessoa certa, e nome só se ela disser (2026-10-22).
 
-### Som
+### Pasta da peça
+Vídeo novo = pasta nova na sequência do mês (última "07 - ..." → "08 - REELS - <tema>"), nunca dentro de pasta existente, mesmo com tema igual (correção do Pailer, 2026-11-19).
+
+## Som
 - Entrega de -14 a -16 LUFS, pico até -1 dB. Medir: gravação quente pede voz abaixo de 0 dB (2026-11-01).
 - Vozes no mesmo nível entre cortes: quem está longe do celular (aluna x instrutor) sobe por ganho de corte com Hard Limiter; diferença acima de 6 dB reprova (2026-11-12).
 - Trilha pelo tom da peça: depoimento pede música animada e adulta, nunca com cara de infantil. Começar pela trilha que o Pailer usou em peça aprovada do mesmo cliente e formato (pastas `02 - ASSETS` dos meses anteriores) (2026-11-12).
