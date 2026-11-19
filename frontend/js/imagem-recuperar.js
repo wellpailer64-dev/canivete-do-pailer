@@ -271,8 +271,9 @@ Object.assign(IE_FERR, { recManchas: IE_REC_MANCHAS, recPincel: IE_REC_PINCEL, r
     IE_FERR_ORDEM.splice(i, 0, 'recManchas', 'recPincel', 'remendo');
     IE_FERR_ORDEM.splice(IE_FERR_ORDEM.indexOf('laco') + 1, 0, 'lacoMag');
     if (typeof IE_FERR_GRUPOS !== 'undefined') {
-        const c = IE_FERR_GRUPOS.findIndex(g => Array.isArray(g) && g[0] === 'contagotas');
-        IE_FERR_GRUPOS.splice(c + 1, 0, ['recManchas', 'recPincel', 'remendo']);
+        // no grupo do Carimbo (pedido do Pailer): segurar o botão do Carimbo mostra as ferramentas de recuperação
+        const c = IE_FERR_GRUPOS.find(g => Array.isArray(g) && g[0] === 'carimbo');
+        if (c) c.push('recManchas', 'recPincel', 'remendo');
         const l = IE_FERR_GRUPOS.find(g => Array.isArray(g) && g[0] === 'laco');
         if (l) l.push('lacoMag');
     }
