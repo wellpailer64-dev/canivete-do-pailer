@@ -217,3 +217,10 @@ function ieDivGrade(btn, px, py) {
     return `<label class="ie-op-campo">${ieT('Símbolo')} <button class="ie-btn ie-btn-mini" style="display:inline-flex;align-items:center;gap:6px" onclick="ieDivGrade(this)">${ieDivIcone(k, 16)} ${ieEsc(ieT(IE_DIVERSOS[k][0]))} ▾</button></label>` +
         `<span class="ie-op-dica">${ieT('Botão direito na imagem: escolher símbolo · Shift: proporcional · duplo clique: cor')}</span>`;
 });
+
+// duplo clique numa camada de forma, com qualquer ferramenta do grupo das formas: seletor de cor (como no Mover)
+for (const n of [...IE_FORMAS_GRUPO, 'formaDiv']) if (IE_FERR[n]) IE_FERR[n].dbl = function (p, ev, doc) {
+    IE.arr = null; ieDesenharSobre();
+    const L = ieCamadaNoPonto(doc, p.x, p.y);
+    if (L && L.tipo === 'forma' && L.vet) ieFormaCorEditar(doc, L, ieAncoraNoMouse(ev));
+};
