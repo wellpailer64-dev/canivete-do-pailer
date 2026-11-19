@@ -1,7 +1,7 @@
 """
 recuperar.py — o miolo das ferramentas de recuperação do Photo Kanivete (como as do Photoshop):
   · curar: Pincel de recuperação e Remendo — a textura vem da ORIGEM e a luz/cor da borda do DESTINO
-    (clonagem de Poisson, cv2.seamlessClone), por isso o remendo some na pele, no céu, no papel.
+    (correção de luz espalhada da moldura, com peso menor em bordas fortes), por isso o remendo some na pele, no céu, no papel.
   · preencher: Pincel de recuperação para manchas e Remendo "sensível ao conteúdo" — reconstrói a área a partir
     do que está em volta (cv2.inpaint, Telea), bom para manchas, fios, poeira, pequenos objetos.
 A página manda PNGs (base64) do trecho da camada; a resposta é o trecho pronto, com o alfa original.
@@ -32,9 +32,29 @@ def _bgra(img):
     return img
 
 
+def _membrana(val, w):
+    """Espalha valores conhecidos (val, peso w) por toda a área de forma suave (push-pull em pirâmide):
+    a mesma ideia da clonagem de Poisson, mas cada ponto da borda vale pelo seu peso."""
+    V, W = [val * w[:, :, None]], [w.copy()]
+    while min(W[-1].shape) > 4:
+        V.append(cv2.pyrDown(V[-1])); W.append(cv2.pyrDown(W[-1]))
+    est = V[-1] / np.maximum(W[-1], 1e-6)[:, :, None]
+    for k in range(len(V) - 2, -1, -1):
+        h, w_ = W[k].shape
+        up = cv2.pyrUp(est, dstsize=(w_, h))
+        if up.ndim == 2:
+            up = up[:, :, None]
+        a = np.clip(W[k] * 4, 0, 1)[:, :, None]
+        est = a * (V[k] / np.maximum(W[k], 1e-6)[:, :, None]) + (1 - a) * up
+    return est
+
+
 def curar(regiao_b64, mascara_b64, dx, dy, difusao=0):
     """regiao = trecho da camada (com destino e origem dentro); mascara = onde vai a cura (branco), no mesmo trecho;
-    a origem é a mesma forma deslocada (dx, dy). difusao (0-7) amacia a borda da máscara."""
+    a origem é a mesma forma deslocada (dx, dy). difusao (0-7) amacia a borda da máscara.
+    Textura da origem + correção de luz/cor tirada da moldura em volta do destino. Diferente do seamlessClone,
+    pontos da moldura sobre bordas fortes ou cores fora do comum (um fio, um cabelo cruzando) quase não pesam,
+    então não "escorrem" mancha para dentro do remendo."""
     reg = _bgra(_ler(regiao_b64))
     m = _ler(mascara_b64, cv2.IMREAD_UNCHANGED)
     m = m[:, :, 3] if m.ndim == 3 and m.shape[2] == 4 else (cv2.cvtColor(m, cv2.COLOR_BGR2GRAY) if m.ndim == 3 else m)
@@ -44,30 +64,37 @@ def curar(regiao_b64, mascara_b64, dx, dy, difusao=0):
     if not len(xs):
         return {"success": False, "error": "máscara vazia"}
     x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
-    sx0, sy0 = x0 + int(dx), y0 + int(dy)
-    if sx0 < 0 or sy0 < 0 or sx0 + (x1 - x0) > w or sy0 + (y1 - y0) > h:
+    dx, dy = int(dx), int(dy)
+    if x0 + dx < 0 or y0 + dy < 0 or x1 + dx > w or y1 + dy > h:
         return {"success": False, "error": "a origem sai da imagem"}
     bgr = cv2.cvtColor(reg, cv2.COLOR_BGRA2BGR)
-    fonte = bgr[sy0:sy0 + (y1 - y0), sx0:sx0 + (x1 - x0)].copy()
-    mm = m[y0:y1, x0:x1].copy()
-    # o seamlessClone exige a máscara longe da borda da imagem: margem de 2 px
-    pad = 2
-    destino = cv2.copyMakeBorder(bgr, pad, pad, pad, pad, cv2.BORDER_REFLECT)
-    mm[[0, -1], :] = 0
-    mm[:, [0, -1]] = 0
-    if not mm.any():
-        return {"success": False, "error": "área pequena demais"}
-    centro = (int(x0 + pad + (x1 - x0) / 2), int(y0 + pad + (y1 - y0) / 2))
-    try:
-        res = cv2.seamlessClone(fonte, destino, mm, centro, cv2.NORMAL_CLONE)[pad:-pad, pad:-pad]
-    except cv2.error as e:
-        return {"success": False, "error": str(e)}
+    f = bgr.astype(np.float32)
+    # fonte alinhada ao destino: fonte[y, x] = imagem[y + dy, x + dx]
+    T = np.float32([[1, 0, dx], [0, 1, dy]])
+    fonte = cv2.warpAffine(f, T, (w, h), flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REFLECT)
+    # moldura: anel de 3 px logo fora da área
+    anel = (cv2.dilate(m, np.ones((7, 7), np.uint8)) > 0) & (m == 0)
+    if not anel.any():
+        anel = m > 0
+    dif = f - fonte
+    # peso de cada ponto da moldura: baixo em borda forte (destino ou fonte) e em diferença fora do comum
+    g = lambda im: cv2.magnitude(cv2.Sobel(im, cv2.CV_32F, 1, 0), cv2.Sobel(im, cv2.CV_32F, 0, 1))
+    grad = np.maximum(g(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)),
+                      g(cv2.cvtColor(fonte.clip(0, 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)))
+    da = dif[anel]
+    med = np.median(da, 0)
+    mad = np.median(np.abs(da - med), 0) + 2
+    desvio = np.abs(dif - med) / (3 * mad)
+    peso_anel = (1 / (1 + (grad / 60) ** 2)) * (1 / (1 + (desvio.max(2)) ** 2))
+    pw = np.where(anel, peso_anel, 0).astype(np.float32) + np.where(anel, 1e-3, 0).astype(np.float32)
+    corr = _membrana(dif.astype(np.float32), pw)
+    res = fonte + corr
     peso = m.astype(np.float32) / 255
     if difusao:
         k = int(difusao) * 2 + 1
         peso = cv2.GaussianBlur(peso, (k * 2 + 1, k * 2 + 1), 0)
     peso = peso[:, :, None]
-    out = (res.astype(np.float32) * peso + bgr.astype(np.float32) * (1 - peso)).clip(0, 255).astype(np.uint8)
+    out = (res * peso + f * (1 - peso)).clip(0, 255).astype(np.uint8)
     return {"success": True, "png": _png(np.dstack([out, reg[:, :, 3]]))}
 
 
