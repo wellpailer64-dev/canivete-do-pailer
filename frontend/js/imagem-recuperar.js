@@ -36,7 +36,8 @@ async function ieRecCamada(doc) {
 async function ieRecAplicar(doc, L, mascara, { modo, dx = 0, dy = 0, difusao = 0, nome }) {
     const api = ieApi(), b = ieLimites(mascara);
     if (!b || !api) return false;
-    const mg = Math.max(24, Math.round(Math.max(b.w, b.h) * 0.25));
+    // preencher procura o melhor pedaço real em volta (Functions/recuperar.py): precisa de vizinhança larga
+    const mg = modo === 'curar' ? Math.max(24, Math.round(Math.max(b.w, b.h) * 0.25)) : Math.max(64, Math.round(Math.max(b.w, b.h) * 2));
     let R = { x: b.x - mg, y: b.y - mg, w: b.w + 2 * mg, h: b.h + 2 * mg };
     if (modo === 'curar') R = ieRUniao(R, { x: b.x + dx - mg, y: b.y + dy - mg, w: b.w + 2 * mg, h: b.h + 2 * mg });
     R = ieRInter(ieRInt(R), ieRDoc(doc));
@@ -120,11 +121,8 @@ const IE_REC_MANCHAS = {
         const t = IE.recTraco; if (!t) return;
         const L = await ieRecCamada(doc);
         if (L) {
-            if (IE.op.recManchas.tipo === 'proximidade') {
-                const m = ieRecProximidade(doc, L, t.c);
-                if (m) await ieRecAplicar(doc, L, t.c, { modo: 'curar', dx: m.ox, dy: m.oy, difusao: 2, nome: 'Pincel de recuperação para manchas' });
-                else await ieRecAplicar(doc, L, t.c, { modo: 'preencher', nome: 'Pincel de recuperação para manchas' });
-            } else await ieRecAplicar(doc, L, t.c, { modo: 'preencher', nome: 'Pincel de recuperação para manchas' });
+            // os dois modos usam a busca do melhor pedaço real em volta + Poisson (a busca antiga de 8 direções trazia bordas)
+            await ieRecAplicar(doc, L, t.c, { modo: 'preencher', nome: 'Pincel de recuperação para manchas' });
         }
         IE.recTraco = null; ieDesenharSobre();
     },

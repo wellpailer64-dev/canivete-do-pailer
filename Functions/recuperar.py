@@ -71,8 +71,51 @@ def curar(regiao_b64, mascara_b64, dx, dy, difusao=0):
     return {"success": True, "png": _png(np.dstack([out, reg[:, :, 3]]))}
 
 
+def _melhor_pedaco(bgr, m):
+    """Procura em volta o pedaço REAL que melhor continua a moldura da mancha (como o Photoshop): compara a moldura
+    (anel em volta da área) em todas as posições e evita pedaços com borda/objeto (textura diferente da moldura)."""
+    h, w = m.shape
+    ys, xs = np.nonzero(m)
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    anel_px = max(4, int(max(x1 - x0, y1 - y0) * 0.25))
+    dil = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * anel_px + 1,) * 2))
+    bx0, by0 = max(0, x0 - anel_px), max(0, y0 - anel_px)
+    bx1, by1 = min(w, x1 + anel_px), min(h, y1 + anel_px)
+    tpl = bgr[by0:by1, bx0:bx1].astype(np.float32)
+    anel = ((dil[by0:by1, bx0:bx1] > 0) & (m[by0:by1, bx0:bx1] == 0)).astype(np.float32)
+    th, tw = anel.shape
+    if th >= h or tw >= w or anel.sum() < 8:
+        return None
+    img = bgr.astype(np.float32)
+    mask3 = cv2.merge([anel] * 3)
+    custo = cv2.matchTemplate(img, tpl, cv2.TM_SQDIFF, mask=mask3) / max(1.0, anel.sum())
+    # miolo: o pedaço inteiro (não só a moldura) deve ter a cor média e o grão da moldura, senão traz borda/objeto
+    miolo = (m[by0:by1, bx0:bx1] > 0).astype(np.float32)
+    k = miolo / miolo.sum()
+    ch, cw = custo.shape
+    media = cv2.filter2D(img, -1, k, anchor=(0, 0), borderType=cv2.BORDER_CONSTANT)[:ch, :cw]
+    quad = cv2.filter2D(img * img, -1, k, anchor=(0, 0), borderType=cv2.BORDER_CONSTANT)[:ch, :cw]
+    var = np.maximum(0, quad - media * media).sum(2)
+    px_anel = tpl[anel > 0]
+    m_anel, v_anel = px_anel.mean(0), px_anel.var(0).sum()
+    custo = custo + 3.0 * ((media - m_anel) ** 2).sum(2) + 2.0 * np.maximum(0, var - v_anel * 1.5)
+    # proibido: o miolo do candidato não pode cair na mancha (nem colado nela)
+    proib = cv2.dilate((dil > 0).astype(np.uint8), miolo.astype(np.uint8), anchor=(0, 0))
+    custo[proib[:ch, :cw] > 0] = np.inf
+    if not np.isfinite(custo).any():
+        return None
+    # leve preferência por perto
+    yy, xx = np.mgrid[:custo.shape[0], :custo.shape[1]]
+    dist = np.hypot(xx - bx0, yy - by0) / max(w, h)
+    custo = custo * (1 + 0.5 * dist)
+    custo[~np.isfinite(custo)] = np.inf
+    cy, cx = np.unravel_index(np.argmin(custo), custo.shape)
+    return int(cx - bx0), int(cy - by0)
+
+
 def preencher(regiao_b64, mascara_b64, raio=6):
-    """Reconstrói a área branca da máscara a partir da vizinhança (sensível ao conteúdo)."""
+    """Reconstrói a área branca da máscara com textura REAL da vizinhança: acha o melhor pedaço em volta
+    (_melhor_pedaco) e o mistura por Poisson (curar). Sem pedaço possível, cai no inpaint liso."""
     reg = _bgra(_ler(regiao_b64))
     m = _ler(mascara_b64, cv2.IMREAD_UNCHANGED)
     m = m[:, :, 3] if m.ndim == 3 and m.shape[2] == 4 else (cv2.cvtColor(m, cv2.COLOR_BGR2GRAY) if m.ndim == 3 else m)
@@ -80,13 +123,15 @@ def preencher(regiao_b64, mascara_b64, raio=6):
     if not m.any():
         return {"success": False, "error": "máscara vazia"}
     bgr = cv2.cvtColor(reg, cv2.COLOR_BGRA2BGR)
+    try:
+        d = _melhor_pedaco(bgr, m)
+    except cv2.error:
+        d = None
+    if d:
+        r = curar(regiao_b64, mascara_b64, d[0], d[1], 2)
+        if r.get("success"):
+            return r
     out = cv2.inpaint(bgr, m, max(1, int(raio)), cv2.INPAINT_TELEA)
-    # grão de volta (o inpaint deixa liso): ruído com o desvio da vizinhança
-    viz = cv2.dilate(m, np.ones((15, 15), np.uint8)) & ~m
-    if viz.any():
-        dp = float(np.std(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)[viz > 0] - cv2.GaussianBlur(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY), (5, 5), 0)[viz > 0]))
-        ruido = np.random.default_rng(7).normal(0, min(dp, 12), out.shape[:2]).astype(np.float32)[:, :, None]
-        out = np.where(m[:, :, None] > 0, (out.astype(np.float32) + ruido).clip(0, 255), out).astype(np.uint8)
     alfa = reg[:, :, 3].copy()
     alfa[m > 0] = cv2.inpaint(alfa, m, 3, cv2.INPAINT_TELEA)[m > 0]
     return {"success": True, "png": _png(np.dstack([out, alfa]))}
