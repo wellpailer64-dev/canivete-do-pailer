@@ -18,6 +18,15 @@ if not defined PY (
     exit /b 1
 )
 
+rem Sem janela de CMD: abre por pythonw (a saida vai para logsunapp.log). Para ver o console: set KANIVETE_CONSOLE=1
+if not defined KANIVETE_CONSOLE (
+    set "PYW=%PY:py =pyw %"
+    if "%PY%"=="python" set "PYW=pythonw"
+    if "%PY%"=="py" set "PYW=pyw"
+    start "" %PYW% "main.py" %*
+    exit /b 0
+)
+
 %PY% "main.py" %*
 
 if not %errorlevel%==0 (
