@@ -102,7 +102,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 ### Legenda e texto
 - Sem caixa, sem contorno, sombra 100, nunca em maiúsculas. Destaque da palavra na cor da marca (2026-10-07).
 - Legenda nunca atravessa corte de câmera (2026-10-15) e fica longe das bordas (2026-10-18).
-- Conferir nomes próprios com dicionário.
+- **Caixa (2026-11-18, regra do Pailer):** legenda minúscula, mas nome de pessoa, lugar ou marca sempre com inicial maiúscula (Renato, Alessandro, Gordinhos) e sigla toda maiúscula (ABS, JS1). Automático em `caixa()` do `reel_fala.py`: nome que a transcrição escreveu com maiúscula no meio da frase, lista `Instructions/agente/nomes_proprios.txt` (acrescentar todo nome novo de cliente/pessoa), `nomes`/`siglas` do roteiro e siglas conhecidas. Conferir nomes próprios antes de mostrar.
 - Texto sobre imagem movimentada sempre com apoio: etiqueta ou película do tamanho do texto (2026-10-14, 2026-10-24).
 - Uma frase por cena; lettering fora do meio. GC sobre o rosto da pessoa certa, e nome só se ela disser (2026-10-22).
 

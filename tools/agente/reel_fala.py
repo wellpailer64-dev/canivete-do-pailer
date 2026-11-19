@@ -91,6 +91,44 @@ def AUD(k):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, ATRASO(k)):.3f}", "-t", f"{_duracao(ARQ(k)):.3f}", "-i", LAP(k), "-vn", "-ac", "1", "-ar", "16000", f], check=True)
     return f
 NOMES = {k.lower(): v for k, v in CFG.get("nomes", {}).items()}
+# Caixa da legenda (2026-11-18, regra do Pailer): legenda é minúscula, mas nome de pessoa/lugar/marca leva a
+# inicial maiúscula e sigla fica toda maiúscula (ABS, ESP). Nome próprio = palavra que a transcrição escreveu
+# com maiúscula fora do começo de frase em qualquer ponto do vídeo; sigla = toda em maiúscula ou na lista.
+SIGLAS = {x.lower() for x in CFG.get("siglas", [])} | {"abs", "esp", "ecu", "suv", "led", "cnh", "ipva", "gnv", "obd", "tpms", "adas", "ebd", "cvt", "dpf", "egr", "abs.", "ev", "pcd"}
+_PROPRIOS = None
+_ARQ_NOMES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Instructions", "agente", "nomes_proprios.txt")
+for _ln in (open(_ARQ_NOMES, encoding="utf-8") if os.path.isfile(_ARQ_NOMES) else []):
+    _ln = _ln.strip()
+    if _ln and not _ln.startswith("#") and " " not in _ln:
+        NOMES.setdefault(_ln.lower(), _ln)
+    elif _ln and not _ln.startswith("#"):
+        NOMES.setdefault(_ln.lower(), _ln)
+        JUNTAS.append((tuple(_ln.lower().split()), _ln))
+
+
+def proprios():
+    global _PROPRIOS
+    if _PROPRIOS is None:
+        _PROPRIOS = set()
+        for ws_ in WS.values():
+            for j in range(1, len(ws_)):
+                w = re.sub(r"[^\w-]+", "", ws_[j][2])
+                if len(w) > 1 and w[0].isupper() and not w.isupper() and ws_[j - 1][2][-1:] not in ".?!":
+                    _PROPRIOS.add(w.lower())
+    return _PROPRIOS
+
+
+def caixa(x):
+    lx = x.lower()
+    if lx in NOMES:
+        return NOMES[lx]
+    if lx in SIGLAS or (len(x) >= 2 and x.isupper() and x.isalpha()) or (re.fullmatch(r"[a-zA-Z]+\d+[a-zA-Z0-9]*", x) and not x.isdigit()):
+        return x.upper()
+    if x[:1].isupper() and lx in proprios():
+        return x[:1].upper() + x[1:]
+    return lx
+
+
 JUNTAS = [(tuple(a), b) for a, b in CFG.get("juntas", [])] + JUNTAS   # ex.: [["são", "paulo"], "São Paulo"]; o do roteiro vale primeiro
 # Identidade do cliente copiada do projeto modelo dele (ex.: Helo Ribeiro): logo girando sobre pincel no canto, GC na
 # primeira aparição e assinatura animada no fim, no lugar do logo/CTA/finalização padrão. Sem efeitos sonoros de troca
@@ -343,7 +381,7 @@ def legendas(k, a, b, ofs):
                 break
         else:
             x = limpa(ws[i][2])
-            toks.append((ws[i][0], ws[i][1], NOMES.get(x.lower(), x.lower()), ws[i][2][-1] in ".?!,")); i += 1
+            toks.append((ws[i][0], ws[i][1], caixa(x), ws[i][2][-1] in ".?!,")); i += 1
     grupos, g, n = [], [], 0
     for t in toks:
         if g and (n + len(t[2]) > 22 or len(g) >= 5):

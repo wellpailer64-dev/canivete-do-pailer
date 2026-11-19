@@ -1,0 +1,16 @@
+# Nomes próprios das legendas (reel_fala.py caixa()): um por linha; vale para todo vídeo.
+# Nome que aparece no começo de frase só fica maiúsculo se estiver aqui ou no "nomes" do roteiro.
+Alessandro
+Renato
+Gordinhos
+Bosch
+Car Service
+Pailer
+Carlinhos
+Helo
+Ribeiro
+Morumbi
+Oficina Produtiva
+JAC
+São Paulo
+Brasil
