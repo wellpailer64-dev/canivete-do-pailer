@@ -548,7 +548,7 @@ Object.assign(IE_CMDS, {
     };
 })();
 
-// nome da prancheta: clicar seleciona (acima); arrastar move a prancheta inteira; Alt+arrastar arrasta uma CÓPIA
+// nome da prancheta: clicar seleciona (acima); arrastar move a prancheta inteira; Alt+arrastar arrasta uma CÓPIA; Shift trava em linha reta
 document.addEventListener('pointerdown', ev => {
     const doc = IE.doc, sobre = ieEl('ie-sobre');
     if (!doc || ev.target !== sobre || ev.button !== 0 || IE.semExtras) return;
@@ -563,7 +563,8 @@ document.addEventListener('pointerdown', ev => {
             ativo = true;
             if (alt) { L = ieDuplicarPrancheta(doc, L, 0, 0); doc.ativa = L.id; doc.selIds = [L.id]; ieUiCamadas(); }
         }
-        const dx = Math.round((e.clientX - x0) / doc.zoom), dy = Math.round((e.clientY - y0) / doc.zoom);
+        let dx = Math.round((e.clientX - x0) / doc.zoom), dy = Math.round((e.clientY - y0) / doc.zoom);
+        if (e.shiftKey) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; }   // Shift: só na horizontal ou na vertical
         ieMoverPrancheta(L, dx - feito.x, dy - feito.y);
         feito = { x: dx, y: dy };
         ieDesenharVista(); ieDesenharSobre();
