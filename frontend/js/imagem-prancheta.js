@@ -450,6 +450,13 @@ function ieDocCaberPranchetas(doc) {
     ieDesenharVista(); ieDesenharSobre();
 }
 
+// Mover (inclusive Alt+arrastar cópia) que leva uma prancheta para fora do documento: o documento cresce antes de
+// gravar o passo (senão o fundo e o conteúdo ficam cortados na borda antiga)
+(function () {
+    const F = IE_FERR.mover, up = F.up;
+    F.up = function (p, ev, doc) { if (doc && IE.mov && ieTemPranchetas(doc)) ieDocCaberPranchetas(doc); return up.apply(this, arguments); };
+})();
+
 // lugar livre à direita de todas as pranchetas (na altura de `ref`, se der)
 function iePranchetaLugar(doc, ref) {
     const pr = iePranchetas(doc);
