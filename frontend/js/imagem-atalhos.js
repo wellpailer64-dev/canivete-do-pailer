@@ -111,6 +111,7 @@ function ieTelaModo(m) {
     const ie = ieEl('ie');
     ie.classList.toggle('ie-tela-1', IE.telaModo === 1);
     ie.classList.toggle('ie-tela-2', IE.telaModo === 2);
+    window.appTelaCheia?.(IE.telaModo > 0);   // como no Photoshop: os modos cheios tiram a barra de título da janela
     ieToast([ieT('Modo de tela padrão'), ieT('Tela cheia com menus'), ieT('Tela cheia (F volta)')][IE.telaModo]);
     setTimeout(() => ieAjustarVista(), 60);
 }

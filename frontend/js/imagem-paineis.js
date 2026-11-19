@@ -1638,7 +1638,7 @@ async function ieCmd(c) {
     if (['g180', 'g90h', 'g90a', 'fh', 'fv'].includes(c)) return ieTransfRapida(c);
     const fn = IE_CMDS[c];
     if (!fn) return;
-    if (!doc && !['novo', 'abrir', 'colar'].includes(c)) return;
+    if (!doc && !['novo', 'abrir', 'colar', 'telaProxima', 'telaAnterior', 'tela0', 'tela1', 'tela2'].includes(c)) return;
     if (IE.transf && !['transformar'].includes(c) && !c.startsWith('tf:')) ieTransfAplicar();
     try { await fn(doc); } catch (e) { console.error('[editor de imagem] comando', c, e); ieToast(`${ieT('Erro')}: ${e.message || e}`); }
 }

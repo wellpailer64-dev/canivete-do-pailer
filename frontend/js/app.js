@@ -338,8 +338,15 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('keydown', e => {
     if (e.key !== 'F11') return;
     e.preventDefault();
-    window.pywebview?.api?.toggle_fullscreen?.();
+    appTelaCheia(!window._appTelaCheia);
 });
+// tela cheia da janela (sem barra de título), para qualquer ferramenta; só alterna se o estado mudar
+function appTelaCheia(on) {
+    on = !!on;
+    if (on === !!window._appTelaCheia) return;
+    window._appTelaCheia = on;
+    window.pywebview?.api?.toggle_fullscreen?.();
+}
 
 // Ctrl+K: buscar ferramenta (no editor de vídeo o Ctrl+K é "dividir")
 document.addEventListener('keydown', e => {
