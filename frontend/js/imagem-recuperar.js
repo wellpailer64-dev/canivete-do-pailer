@@ -263,6 +263,18 @@ document.addEventListener('keydown', ev => {
 }, true);
 
 // ─────────────────────────── registro e barra de opções ───────────────────────────
+// Alt + botão direito arrastando para os lados: tamanho do pincel (como no Photoshop)
+function ieRecAltTam(f, tipo) {
+    f.rightDown = (p, ev) => { IE._pincelAjuste = ev.altKey ? { x0: ev.clientX, tam0: IE.op[tipo].tam, p0: IE.mouse || p } : null; };
+    f.rightMove = (p, ev) => {
+        const a = IE._pincelAjuste; if (!a) return;
+        IE.mouse = a.p0;
+        IE.op[tipo].tam = Math.round(ieClamp(a.tam0 + (ev.clientX - a.x0) / (IE.doc?.zoom || 1), 1, 1000));
+        ieOpcoesRender?.(); ieDesenharSobre();
+    };
+    f.rightUp = () => { IE._pincelAjuste = null; };
+}
+ieRecAltTam(IE_REC_MANCHAS, 'recManchas'); ieRecAltTam(IE_REC_PINCEL, 'recPincel');
 Object.assign(IE_FERR, { recManchas: IE_REC_MANCHAS, recPincel: IE_REC_PINCEL, remendo: IE_REMENDO, lacoMag: IE_LACO_MAG });
 {
     const i = IE_FERR_ORDEM.indexOf('carimbo');
