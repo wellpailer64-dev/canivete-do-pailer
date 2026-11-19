@@ -614,10 +614,10 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-ico-btn.on { background: var(--ie-sel); color: var(--text); }
 
 /* Cor: cubo de cores */
-.ie-pn-cubo { display: grid; grid-template-columns: 44px minmax(0, 1fr) 16px; gap: 10px; align-items: start; }
+.ie-pn-cubo { display: grid; grid-template-columns: 44px minmax(0, 1fr) 16px; gap: 10px; align-items: start; margin-bottom: 8px; }
 .ie-pn-sv, .ie-pn-mt { position: relative; cursor: crosshair; touch-action: none; }
 .ie-pn-sv canvas { width: 100%; aspect-ratio: 1.4; display: block; border-radius: 2px; }
-.ie-pn-mt canvas { width: 16px; height: 100%; display: block; }
+.ie-pn-mt canvas { position: absolute; inset: 0; width: 16px; height: 100%; display: block; border-radius: 2px; }   /* absoluto: a altura natural (256) não estica a linha; acompanha o quadro */
 .ie-pn-mt { align-self: stretch; }
 .ie-pn-sv i { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #000; pointer-events: none; }
 .ie-pn-mt i { position: absolute; left: -3px; right: -3px; height: 4px; margin-top: -2px; border: 1px solid #fff; box-shadow: 0 0 0 1px #000; pointer-events: none; }
