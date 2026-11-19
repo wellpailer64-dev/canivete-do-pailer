@@ -5,6 +5,17 @@ Permite que um agente de IA ou script de automação **veja e use o painel** do 
 
 ## Abrir o app pelo agente sem vincular à tarefa
 
+`--agente` também respeita a instância única. A porta não responder não significa que o app fechou:
+o registro de PID vivo vale inclusive para `python main.py` e modo agente desligado. Se outra cópia
+não confirmar o pedido de abertura, a nova tentativa termina sem criar outra janela.
+Portas de teste (como 9333) exigem `APPDATA` dentro de `D:/kanivete_testes`; cada perfil isolado
+tem seu próprio mutex. A mudança no código vale para novas aberturas por `main.py`/`Runapp.bat`;
+o executável já compilado precisa incorporar a mudança numa próxima compilação.
+Conferência sem abrir apps: `py -3.13 testes/teste_instancia_unica.py`.
+Na CLI, uma única instância registrada na 9223 é reutilizada nessa porta. Se já houver várias,
+`abrir` exige identificar o projeto e passar `--porta`; não escolhe silenciosamente a 9222.
+Modo agente desligado informa o estado imediatamente, sem abrir outra cópia nem esperar três minutos.
+
 **O app do Pailer abre SEMPRE visível: use `py -3.13 D:/Kanivete/Plugins/kanicode/plugins/kanivete/kanivete.py abrir` e, para trazer à frente, `frente`.** Nunca `ShowWindow=0`: ele precisa ver o trabalho (2026-10-30, esta instrução escondeu o app dele). Por dentro: `Invoke-CimMethod -ClassName Win32_Process -MethodName Create`, com executável e projeto entre aspas e `Win32_ProcessStartup.ShowWindow=1`. O processo nasce pelo serviço WMI, independente da árvore de processos da tarefa. Não use `Start-Process` para deixar o app do usuário aberto: nesta sessão (2026-10-23), ele respondeu durante a tarefa e encerrou depois de cada resposta, sem registro novo de falha. A vinculação ao processo da tarefa é uma hipótese; confirmar a permanência também na interação seguinte. Não reiniciar sem autorização. Quando o Pailer pedir trabalho no app aberto, use API, CLI ou atalhos e identifique a instância com `tools/porta_agente.py`; preserve o projeto e não use o app dele para testes. Testes continuam na 9333.
 
 ## Identidade, avisos e borda (17/11/2026)

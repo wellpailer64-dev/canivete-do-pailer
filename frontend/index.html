@@ -6,7 +6,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KANIVETE</title>
-    <script src="ls_boot.js"></script>
+    <script src="ls_boot.js"></script>
+
     <!-- Script da página que não carregou (erro de sintaxe, nome global repetido): aviso na tela em vez de a ferramenta
          sumir calada (o Kanivete Encoder ficou dias sem carregar por um const repetido, 2026-11-07) -->
     <script>(function () {
@@ -695,6 +696,8 @@
                                         <select class="ve-res-sel" id="ve-res-sel" onchange="veSetPreviewRes(this.value)" title="Resolução da reprodução: Half alivia o processamento na prévia (a exportação sai sempre em qualidade máxima)">
                                             <option value="1">Full</option>
                                             <option value="0.5">1/2</option>
+                                            <option value="0.3333">1/3</option>
+                                            <option value="0.25">1/4</option>
                                         </select>
                                     </div>
                                     <div class="ve-transport-btns">

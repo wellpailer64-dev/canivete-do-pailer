@@ -5116,8 +5116,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             if log:
                 detalhe += f"\nLog: {log}"
             return {"success": False, "error": "Falha ao exportar: " + detalhe}
-    except FileNotFoundError:
-        return {"success": False, "error": "ffmpeg não encontrado."}
+    except FileNotFoundError as _e:
+        # FileNotFoundError não é só o ffmpeg: arquivo de mídia, PNG de texto ou pasta de saída sumidos dão o mesmo erro
+        import traceback as _tb
+        _salvar_falha_export(ultimo_cmd, None, _tb.format_exc(), saida)
+        _arq = getattr(_e, "filename", None) or str(_e)
+        return {"success": False, "error": f"Arquivo não encontrado na exportação: {_arq}"}
     finally:
         for arq in prep["scripts"] + prep["ass"]:
             _apagar(arq)

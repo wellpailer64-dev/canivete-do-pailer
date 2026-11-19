@@ -284,9 +284,16 @@ def buscar(termo, js):
 
 
 if __name__ == "__main__":
-    js = gerar()
     if "--busca" in sys.argv:
-        buscar(sys.argv[sys.argv.index("--busca") + 1], js)
+        indice = sys.argv.index("--busca")
+        if indice + 1 >= len(sys.argv) or sys.argv[indice + 1].startswith("--"):
+            raise SystemExit("Uso: py -3.13 tools/mapa_geral.py --busca TERMO")
+        caminho = "Instructions/mapa.json"
+        if not os.path.isfile(caminho):
+            raise SystemExit("Instructions/mapa.json não existe; rode py -3.13 tools/mapa_geral.py para gerar o índice")
+        with open(caminho, encoding="utf-8") as f:
+            buscar(sys.argv[indice + 1], json.load(f))
     else:
+        js = gerar()
         print(f"MAPA.md e mapa.json: {len(js['ferramentas'])} ferramentas, {len(js['api'])} métodos da API, {len(js['vkn'])} comandos VKN, "
               f"{len(js['knv'])} KNV, {len(js['testes'])} testes, {len(js['guias'])} guias")

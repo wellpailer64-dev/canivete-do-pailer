@@ -6,6 +6,7 @@ de tarefas: o pedido vai para a cópia que já está rodando (que vem para a fre
 A conversa é por um soquete só em 127.0.0.1, com um token gravado na pasta do usuário.
 """
 import ctypes
+import hashlib
 import json
 import os
 import socket
@@ -15,6 +16,56 @@ import uuid
 
 _MUTEX = "Local\\CaniveteDoPailer_instancia"
 _mutex = None
+
+
+def dados_isolados():
+    """Só o perfil de testes no D pode ter uma instância separada da do Pailer."""
+    base = os.path.normcase(os.path.realpath(os.environ.get("APPDATA") or os.path.expanduser("~")))
+    testes = os.path.normcase(os.path.realpath("D:/kanivete_testes"))
+    try:
+        return os.path.commonpath([base, testes]) == testes
+    except ValueError:
+        return False
+
+
+def _nome_mutex():
+    if not dados_isolados():
+        return _MUTEX
+    base = os.path.normcase(os.path.realpath(os.environ["APPDATA"]))
+    return _MUTEX + "_teste_" + hashlib.sha256(base.encode("utf-8")).hexdigest()[:16]
+
+
+def _pid_vivo(pid):
+    try:
+        pid = int(pid)
+        if pid <= 0:
+            return False
+        k = ctypes.windll.kernel32
+        k.OpenProcess.restype = ctypes.c_void_p
+        k.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        k.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+        k.CloseHandle.argtypes = [ctypes.c_void_p]
+        h = k.OpenProcess(0x1000, False, pid)
+        if not h:
+            return False
+        try:
+            codigo = ctypes.c_ulong()
+            return bool(k.GetExitCodeProcess(h, ctypes.byref(codigo))) and codigo.value == 259
+        finally:
+            k.CloseHandle(h)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
+def instancias_vivas():
+    """Registro do app, inclusive cópias antigas sem mutex e modo agente desligado. Não depende do CDP."""
+    arq = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "agente.json")
+    try:
+        with open(arq, encoding="utf-8") as f:
+            lista = (json.load(f) or {}).get("instancias") or []
+        return [i for i in lista if isinstance(i, dict) and i.get("pid") != os.getpid() and _pid_vivo(i.get("pid"))]
+    except (OSError, ValueError, TypeError, AttributeError):
+        return []
 
 
 def _arquivo():
@@ -30,12 +81,15 @@ def ja_aberta():
         return False
     k = ctypes.windll.kernel32
     k.CreateMutexW.restype = ctypes.c_void_p
-    _mutex = k.CreateMutexW(None, False, _MUTEX)
-    return k.GetLastError() == 183   # ERROR_ALREADY_EXISTS
+    _mutex = k.CreateMutexW(None, False, _nome_mutex())
+    if not _mutex:
+        raise OSError("Não consegui verificar a instância única do KANIVETE.")
+    existe = k.GetLastError() == 183   # ERROR_ALREADY_EXISTS
+    return existe or bool(instancias_vivas())
 
 
 def enviar(pedido, espera=8.0):
-    """Manda o pedido para a cópia aberta. False se ela não respondeu (aí esta abre normalmente)."""
+    """Manda o pedido para a cópia aberta. False se ela não respondeu; isso não autoriza abrir outra."""
     fim = time.time() + espera
     while True:
         try:

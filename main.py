@@ -6210,6 +6210,27 @@ def _relancar_se_pedido():
         print("[reiniciar] não relançou:", e)
 
 
+def _encerrar_limpo():
+    """Saída do app (2026-11-18: ao fechar dava erro de WebView2 descartado e sobravam msedgewebview2 órfãos
+    segurando a pasta de dados): mata o que o WebView2 deixou pendurado neste processo e, se alguma thread
+    ficar impedindo o Python de sair, força a saída depois de alguns segundos."""
+    def _forcar():
+        time.sleep(6)
+        os._exit(0)
+    threading.Thread(target=_forcar, daemon=True).start()
+    try:
+        import psutil
+        filhos = psutil.Process().children(recursive=True)
+        for f in filhos:
+            try:
+                if "msedgewebview2" in (f.name() or "").lower():
+                    f.kill()
+            except Exception:
+                pass
+    except Exception as e:
+        print("[sair] limpeza do WebView2:", e)
+
+
 def _servidor_com_ajuda():
     """Servidor da interface (pywebview/bottle): "/" dava erro 500 (a rota "/" do pywebview chama asset() sem o
     arquivo) — agora leva a /agente.md; 404 diz onde estão as instruções; .md sai como texto."""
@@ -6267,18 +6288,22 @@ def _servidor_com_ajuda():
 def _abrir_em_outra_copia():
     """App (.exe) já aberto: manda o projeto do duplo clique para ele e esta cópia não abre (senão ficavam dois
     ícones na barra e duas cópias disputando as prévias e as preferências). Vale também pelo código (python main.py,
-    2026-11-07); só a cópia de agente/teste (--agente=PORTA) abre sempre.
-    Devolve True se entregou o pedido; None se esta é a primeira cópia (e deve escutar as próximas)."""
-    if _porta_agente():
-        return False
+    2026-11-07). Modo agente também respeita a instância única; teste exige perfil isolado no D.
+    Devolve True se há outra cópia (pedido encaminhado ou abertura impedida); None se esta é a primeira."""
     try:
         from Functions import instancia_unica, projeto
+        porta = _porta_agente()
+        if porta and porta not in range(9222, 9232) and not instancia_unica.dados_isolados():
+            print("[instância] porta de teste exige APPDATA isolado em D:/kanivete_testes; não abri outra cópia")
+            return True
         if not instancia_unica.ja_aberta():
             return None
-        return instancia_unica.enviar({"projeto": projeto.projeto_na_linha_de_comando()})
+        if not instancia_unica.enviar({"projeto": projeto.projeto_na_linha_de_comando()}):
+            print("[instância] o KANIVETE já está aberto, mas não respondeu; não abri outra cópia")
+        return True
     except Exception as e:
-        print("[instância] seguindo com uma cópia nova:", e)
-        return False
+        print("[instância] não consegui confirmar a cópia aberta; não abri outra:", e)
+        return True
 
 
 def _receber_de_outra_copia(pedido):
@@ -6407,8 +6432,12 @@ def main():
     _set_window(window)
 
     def _on_window_closed():
-        _save_window_state(window)
-        gdrive_cancel()
+        _FECHAR["ok"] = True   # a janela já foi descartada: nada de evaluate_js/pergunta depois daqui
+        for _f in (lambda: _save_window_state(window), gdrive_cancel):
+            try:
+                _f()
+            except Exception:
+                pass
 
     window.events.closed += _on_window_closed
 
@@ -6443,6 +6472,8 @@ def main():
         _FECHAR["pedido"] = agora
         def _perguntar():
             try:
+                if _FECHAR["ok"]:
+                    return
                 window.evaluate_js("window.appSair ? (window.pywebview.api.fechar_visto(), appSair()) : window.pywebview.api.sair_app()")
             except Exception:
                 pass
@@ -6525,6 +6556,7 @@ def main():
     _cleanup_temp_thumbs()
     _agente_registrar(sair=True)
     _relancar_se_pedido()
+    _encerrar_limpo()
     return
 
 

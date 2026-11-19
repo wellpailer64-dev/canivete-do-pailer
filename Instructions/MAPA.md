@@ -499,6 +499,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_illustrator.py` — Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
 - `testes/teste_imagem_dia_video.py` — Testa tools/agente/imagem_dia_video.py com assets mínimos gerados na hora (card fictício no disco D:)
+- `testes/teste_instancia_unica.py` — Abertura segura com agente, app sem CDP e perfil de teste. Não abre nem fecha aplicativos
 - `testes/teste_jcut.py` — J-cut após o corte de respiros, no app de teste
 - `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
 - `testes/teste_kani_maos.py` — Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da
@@ -511,6 +512,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_lc_hsl.py` — HSL secundário: seletividade, UI e prévia WebGL × render FFmpeg, sem acessar o app aberto
 - `testes/teste_lobby_camadas.py` — Lobby do Photo/Vetor não cobre a janela Novo documento nem os menus (app 9333)
 - `testes/teste_lux_casa.py` — Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)
+- `testes/teste_mcp_video.py` — Regressão do MCP de vídeo (keyframes, easings, animações de clipe, sobreposições, revisão obrigatória)
 - `testes/teste_misturar_se.py` — Misturar se: campos numéricos, arraste, canais, prévia e histórico; fonte do app 9333 em Edge sem janela
 - `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
 - `testes/teste_motion.py` — Motion do Editor Kanivete (editor-motion.js) com mouse de verdade: ferramenta Máscara (arrastar no monitor), Caneta

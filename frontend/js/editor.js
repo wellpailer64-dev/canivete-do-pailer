@@ -336,9 +336,10 @@ function veLsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 // ─────────────────────────── cache RAM da prévia ───────────────────────────
 // Cada quadro guardado leva a "assinatura" do que o compõe (clipes em volta da agulha, legenda, quadro):
 // uma edição só descarta os quadros que ela mudou de fato, e não o cache inteiro.
-// Teto em 1,5 GB: os ImageBitmap de um canvas acelerado ficam na memória da placa de vídeo, a mesma que o
+// Teto em 1 GB: os ImageBitmap de um canvas acelerado ficam na memória da placa de vídeo, a mesma que o
 // decodificador de vídeo e a composição da tela usam — com 4 GB a placa ficava sem folga e a reprodução engasgava.
-const VE_CACHE_MAX_BYTES = Math.min(1.5, Math.max(0.5, (navigator.deviceMemory || 8) / 4)) * 1024 * 1024 * 1024;
+// 1,5 GB + vídeos + efeitos levaram o processo da GPU a 3 GB e ele reiniciou (twirl, 2026-11-18).
+const VE_CACHE_MAX_BYTES = Math.min(1, Math.max(0.5, (navigator.deviceMemory || 8) / 4)) * 1024 * 1024 * 1024;
 const VE_CACHE_MARGEM = 5;   // s: clipes até aqui antes/depois da agulha entram na assinatura (transições)
 
 // Núcleo de hardware (Functions/hardware.py): o cache da prévia segue o plano do PC (8 GB com integrada: 256 MB — a
@@ -420,6 +421,14 @@ function veGpuObservar(cv, gl, reiniciar) {
         VE._gpuPerdidos = VE._gpuPerdidos || new Set();
         VE._gpuPerdidos.add(gl);
         veCacheSoltarPlaca();
+        // Processo da GPU reiniciado (pico de memória, 2026-11-18): o "restored" às vezes nunca chega e o efeito
+        // ficava preso num contexto morto (texto animado bugado). Larga o contexto já; o próximo quadro cria outro.
+        setTimeout(() => {
+            if (!gl.isContextLost()) return;
+            VE._gpuPerdidos.delete(gl);
+            reiniciar();
+            if (VE.ready) veDrawMonitorSoon();
+        }, 1500);
     });
     cv.addEventListener('webglcontextrestored', () => {
         if (VE._gpuPerdidos) VE._gpuPerdidos.delete(gl);
@@ -3809,8 +3818,14 @@ function veToggleRulers(on) {
     veApplyMonitor();
 }
 
+// Full, 1/2, 1/3, 1/4: menos pixels = menos memória de placa e mais segundos no cache de prévia
+function veResNorm(r) {
+    const n = Number(r);
+    return [1, 0.5, 0.3333, 0.25].reduce((a, b) => Math.abs(b - n) < Math.abs(a - n) ? b : a, 1);
+}
+
 function veSetPreviewRes(r) {
-    const res = Number(r) === 1 ? 1 : 0.5;
+    const res = veResNorm(r);
     const sel = $ve('ve-res-sel');
     if (sel) sel.value = String(res);
     if (res === VEM.res) return;
@@ -6943,7 +6958,7 @@ function veOnExport(ev) {
 
 const VE_MZ_MIN = 0.25, VE_MZ_MAX = 16;
 const VEM = { mz: 1, mx: 0, my: 0, pan: null, panned: false,
-    rulers: veLsGet('ve.rulers') !== '0', res: veLsGet('ve.previewRes') === '0.5' ? 0.5 : 1 };
+    rulers: veLsGet('ve.rulers') !== '0', res: veLsGet('ve.previewRes') ? veResNorm(veLsGet('ve.previewRes')) : 1 };
 
 // px de tela por px do quadro no modo Fit
 function veTamTela(scr) { return veTam(scr, () => { if (VE.ready) veDrawMonitorSoon(); }); }

@@ -651,6 +651,11 @@ async function veMoFonte(c, T, f) {
     // o seek venceu o tempo (ou a placa perdeu o decodificador) sem quadro: desenhar agora sairia transparente e o cache
     // guardaria a camada vazia para sempre — cena10 do Dago ficou preta no export por isso (2026-11-17)
     for (let k = 0; k < 100 && v.readyState < 2; k++) await new Promise(r => setTimeout(r, 50));
+    // instável no início do vídeo (várias camadas do mesmo clipe pedindo seek ao mesmo tempo): refaz a busca até 3 vezes, deslocando 1 ms
+    for (let tent = 1; tent <= 3 && v.readyState < 2; tent++) {
+        try { await veMoBuscar(v, veSrcAt(c, T) + 0.001 * tent); } catch (e) { /* tenta de novo */ }
+        for (let k = 0; k < 60 && v.readyState < 2; k++) await new Promise(r => setTimeout(r, 50));
+    }
     if (v.readyState < 2) throw new Error(veT('o vídeo da camada não entregou o quadro'));
     return v;
 }

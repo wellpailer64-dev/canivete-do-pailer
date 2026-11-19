@@ -37,8 +37,9 @@
 
 ## Mapa geral (comece por aqui)
 `Instructions/MAPA.md` (ferramentas → arquivos, API, comandos VKN/KNV, testes, guias, pontes, onde ficam dados e
-caches); versão do Jr: `Instructions/mapa.json`. Achar algo: `py -3.13 tools/mapa_geral.py --busca termo`; depois de
-criar ferramenta, comando ou teste: `py -3.13 tools/mapa_geral.py` (regenera os dois).
+caches); versão do Jr: `Instructions/mapa.json`. A busca `--busca` lê esse índice sem gravar arquivos; se ele ainda
+não existir, rode `py -3.13 tools/mapa_geral.py`. Depois de criar ferramenta, comando ou teste, rode esse comando para
+regenerar os dois mapas.
 
 ## Trabalhar barato (economia de tokens — usar SEMPRE)
 - Editar código: `py -3.13 tools/patch.py mudancas.patch` (blocos `@@ arquivo` / `<<<` velho `===` novo `>>>`; confere âncora
@@ -560,3 +561,12 @@ Colagem de papel rasgado (`tools/agente/rasgo_papel.py`, `receita_rasgo.py`), ta
 
 ## falas_midia.py (tools/agente)
 Fala de arquivo bruto (depoimento, entrevista) com tempo por palavra, para escolher frase e cortar no vale (`onda_voz.py`). `py -3.13 tools/agente/falas_midia.py arq.mp4 [outro] [--de s --ate s] [--json]`. Reconhecedor das legendas (`legendas.transcrever_wav`); cache em `D:/Kanivete/cache/falas` (chave tamanho+data). Testado no depoimento 047 do HDI.
+# Instância única também em modo agente (18/11/2026)
+
+`main.py --agente` e `Runapp.bat --agente` não pulam a instância única. PID registrado e vivo
+vale mesmo sem resposta do CDP ou com modo agente desligado; falha de comunicação bloqueia outra janela.
+Portas de teste exigem APPDATA em D:/kanivete_testes, com mutex separado por perfil.
+Código: `Functions/instancia_unica.py`, `_abrir_em_outra_copia` no main e CLI do KaniCode
+`plugins/kanivete/kanivete.py`. Teste sem abrir apps: `py -3.13 testes/teste_instancia_unica.py`.
+Executável compilado antigo mantém o comportamento antigo até próxima compilação; não reiniciar nem fechar
+o app do usuário para aplicar esta correção. Guia: `Instructions/modo-agente.md`.
