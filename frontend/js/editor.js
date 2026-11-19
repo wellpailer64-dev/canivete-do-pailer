@@ -54,7 +54,7 @@ const VE = {
 
 const VE_RULER = 40;   // régua da timeline mais alta: fácil de acertar o clique (= .ve-head-ruler no CSS)
 const VE_MAX_PPS = 16000;   // zoom máximo: ~530 px por quadro a 30 fps (onda em alta resolução a partir de VE_PF_MIN)
-const VE_PF_MIN = 220;      // a partir daqui a onda pede picos finos do trecho visível (ve_peaks_faixa)
+const VE_PF_MIN = 90;       // a partir daqui a onda pede picos finos do trecho visível (ve_peaks_faixa)
 const VE_TRACK_MIN = 22, VE_TRACK_MAX = 220;
 const VE_MIN_TRACKS = 4;
 // procura na janela principal e, se o painel estiver numa janela solta (editor-dock.js), nela
@@ -5418,7 +5418,7 @@ function veClampVScroll() {
 // Onda de alta resolução (zoom profundo): picos finos só do trecho visível, pedidos ao Python e guardados por mídia.
 function vePicosFinos(med, path, s0, s1) {
     if (VE.pps < VE_PF_MIN || !path || !window.pywebview?.api?.ve_peaks_faixa) return null;
-    const dens = Math.min(VE.pps * 1.2, 8000), f = med._pf;
+    const dens = Math.min(VE.pps * 3, 16000), f = med._pf;
     if (f && f.path === path && f.ini <= s0 && f.fim >= s1 && f.dens >= dens * 0.7) return f;
     if (!med._pfBusy) {
         med._pfBusy = true;
@@ -6077,19 +6077,37 @@ function veRender() {
             const xa = Math.max(cx, 0), xb = Math.min(cx + cw, W);
             const fino = veMelLigado(med) ? null : vePicosFinos(outra ? med : VE, outra ? med.path : VE.path, srcAt(xa), srcAt(xb));
             const pU = fino ? fino.peaks : picos, nU = pU.length, d0 = fino ? fino.ini : 0, dU = fino ? fino.fim - fino.ini : durP;
-            for (let x = xa; x < xb; x += 2) {
-                const sa = srcAt(x), sb = srcAt(x + 2);
-                const ia = Math.floor((sa - d0) / dU * nU), ib = Math.max(ia + 1, Math.ceil((sb - d0) / dU * nU));
-                let pk = 0;
-                for (let k = Math.max(0, ia); k < Math.min(nU, ib); k++) pk = Math.max(pk, pU[k]);
+            // colunas de 1 px presas ao clipe (x = cx + j): o grid anda junto com a fonte, então rolar/zoom não
+            // reamostra em fronteiras diferentes a cada quadro (era isso que fazia a onda "dançar").
+            const corOnda = cor || '#43c58f', hDb = (pk, s) => {
                 // como no Premiere: a onda segue o volume que sai (ganho + linha de volume), em escala de dB de
-                // −48 a 0 dBFS — abaixar encolhe até sumir, passar do topo = estouro (vermelho). Os picos vêm em raiz
-                // (gerar_peaks): pk² é a amplitude real.
-                const db = pk > 0 ? 40 * Math.log10(pk) + g0 + (linha ? veCnValor(c, 'a', sa) : 0) : -Infinity;
-                if (db < -48) continue;
-                ctx.fillStyle = db > 0 ? '#f87171' : (cor || '#43c58f');     // vermelho = passa de 0 dBFS
-                const h = Math.max(1, Math.min(1, (db + 48) / 48) * amp);
-                ctx.fillRect(x, base - h, 1.4, h);
+                // −48 a 0 dBFS. Os picos vêm em raiz (gerar_peaks): pk² é a amplitude real.
+                const db = pk > 0 ? 40 * Math.log10(pk) + g0 + (linha ? veCnValor(c, 'a', s) : 0) : -Infinity;
+                return db < -48 ? [0, db] : [Math.max(1, Math.min(1, (db + 48) / 48) * amp), db];
+            };
+            for (let x = cx + Math.max(0, Math.floor(xa - cx)); x < xb; x += 1) {
+                const sa = srcAt(x), sb = srcAt(x + 1);
+                const fa = (sa - d0) / dU * nU, fb = (sb - d0) / dU * nU;
+                let pk = 0, soma = 0, cnt = 0;
+                if (fb - fa < 1) {
+                    // zoom além da resolução dos picos: interpola entre vizinhos (sem degraus nem tremor)
+                    const fm = (fa + fb) / 2 - 0.5, i0 = Math.floor(fm), t = fm - i0;
+                    const p0 = pU[Math.min(nU - 1, Math.max(0, i0))] || 0, p1 = pU[Math.min(nU - 1, Math.max(0, i0 + 1))] || 0;
+                    pk = p0 + (p1 - p0) * t; soma = pk; cnt = 1;
+                } else {
+                    const ia = Math.max(0, Math.floor(fa)), ib = Math.min(nU, Math.floor(fb));
+                    for (let k = ia; k < ib; k++) { const v = pU[k]; if (v > pk) pk = v; soma += v; cnt++; }
+                }
+                const [h, db] = hDb(pk, sa);
+                if (!h) continue;
+                const vermelho = db > 0;                                       // passa de 0 dBFS
+                // camada externa = pico (mais clara); interna = média da coluna (corpo): separa chiado, fala e silêncio
+                ctx.fillStyle = vermelho ? '#f87171' : veRgba(corOnda, 0.55);
+                ctx.fillRect(x, base - h, 1, h);
+                if (cnt > 1 && !vermelho) {
+                    const [hm] = hDb(soma / cnt, sa);
+                    if (hm) { ctx.fillStyle = corOnda; ctx.fillRect(x, base - hm, 1, hm); }
+                } else if (!vermelho) { ctx.fillStyle = corOnda; ctx.fillRect(x, base - h, 1, h); }
             }
             if (c.g && cw > 60 && ah >= 14) {
                 ctx.font = '600 10px Cascadia Mono, Consolas, monospace';

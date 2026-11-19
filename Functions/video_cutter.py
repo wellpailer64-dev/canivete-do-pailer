@@ -950,7 +950,7 @@ def gerar_thumbs(path, duration, outdir, count):
 
 
 def gerar_peaks(path, duration):
-    """Forma de onda (pico por bloco) com numpy. Resolução ~40 pontos/segundo."""
+    """Forma de onda (pico por bloco) com numpy. Resolução ~100 pontos/segundo."""
     try:
         import numpy as np
     except Exception:
@@ -965,7 +965,7 @@ def gerar_peaks(path, duration):
         if not r.stdout:
             return []
         pcm = np.frombuffer(r.stdout, dtype=np.int16)
-        n = int(min(20000, max(800, duration * 40)))
+        n = int(min(60000, max(800, duration * 100)))
         bloco = max(1, len(pcm) // n)
         usable = pcm[: bloco * n] if len(pcm) >= bloco * n else np.pad(pcm, (0, bloco * n - len(pcm)))
         picos = np.abs(usable.reshape(n, bloco).astype(np.int32)).max(axis=1) / 32768.0
