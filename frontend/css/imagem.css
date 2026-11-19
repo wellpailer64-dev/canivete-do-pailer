@@ -388,12 +388,12 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 
 /* modos de tela (F) e painéis escondidos (Tab / Shift+Tab) — imagem-atalhos.js */
 .ie.ie-tela-1, .ie.ie-tela-2 { position: fixed; inset: 0; z-index: 2000; }
-.ie.ie-tela-2 { grid-template-rows: 0 0 minmax(0, 1fr); background: #000; }
+.ie.ie-tela-2 { grid-template-rows: minmax(0, 1fr); background: #000; }   /* itens escondidos não ocupam trilha: só sobra o corpo */
 .ie.ie-tela-2 .ie-top, .ie.ie-tela-2 .ie-opcoes, .ie.ie-tela-2 .ie-ferr, .ie.ie-tela-2 .ie-paineis, .ie.ie-tela-2 .ie-abas,
 .ie.ie-tela-2 .ie-status { display: none !important; }
-.ie.ie-tela-2 .ie-corpo { grid-template-columns: 0 0 minmax(0, 1fr) 0 !important; }
-.ie.ie-tela-2 .ie-opcoes-linha { overflow: hidden; visibility: hidden; }
-.ie.ie-tela-2 .ie-centro { grid-template-rows: 0 minmax(0, 1fr) 0; }
+.ie.ie-tela-2 .ie-corpo { grid-template-columns: minmax(0, 1fr) !important; }
+.ie.ie-tela-2 .ie-opcoes-linha { display: none !important; }
+.ie.ie-tela-2 .ie-centro { grid-template-rows: minmax(0, 1fr); }
 .ie.ie-tela-2 .ie-vista { background: #000; }
 .ie.ie-sem-paineis { grid-template-rows: 40px 0 minmax(0, 1fr); }
 .ie.ie-sem-paineis .ie-opcoes, .ie.ie-sem-paineis .ie-ferr, .ie.ie-sem-paineis .ie-paineis { display: none !important; }
