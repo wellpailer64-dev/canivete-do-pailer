@@ -171,6 +171,8 @@ const veClipAlvo = c => !!c && veTrkAlvo(veIsAudio(c) ? 'a' : 'v', c.tr);
 const veAlvoFiltra = () => [...VE_TRK.v, ...VE_TRK.a].some(t => t && t.semAlvo);
 // clipe trava pela trilha do próprio tipo: A1 bloqueada não trava o vídeo da V1 (antes misturava as duas)
 const veLocked = c => !!c && c.tr >= 0 && !!(((veIsAudio(c) ? VE_TRK.a : VE_TRK.v)[c.tr] || {}).lock);
+// trilha de destino travada para ESTE clipe (vídeo olha V, áudio olha A)
+const veTrkLockedPara = (c, tr) => veLocked({ ...c, tr });
 function veAvisoBloqueio() { veToast('Trilha bloqueada: clique no cadeado para desbloquear'); }
 
 // Cores do rótulo do clipe (menu do botão direito na timeline)
@@ -1965,7 +1967,7 @@ function veDuplicarEm(i, tr, st) {
     const c = VE.clips[i];
     if (!c) return;
     veEnsureTrackIndex(tr);
-    if (veTrkLocked(tr)) { veAvisoBloqueio(); veDraw(); return; }
+    if (veTrkLockedPara(c, tr)) { veAvisoBloqueio(); veDraw(); return; }
     vePushHistory();
     vePlaceClip({ ...veCopiaClipe(c), tr, st });
     veAfterEdit(VE.playhead);
@@ -2035,7 +2037,7 @@ function veColar() {
     const st = veSnapFrame(VE.playhead), tr0 = veColarTrilha(cb.c);
     const tr = tr0 + veColarDesce([{ ...cb.c, tr: tr0, st }]);
     veEnsureTrackIndex(tr);
-    if (veTrkLocked(tr)) { veAvisoBloqueio(); return; }
+    if (veTrkLockedPara(cb.c, tr)) { veAvisoBloqueio(); return; }
     vePushHistory();
     const novo = { ...veCopiaClipe(cb.c), tr, st };
     vePlaceClip(novo);
@@ -2084,7 +2086,7 @@ function veColarVarios(cs) {
     });
     const trs = [...new Set(cs.map(c => c.tr))];
     trs.forEach(tr => veEnsureTrackIndex(tr));
-    if (trs.some(veTrkLocked)) { veAvisoBloqueio(); return; }
+    if (cs.some(c => veLocked(c))) { veAvisoBloqueio(); return; }
     vePushHistory();
     const lk = veLkMapa(), novos = [];
     cs.forEach(c => {
@@ -2106,7 +2108,7 @@ function veDuplicarAcima() {
     let tr = acima.find(k => !veTrkLocked(k) && veTrackFree(k, a, b, c));
     if (tr == null && acima.length && !veTrkLocked(c.tr + 1)) tr = c.tr + 1;
     if (tr == null) { tr = veTrackCount(); veEnsureTrackIndex(tr); }
-    if (veTrkLocked(tr)) { veAvisoBloqueio(); return false; }
+    if (veTrkLockedPara(c, tr)) { veAvisoBloqueio(); return false; }
     vePushHistory();
     vePlaceClip({ ...veCopiaClipe(c), tr });
     veRefresh();
@@ -2204,7 +2206,7 @@ function veMoveClip(i, tr, st) {
     const c = VE.clips[i];
     if (!c || tr < 0) { veDraw(); return; }
     veEnsureTrackIndex(tr);
-    if (veTrkLocked(tr)) { veAvisoBloqueio(); veDraw(); return; }
+    if (veTrkLockedPara(c, tr)) { veAvisoBloqueio(); veDraw(); return; }
     if (tr === c.tr && Math.abs(st - c.st) < veFrame() / 2) { veDraw(); return; }
     st = Math.max(0, st + veEncosto([{ c, tr, st, en: st + veLen(c) }], VE.clips.filter((o, j) => j !== i)));
     vePushHistory();
