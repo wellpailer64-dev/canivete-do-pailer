@@ -62,6 +62,7 @@ Medido comparando a minha entrega com a timeline que ele ajustou (Carlinhos, Qua
 - **Texto de destaque:** em MAIÚSCULAS, peso 900, tamanho 108 e entrelinha de 85 a 97 (não 120). Mais baixo, com y entre 1470 e 1510 em 1080x1920. Entra na palavra falada e dura só a frase, de 1,1 a 2,9 s. Atrás vai o brilho azul da borda (`sombra_borda`), com o mesmo tempo e um leve contraste.
 - **Cor:** UMA camada de ajuste no vídeo inteiro para o look: ct 55, hi 21, wh -11, sat 86, fade 20, sharp 66, lm -33, piv 43, clar -23. Correção de exposição fica no próprio clipe, por câmera (exemplo: exp +0,6, sh +23, bl -38), em vez de camadas de cor picadas por trecho.
 - **Legenda:** 2 a 4 palavras em uma linha, sem pontuação, presa à fala. Desde o commit de 2026-11-20 ela acompanha sozinha qualquer corte, trim ou arraste do clipe de fala (`veLegAcompanharCortes`). Depois de cortar, conferir que nenhuma ficou sobreposta.
+- Onde há texto de destaque, a legenda sai nesse trecho (redundante).
 
 ## Lacunas: critérios para implementação
 
