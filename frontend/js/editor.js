@@ -169,7 +169,8 @@ const veTrkAlvo = (kind, tr) => tr >= 0 && !((kind === 'v' ? VE_TRK.v : VE_TRK.a
 const veClipAlvo = c => !!c && veTrkAlvo(veIsAudio(c) ? 'a' : 'v', c.tr);
 // alguma trilha desligada como alvo? (todas como alvo = comportamento de sempre)
 const veAlvoFiltra = () => [...VE_TRK.v, ...VE_TRK.a].some(t => t && t.semAlvo);
-const veLocked = c => !!c && veTrkLocked(c.tr);
+// clipe trava pela trilha do próprio tipo: A1 bloqueada não trava o vídeo da V1 (antes misturava as duas)
+const veLocked = c => !!c && c.tr >= 0 && !!(((veIsAudio(c) ? VE_TRK.a : VE_TRK.v)[c.tr] || {}).lock);
 function veAvisoBloqueio() { veToast('Trilha bloqueada: clique no cadeado para desbloquear'); }
 
 // Cores do rótulo do clipe (menu do botão direito na timeline)
