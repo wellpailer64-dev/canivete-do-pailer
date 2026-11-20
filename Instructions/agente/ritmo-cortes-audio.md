@@ -63,6 +63,7 @@ Medido comparando a minha entrega com a timeline que ele ajustou (Carlinhos, Qua
 - **Cor:** UMA camada de ajuste no vídeo inteiro para o look: ct 55, hi 21, wh -11, sat 86, fade 20, sharp 66, lm -33, piv 43, clar -23. Correção de exposição fica no próprio clipe, por câmera (exemplo: exp +0,6, sh +23, bl -38), em vez de camadas de cor picadas por trecho.
 - **Legenda:** 2 a 4 palavras em uma linha, sem pontuação, presa à fala. Desde o commit de 2026-11-20 ela acompanha sozinha qualquer corte, trim ou arraste do clipe de fala (`veLegAcompanharCortes`). Depois de cortar, conferir que nenhuma ficou sobreposta.
 - Onde há texto de destaque, a legenda sai nesse trecho (redundante).
+- Regra geral: texto nunca se sobrepõe a texto (legenda × camada de texto) nem objeto cobre texto, salvo pedido do projeto. O editor já encurta/tira a legenda que cruza camada de texto (veLegTextosNaTela); objeto sobre texto conferir no quadro.
 
 ## Lacunas: critérios para implementação
 

@@ -1491,10 +1491,13 @@ function veLegDaAncora(l) {
     return { ...l, st, en: +en.toFixed(3), pt, texto, ancora: { ...A, st, tx: texto } };
 }
 let _veLegAssin = '';
+const veLegTextosNaTela = () => VE.clips.filter(c => c.tx && String(c.tx.t || '').trim() && !veClipOff(c)).map(c => [c.st, veEnd(c)]);
+const veLegAssinClipes = () => VE.clips.map(c => c.m == null ? (c.tx ? `t${c.st.toFixed(3)},${veEnd(c).toFixed(3)},${c.off ? 1 : 0}` : '')
+    : `${c.m},${c.tr},${c.x || ''},${c.st.toFixed(3)},${c.s.toFixed(3)},${c.e.toFixed(3)},${c.v || 1},${c.off ? 1 : 0}`).join('|');
 function veLegAcompanharCortes() {
     const L = VE.legendas;
     if (!L || !L.length) { _veLegAssin = ''; return; }
-    const assin = VE.clips.map(c => c.m == null ? '' : `${c.m},${c.tr},${c.x || ''},${c.st.toFixed(3)},${c.s.toFixed(3)},${c.e.toFixed(3)},${c.v || 1},${c.off ? 1 : 0}`).join('|')
+    const assin = veLegAssinClipes()
         + '#' + L.map(l => `${l.st}|${l.texto}`).join('¦');
     if (assin === _veLegAssin) return;
     let mudou = false;
@@ -1508,8 +1511,18 @@ function veLegAcompanharCortes() {
     // nunca encavala: cada uma termina antes da próxima começar
     novo.sort((a, b) => a.st - b.st);
     novo.forEach((l, i) => { const p = novo[i + 1]; if (p && l.en > p.st) { novo[i] = { ...l, en: Math.max(l.st + 0.05, p.st) }; mudou = true; } });
+    // nunca por cima de texto na tela (destaque, título): encurta até o texto entrar; sem espaço, sai
+    const W = veLegTextosNaTela();
+    for (let i = novo.length - 1; i >= 0; i--) {
+        let l = novo[i];
+        for (const [a, b] of W) {
+            if (!(l.st < b - VE_EPS && l.en > a + VE_EPS)) continue;
+            if (a - l.st >= 0.35) { l = { ...l, en: a }; novo[i] = l; mudou = true; }
+            else { novo.splice(i, 1); mudou = true; break; }
+        }
+    }
     if (mudou) { VE.legendas = novo; if (typeof VETX !== 'undefined' && VETX.legSel >= novo.length) VETX.legSel = -1; }
-    _veLegAssin = VE.clips.map(c => c.m == null ? '' : `${c.m},${c.tr},${c.x || ''},${c.st.toFixed(3)},${c.s.toFixed(3)},${c.e.toFixed(3)},${c.v || 1},${c.off ? 1 : 0}`).join('|')
+    _veLegAssin = veLegAssinClipes()
         + '#' + VE.legendas.map(l => `${l.st}|${l.texto}`).join('¦');
 }
 
