@@ -233,6 +233,46 @@ def _linhas_ffmpeg(err, n=8):
     return linhas[-n:]
 
 
+def _encurtar_cmd(cmd, limite=30000):
+    """Windows aceita no máximo 32.767 caracteres na linha de comando. Timeline com centenas de clipes em pasta de
+    cliente funda (Carlinhos, 284 entradas: 41,9 mil caracteres) dava WinError 206. Passou do limite: a pasta de cada
+    entrada vira um junction curto (X:/kj/<hash> no disco da pasta de trabalho), sem copiar nada."""
+    if os.name != "nt" or len(subprocess.list2cmdline(cmd)) <= limite:
+        return cmd
+    import hashlib
+    raiz = None
+    for r in (os.path.splitdrive(_work_dir())[0] + os.sep + "kj", os.path.join(_work_dir(), "j")):
+        try:
+            os.makedirs(r, exist_ok=True)
+            raiz = r
+            break
+        except OSError:
+            continue
+    if not raiz:
+        return cmd
+    feitos = {}
+    out = list(cmd)
+    for i in range(len(out) - 1):
+        if out[i] != "-i" or not os.path.isfile(out[i + 1]):
+            continue
+        pasta, nome = os.path.split(os.path.abspath(out[i + 1]))
+        if len(pasta) < 40:
+            continue
+        if pasta not in feitos:
+            lnk = os.path.join(raiz, hashlib.md5(pasta.lower().encode("utf-8")).hexdigest()[:6])
+            if not os.path.isdir(lnk):
+                try:
+                    import _winapi
+                    _winapi.CreateJunction(pasta, lnk)
+                except Exception:
+                    subprocess.run(["cmd", "/c", "mklink", "/J", lnk, pasta], capture_output=True,
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            feitos[pasta] = lnk if os.path.isdir(lnk) else None
+        if feitos[pasta]:
+            out[i + 1] = os.path.join(feitos[pasta], nome)
+    return out
+
+
 def _salvar_falha_export(cmd, script, err, saida):
     try:
         arq = os.path.join(_work_dir(), f"export_fail_{uuid.uuid4().hex[:8]}.log")
@@ -1026,9 +1066,39 @@ def _proxy_existente(work, lado, alfa=False):
         nomes = [f"proxy_v3_{l}.mp4" for l in (lado, 720, 1080, 540)] + ["proxy_v2.mp4", "proxy_v2_720.mp4", "proxy_v2_540.mp4"]
     for n in dict.fromkeys(nomes):
         p = os.path.join(work, n)
-        if os.path.isfile(p):
+        if os.path.isfile(p) and _proxy_integro(p):
             return p
     return None
+
+
+def _proxy_integro(p):
+    """Prévia corrompida (ex.: gravada com o disco cheio) deixava o preview preto. Decodifica 1 s do começo e do fim;
+    falhou → renomeia para .corrompido e a prévia é refeita. Resultado guardado em <proxy>.ok (só reconfere se mudar)."""
+    marca = p + ".ok"
+    try:
+        assin = f"{os.path.getsize(p)}:{int(os.path.getmtime(p))}"
+        if os.path.isfile(marca) and open(marca, encoding="utf-8").read() == assin:
+            return True
+        ruim = False
+        for pos in (["-t", "1"], ["-sseof", "-1"]):
+            r = subprocess.run([ffmpeg_path(), "-hide_banner", "-v", "error", "-xerror", *pos[:0],
+                                *(pos if pos[0] == "-sseof" else []), "-i", p, *(pos if pos[0] == "-t" else []),
+                                "-map", "0:v:0", "-f", "null", "-"], capture_output=True, timeout=30,
+                               creationflags=_creationflags())
+            if r.returncode != 0 or r.stderr.strip():
+                ruim = True
+                break
+        if not ruim:
+            with open(marca, "w", encoding="utf-8") as f:
+                f.write(assin)
+            return True
+        print("[proxy] corrompida, refazendo:", p)
+        _apagar_item(p + ".corrompido")
+        os.replace(p, p + ".corrompido")
+        return False
+    except Exception as e:
+        print("[proxy] não conferi:", e)
+        return True
 
 
 def _proxy_junto(path, lado, alfa=False):
@@ -4237,6 +4307,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         aberto = path   # nome e pasta da saída vêm do que o usuário abriu
     if _eh_imagem(path):
         path = _base_imagem(path)   # timeline que começou por uma imagem: fundo preto no tamanho dela
+    if (usar_gpu and not saida and not previa_h and not alfa and janela is None
+            and not FORMATOS_SAIDA.get(str(formato_saida).lower(), {}).get("audio_only")):
+        from Functions import export_placa
+        export_placa.preparar_placa(prog)
     # Modo placa (Functions/export_placa.py): a timeline inteira montada na placa de vídeo (Vulkan + libplacebo), como
     # o Premiere. O que ele ainda não sabe fazer (motivo) ou uma falha na placa seguem pela CPU, abaixo
     # (Comp pela placa com fundo transparente: medido 2026-10-14 — 60 s × 48 s na CPU e o alfa saía errado; fica na CPU)
@@ -5065,6 +5139,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                                             str(janela["quadros"]), "-an", saida]
         else:
             full = prep["base_cmd"] + video_args + cfg["extra"] + [saida] + prep_min["args"]
+        full = _encurtar_cmd(full)
         ultimo_cmd = full
 
         def _hold(p):
