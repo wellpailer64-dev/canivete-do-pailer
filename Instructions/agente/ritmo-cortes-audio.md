@@ -65,6 +65,8 @@ Medido comparando a minha entrega com a timeline que ele ajustou (Carlinhos, Qua
 - Onde há texto de destaque, a legenda sai nesse trecho (redundante).
 - Regra geral: texto nunca se sobrepõe a texto (legenda × camada de texto) nem objeto cobre texto, salvo pedido do projeto. O editor já encurta/tira a legenda que cruza camada de texto (veLegTextosNaTela); objeto sobre texto conferir no quadro.
 
+- Objetos ilustrativos (regra universal): quando a fala cita algo concreto (preço → cifrão, prazo → relógio), pôr o objeto ao lado da pessoa, em posição harmônica e sem cobrir rosto/texto, com som que condiz (moeda, tique-taque) e animação nativa simples (pop/quicar). Melhor momento: os primeiros segundos (prender o scroll); no resto do vídeo só mais 1–2 vezes, se houver oportunidade. Sutil, nunca exagerado. Imagem: ChatGPT, gerador local (KNV.gerar / Functions/gerador_imagem) ou banco gratuito de ícones/PNG sem fundo, sempre na IDV do cliente (cores, estilo). Planejar já no roteiro de edição.
+
 ## Lacunas: critérios para implementação
 
 - **Speed ramp:** alteração contínua e suavizada da velocidade, conversão correta entre tempo da fonte e da timeline, duração, som, sincronismo, salvamento, desfazer/refazer, prévia e exportação equivalentes. Testar diferentes taxas de origem e trechos com/sem áudio; não declarar concluído só com clipes segmentados.
