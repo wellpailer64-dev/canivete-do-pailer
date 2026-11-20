@@ -52,6 +52,17 @@ Complementa `metodo-edicao-video.md` (regras do Pailer), `tecnicas-de-montagem.m
 
 Não há porcentagem universal de cortes com efeitos. Compare com e sem cada tratamento; retire o que repete a mesma informação ou chama mais atenção que a mensagem. Cheque fala, batidas, intensidade, cor e resolução na peça completa, não só em um quadro.
 
+## Calibragem do Pailer (Reels de fala, medido na correção dele em 2026-11-20)
+Medido comparando a minha entrega com a timeline que ele ajustou (Carlinhos, Qualidade de ensino: 50,9 s → 42,7 s). Vale para todo Reels de fala.
+- **Respiro de entrada:** o clipe abre de 0,15 a 0,28 s antes da primeira palavra. Mais que isso sobra ar, então nunca abrir em silêncio de 0,4 s ou mais.
+- **Respiro de saída:** fecha de 0,1 a 0,25 s depois da última sílaba, quando a onda cai. A cauda de 0,3 a 0,6 s que eu deixava foi toda cortada.
+- **Respiro no meio da frase:** pausa de 0,3 s ou mais vira corte, emendando uma fala direto na outra. Fazer pelo desenho da onda, cortando no vale entre dois blocos, nunca no meio de um bloco.
+- **Frase redundante sai:** se a ideia já foi dita, corta inteira, mesmo que seja do roteiro. Exemplo: "mas não pergunta o que mais importa" saiu.
+- **Impacto e whoosh:** começam de 0,2 a 0,25 s antes do corte. O zoomin acompanha o corte novo; se o corte mudou, o efeito anda junto.
+- **Texto de destaque:** em MAIÚSCULAS, peso 900, tamanho 108 e entrelinha de 85 a 97 (não 120). Mais baixo, com y entre 1470 e 1510 em 1080x1920. Entra na palavra falada e dura só a frase, de 1,1 a 2,9 s. Atrás vai o brilho azul da borda (`sombra_borda`), com o mesmo tempo e um leve contraste.
+- **Cor:** UMA camada de ajuste no vídeo inteiro para o look: ct 55, hi 21, wh -11, sat 86, fade 20, sharp 66, lm -33, piv 43, clar -23. Correção de exposição fica no próprio clipe, por câmera (exemplo: exp +0,6, sh +23, bl -38), em vez de camadas de cor picadas por trecho.
+- **Legenda:** 2 a 4 palavras em uma linha, sem pontuação, presa à fala. Desde o commit de 2026-11-20 ela acompanha sozinha qualquer corte, trim ou arraste do clipe de fala (`veLegAcompanharCortes`). Depois de cortar, conferir que nenhuma ficou sobreposta.
+
 ## Lacunas: critérios para implementação
 
 - **Speed ramp:** alteração contínua e suavizada da velocidade, conversão correta entre tempo da fonte e da timeline, duração, som, sincronismo, salvamento, desfazer/refazer, prévia e exportação equivalentes. Testar diferentes taxas de origem e trechos com/sem áudio; não declarar concluído só com clipes segmentados.

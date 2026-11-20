@@ -1441,6 +1441,78 @@ function veLegRipple(a, b) {
     VETX.legSel = -1;
 }
 
+// ── Legenda presa à fala ──
+// Cada palavra guarda de onde veio no arquivo original (mídia + tempo da fonte). Quando os clipes de fala mudam
+// (corte, trim, arrastar, apagar sem ripple), a legenda é recalculada a partir deles: palavra cortada some, palavra
+// que andou anda junto. Assim legenda nunca encavala nem fica sobre um respiro que foi tirado.
+// Legenda movida ou com texto editado à mão é reancorada na posição nova (a mão manda).
+function veLegFalaEm(t) {
+    let m = null;
+    for (const c of VE.clips) {
+        if (!(t >= c.st && t < veEnd(c))) continue;
+        const md = veMediaOf(c);
+        if (!md || md.kind !== 'video' || !(md.info && md.info.has_audio) || veClipOff(c)) continue;
+        const nota = (c.x === 'a' ? 0 : 100) + c.tr;
+        if (!m || nota < m.n) m = { c, n: nota };
+    }
+    return m && m.c;
+}
+const veLegPalavras = l => String(l.texto || '').split(/\s+/).filter(Boolean);
+function veLegAncorar(l) {
+    const ws = veLegPalavras(l);
+    if (!Array.isArray(l.pt) || !l.pt.length || ws.length !== l.pt.length) return { ...l, ancora: null };
+    const src = l.pt.map(([a, b]) => {
+        const c = veLegFalaEm((a + b) / 2);
+        return c ? [c.m, +(c.s + (a - c.st) * veVel(c)).toFixed(3), +(c.s + (b - c.st) * veVel(c)).toFixed(3)] : null;
+    });
+    if (!src.some(Boolean)) return { ...l, ancora: null };
+    const fimFala = l.pt[l.pt.length - 1][1];
+    const ln = String(l.texto).split('\n').map(x => x.split(/\s+/).filter(Boolean).length);
+    return { ...l, ancora: { w: ws, src, ln, cauda: +Math.max(0, l.en - fimFala).toFixed(3), st: l.st, tx: l.texto } };
+}
+function veLegDaAncora(l) {
+    const A = l.ancora, fala = VE.clips.filter(c => c.m != null && !veClipOff(c));
+    const pt = [], w = [];
+    A.src.forEach((s, k) => {
+        if (!s) return;
+        const mid = (s[1] + s[2]) / 2;
+        const c = fala.find(c => c.m === s[0] && mid >= c.s && mid < c.e && veLegFalaEm(c.st + (mid - c.s) / veVel(c)) === c);
+        if (!c) return;
+        pt.push([+(c.st + (s[1] - c.s) / veVel(c)).toFixed(3), +(c.st + (Math.min(s[2], c.e) - c.s) / veVel(c)).toFixed(3)]);
+        w.push(k);
+    });
+    if (!pt.length) return null;
+    // quebra de linha do original preservada (palavra k vai na linha em que estava)
+    let lim = [], acc = 0; (A.ln || [A.w.length]).forEach(n => { acc += n; lim.push(acc); });
+    const linhas = [];
+    w.forEach(k => { const li = lim.findIndex(x => k < x); (linhas[li] = linhas[li] || []).push(A.w[k]); });
+    const texto = linhas.filter(Boolean).map(x => x.join(' ')).join('\n');
+    const st = pt[0][0], en = pt[pt.length - 1][1] + A.cauda;
+    return { ...l, st, en: +en.toFixed(3), pt, texto, ancora: { ...A, st, tx: texto } };
+}
+let _veLegAssin = '';
+function veLegAcompanharCortes() {
+    const L = VE.legendas;
+    if (!L || !L.length) { _veLegAssin = ''; return; }
+    const assin = VE.clips.map(c => c.m == null ? '' : `${c.m},${c.tr},${c.x || ''},${c.st.toFixed(3)},${c.s.toFixed(3)},${c.e.toFixed(3)},${c.v || 1},${c.off ? 1 : 0}`).join('|')
+        + '#' + L.map(l => `${l.st}|${l.texto}`).join('¦');
+    if (assin === _veLegAssin) return;
+    let mudou = false;
+    const novo = [];
+    L.forEach(l => {
+        let x = l;
+        if (!x.ancora || Math.abs(x.ancora.st - x.st) > 0.0005 || x.ancora.tx !== x.texto) { x = veLegAncorar(x); mudou = mudou || x.ancora !== l.ancora; }
+        if (x.ancora) { const y = veLegDaAncora(x); if (!y) { mudou = true; return; } if (y.st !== l.st || y.en !== l.en || y.texto !== l.texto) mudou = true; x = y; }
+        novo.push(x);
+    });
+    // nunca encavala: cada uma termina antes da próxima começar
+    novo.sort((a, b) => a.st - b.st);
+    novo.forEach((l, i) => { const p = novo[i + 1]; if (p && l.en > p.st) { novo[i] = { ...l, en: Math.max(l.st + 0.05, p.st) }; mudou = true; } });
+    if (mudou) { VE.legendas = novo; if (typeof VETX !== 'undefined' && VETX.legSel >= novo.length) VETX.legSel = -1; }
+    _veLegAssin = VE.clips.map(c => c.m == null ? '' : `${c.m},${c.tr},${c.x || ''},${c.st.toFixed(3)},${c.s.toFixed(3)},${c.e.toFixed(3)},${c.v || 1},${c.off ? 1 : 0}`).join('|')
+        + '#' + VE.legendas.map(l => `${l.st}|${l.texto}`).join('¦');
+}
+
 // Marcadores acompanham o ripple como as legendas: os de depois voltam junto; os de dentro do trecho tirado vão
 // para o corte; marcador com duração (faixa de ato) encolhe o que foi tirado de dentro dela
 function veMkRipple(a, b) {
@@ -5754,7 +5826,7 @@ function veDupAlternar() {
 function veDraw() {
     if (veDrawQueued) return;
     veDrawQueued = true;
-    veRaf($ve('ve-tl'), () => { veDrawQueued = false; veRender(); });
+    veRaf($ve('ve-tl'), () => { veDrawQueued = false; if (!VE.drag && !VE.playing) veLegAcompanharCortes(); veRender(); });
 }
 
 // Reação visual do agente: clipe alterado por um comando (MCP ou agente) ganha um contorno na cor do agente que
@@ -6456,6 +6528,7 @@ function veRefresh() {
     if (typeof veOfxRegistrarClipes === 'function') veOfxRegistrarClipes(VE.clips);
     if (typeof veMidiaUsadasPreparar === 'function') veMidiaUsadasPreparar();
     veTxRender();
+    if (!VE.drag) veLegAcompanharCortes();
     vePjRender();
     if (veMixAtivo()) veAudioEditou();
     veUpdateReadouts();
