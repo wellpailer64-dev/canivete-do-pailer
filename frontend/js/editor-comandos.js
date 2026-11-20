@@ -10,6 +10,20 @@ const veSel = () => VE.sel >= 0 || (typeof veSelLista === 'function' && veSelLis
     (typeof VETX !== 'undefined' && VETX.legSel >= 0 && (VE.legendas || [])[VETX.legSel]) ||
     (typeof veTransSelecionada === 'function' && !!veTransSelecionada());
 
+// Setas com camada visual selecionada: movem a posição no quadro (px). Shift+setas seguem na agulha.
+const veSetaCamada = () => (typeof veSelLista === 'function' ? veSelLista() : [])
+    .filter(c => !veIsAudio(c) && !(typeof veIsAdj === 'function' && veIsAdj(c)) && !veLocked(c));
+let _veSetaHist = 0;
+function veSetaPos(dx, dy) {
+    const cs = veSetaCamada();
+    if (!cs.length) return false;
+    if (Date.now() - _veSetaHist > 800) vePushHistory();
+    _veSetaHist = Date.now();
+    for (const c of cs) { const p = veProps(c); veApplyProps(c, { x: Math.round((+p.x || 0) + dx), y: Math.round((+p.y || 0) + dy) }); }
+    veRenderProps(); veDrawMonitorSoon(); if (cs.some(veHasKf)) veDraw();
+    return true;
+}
+
 // grupo = menu onde aparece (sem menu: só atalho). sempre = funciona sem projeto aberto.
 // pode() = habilitado; marcado() = ✓ no menu. sep = linha antes do item no menu.
 const VE_CMDS = [
@@ -128,12 +142,18 @@ const VE_CMDS = [
         veToast(VE.rate === 1 ? 'Velocidade normal' : `Velocidade ${String(VE.rate).replace('.', ',')}x`);
     } },
     { id: 'voltar-5s', grupo: 'reproducao', nome: 'Voltar 5 segundos', teclas: ['J'], fn: () => veSeek(VE.playhead - 5) },
-    { id: 'quadro-ant', grupo: 'reproducao', nome: 'Voltar 1 quadro', teclas: ['Left'], fn: () => veStepFrames(-1) },
-    { id: 'quadro-prox', grupo: 'reproducao', nome: 'Avançar 1 quadro', teclas: ['Right'], fn: () => veStepFrames(1) },
-    { id: 'seg-ant', grupo: 'reproducao', nome: 'Voltar 1 segundo', teclas: ['Shift+Left'], fn: () => veSeek(VE.playhead - 1) },
-    { id: 'seg-prox', grupo: 'reproducao', nome: 'Avançar 1 segundo', teclas: ['Shift+Right'], fn: () => veSeek(VE.playhead + 1) },
-    { id: 'corte-ant', grupo: 'reproducao', nome: 'Ir para o corte anterior', teclas: ['Up'], fn: () => veJumpEdit(-1) },
-    { id: 'corte-prox', grupo: 'reproducao', nome: 'Ir para o próximo corte', teclas: ['Down'], fn: () => veJumpEdit(1) },
+    { id: 'quadro-ant', grupo: 'reproducao', nome: 'Voltar 1 quadro (com camada: mover 1 px à esquerda)', teclas: ['Left'], fn: () => veSetaPos(-1, 0) || veStepFrames(-1) },
+    { id: 'quadro-prox', grupo: 'reproducao', nome: 'Avançar 1 quadro (com camada: mover 1 px à direita)', teclas: ['Right'], fn: () => veSetaPos(1, 0) || veStepFrames(1) },
+    { id: 'seg-ant', grupo: 'reproducao', nome: 'Voltar 1 segundo (com camada: 1 quadro)', teclas: ['Shift+Left'], fn: () => veSetaCamada() ? veStepFrames(-1) : veSeek(VE.playhead - 1) },
+    { id: 'seg-prox', grupo: 'reproducao', nome: 'Avançar 1 segundo (com camada: 1 quadro)', teclas: ['Shift+Right'], fn: () => veSetaCamada() ? veStepFrames(1) : veSeek(VE.playhead + 1) },
+    { id: 'corte-ant', grupo: 'reproducao', nome: 'Ir para o corte anterior (com camada: mover 1 px acima)', teclas: ['Up'], fn: () => veSetaPos(0, -1) || veJumpEdit(-1) },
+    { id: 'corte-prox', grupo: 'reproducao', nome: 'Ir para o próximo corte (com camada: mover 1 px abaixo)', teclas: ['Down'], fn: () => veSetaPos(0, 1) || veJumpEdit(1) },
+    { id: 'corte-ant-shift', nome: 'Ir para o corte anterior', teclas: ['Shift+Up'], fn: () => veJumpEdit(-1) },
+    { id: 'corte-prox-shift', nome: 'Ir para o próximo corte', teclas: ['Shift+Down'], fn: () => veJumpEdit(1) },
+    { id: 'pos-esq10', nome: 'Mover camada 10 px à esquerda', teclas: ['Ctrl+Left'], fn: () => veSetaPos(-10, 0) },
+    { id: 'pos-dir10', nome: 'Mover camada 10 px à direita', teclas: ['Ctrl+Right'], fn: () => veSetaPos(10, 0) },
+    { id: 'pos-cima10', nome: 'Mover camada 10 px acima', teclas: ['Ctrl+Up'], fn: () => veSetaPos(0, -10) },
+    { id: 'pos-baixo10', nome: 'Mover camada 10 px abaixo', teclas: ['Ctrl+Down'], fn: () => veSetaPos(0, 10) },
     { id: 'inicio', grupo: 'reproducao', nome: 'Ir para o início', teclas: ['Home'], fn: () => veSeek(0) },
     { id: 'fim', grupo: 'reproducao', nome: 'Ir para o fim', teclas: ['End'], fn: () => veSeek(VE.dur) },
 
