@@ -34,7 +34,8 @@ VE_FX.roto = {
     neutro: v => !(v.rd && v.rd.rid),
     draw(a, v, env) {
         const st = veRotoEstado(v.rd, env.c);
-        if (!st || !st.url_p) return a;
+        // sem a máscara ainda (app piscou, reabrindo): o quadro sai sem recorte e NÃO pode ir para o cache do monitor
+        if (!st || !st.url_p) { VE._rotoFalta = true; return a; }
         veRotoParams(st, v);
         const i = veRotoQuadro(st, env.c, env.T);
         if (i < 0 || !st.ver[i]) return a;   // fora do trecho ou ainda sem recorte: opaco (como antes do efeito)
@@ -42,7 +43,7 @@ VE_FX.roto = {
         if (VE.playing) for (let k = 1; k <= 10; k++) if (st.ver[i + k]) veRotoImg(st, i + k);   // tocando: busca à frente
         if (!img) {   // ainda carregando: usa a do quadro vizinho já carregada (não pisca sem recorte)
             for (let k = 1; k <= 4 && !img; k++) img = veRotoImg(st, i - k, true) || veRotoImg(st, i + k, true);
-            if (!img) return a;
+            if (!img) { VE._rotoFalta = true; return a; }
         }
         const x = a.ctx;
         x.save(); x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0, env.w, env.h);
@@ -131,7 +132,14 @@ function veRotoImg(st, i, soPronta, tipo = 'p') {
         if (soPronta) return null;
         const im = new Image(); im.crossOrigin = 'anonymous'; e = { im, ok: false };
         im.onload = () => { e.ok = true; if (!VE.playing) veRotoRedesenhar(); };
-        im.onerror = () => { e.falhou = true; };   // sem cores (descontaminar desligado ou ainda refinando)
+        // sem cores (descontaminar desligado ou ainda refinando). Máscara que falhou (app piscou: GPU/servidor
+        // ocupado) não pode ficar marcada para sempre — o recorte sumia até reabrir: larga e tenta de novo
+        im.onerror = () => {
+            e.falhou = true;
+            VERO.falhas = VERO.falhas || new Map();
+            const n = (VERO.falhas.get(chave) || 0) + 1; VERO.falhas.set(chave, n);
+            if (tipo === 'p' && n <= 6) setTimeout(() => { if (VERO.img.get(chave) === e) { VERO.img.delete(chave); veRotoRedesenhar(); } }, 800);
+        };
         im.src = `${tipo === 'c' ? st.url_c : st.url_p}${tipo}_${String(i).padStart(5, '0')}.png?v=${st.ver[i]}`;
         VERO.img.set(chave, e);
         if (VERO.img.size > 240) VERO.img.delete(VERO.img.keys().next().value);
@@ -182,14 +190,21 @@ async function veRotoPreparar(mapa, filtro, clips = VE.clips) {
     const api = window.pywebview && window.pywebview.api; if (!api || !api.ve_roto_video) return;
     for (const c of clips.filter(c => veRotoFx(c) && veRotoFx(c).v.rd && (!filtro || filtro(c)))) {
         const f = veRotoFx(c), rd = f.v.rd;
-        if (!VERO.st[rd.rid]) await veRotoAbrirJob(rd, c);
-        const st = VERO.st[rd.rid]; if (!st) continue;
-        await window.pywebview.api.ve_roto_refinar(rd.rid, veRotoParamsDe(veFxValues(f)));
-        // o vídeo recortado é montado em segundo plano (chamada longa no Python cai): pede, espera a fila, pede de novo
-        let r = await api.ve_roto_video(rd.rid);
-        for (let k = 0; r && r.success && r.pendente && k < 20; k++) { await veRotoEsperar(rd.rid); r = await api.ve_roto_video(rd.rid); }
-        if (r && r.success) mapa.set(c, Object.assign(mapa.get(c) || {}, { roto: { path: r.path, a: r.a } }));
-        else veToast(veT('Pincel Roto') + ': ' + ((r && r.error) || '?'));
+        // o vídeo recortado é montado em segundo plano (chamada longa no Python cai): pede, espera a fila, pede de novo.
+        // Python reiniciado (app reaberto) perde o trabalho mas o JS ainda o tem em VERO.st: reabre e tenta de novo.
+        // Sem recorte o clipe sairia INTEIRO e cobriria as camadas de baixo (Carlinhos 2026-11-19: o lettering do
+        // gancho sumiu atrás do "Gancho recortado"): falha a exportação em vez de seguir calada
+        let r = null;
+        for (let t = 0; t < 2; t++) {
+            if (!VERO.st[rd.rid] || t) { delete VERO.st[rd.rid]; await veRotoAbrirJob(rd, c); }
+            if (!VERO.st[rd.rid]) continue;
+            await window.pywebview.api.ve_roto_refinar(rd.rid, veRotoParamsDe(veFxValues(f)));
+            r = await api.ve_roto_video(rd.rid);
+            for (let k = 0; r && r.success && r.pendente && k < 20; k++) { await veRotoEsperar(rd.rid); r = await api.ve_roto_video(rd.rid); }
+            if (r && r.success && r.path) break;
+        }
+        if (r && r.success && r.path) mapa.set(c, Object.assign(mapa.get(c) || {}, { roto: { path: r.path, a: r.a } }));
+        else throw new Error(veT('Pincel Roto') + ' (' + (c.nome || 'clipe') + '): ' + ((r && r.error) || 'recorte não ficou pronto'));
     }
 }
 

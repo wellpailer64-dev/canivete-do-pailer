@@ -123,6 +123,9 @@ def converter(entrada, preset, pasta_saida=None, usar_gpu=True, on_progress=lamb
     if not v and not i["audio"]:
         return {"success": False, "error": "esse arquivo não tem áudio"}
     saida = _saida(entrada, pasta_saida, ext, sufixo)
+    if usar_gpu and v in ("h264", "hevc"):
+        from Functions import export_placa
+        export_placa.preparar_placa(on_progress)
     cmd, modo = _comando(entrada, saida, preset, i, usar_gpu)
     rotulo = {"placa": "Convertendo na placa", "processador": "Convertendo no processador"}.get(modo, "Extraindo o áudio")
     on_progress(0, rotulo)

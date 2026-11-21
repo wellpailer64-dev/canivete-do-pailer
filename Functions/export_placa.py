@@ -206,6 +206,34 @@ def memoria_em_uso():
         return 0
 
 
+def preparar_placa(prog=None):
+    """Solta recursos do próprio app antes do render, sem importar motores de IA nem fechar outros programas."""
+    import gc
+    import sys
+    from Functions import memoria
+    if prog:
+        prog(0, "Liberando a memória da placa de vídeo...")
+    # Só a prévia descartável; Comps e os arquivos usados pela fila continuam intactos.
+    for nome, fn in (("render_cache", "cancelar"), ("gerador_sfx", "liberar")):
+        mod = sys.modules.get("Functions." + nome)
+        if mod is not None:
+            try:
+                getattr(mod, fn)()
+            except Exception:
+                pass
+    liberados = memoria.liberar_tudo()
+    gc.collect()
+    # Também limpa o cache quando nenhum modelo ficou registrado no vigia.
+    torch = sys.modules.get("torch")
+    if torch is not None:
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+    return liberados
+
+
 def liberar_placa(cabe, prog=None, espera=15.0):
     """Antes de desistir da placa por memória: tira dela o que o próprio app deixou ocupando — render da prévia em
     andamento (o automático para com a exportação, mas o ffmpeg dele leva segundos para sair), a voz da Kani mantida
