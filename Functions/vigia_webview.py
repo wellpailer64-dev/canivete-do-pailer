@@ -231,6 +231,42 @@ def _cpu_renderer(procs):
         return 0.0
 
 
+MAX_REINICIOS = 3   # reinícios seguidos (contados pelo ambiente) antes de desistir e deixar como está
+
+
+def _reiniciar_app(motivo):
+    """O navegador do WebView2 morreu (nenhum processo 'navegador' filho): a janela fica branca para sempre, recarregar não
+    adianta e a cópia morta ainda segura a instância única (o próximo 'abrir' bate nela). Sobe uma cópia nova com os mesmos
+    argumentos/ambiente (que espera esta sair, ver main.py) e encerra esta. Com o app do Pailer, o autosave já cobre o projeto."""
+    n = int(os.environ.get("KANIVETE_REINICIOS") or 0)
+    if n >= MAX_REINICIOS:
+        return False
+    try:
+        import subprocess
+        env = dict(os.environ)
+        env["KANIVETE_REINICIO_PID"] = str(os.getpid())
+        env["KANIVETE_REINICIOS"] = str(n + 1)
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable] + sys.argv[1:]
+        else:
+            cmd = [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:]
+        flags = 0x00000008 | 0x08000000 | 0x00000200   # DETACHED_PROCESS | CREATE_NO_WINDOW | NEW_PROCESS_GROUP
+        subprocess.Popen(cmd, env=env, cwd=os.getcwd(), creationflags=flags, close_fds=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"[vigia] {motivo}: reiniciando o app ({n + 1}/{MAX_REINICIOS})", flush=True)
+        try:
+            m = sys.modules.get("__main__")
+            if m is not None and hasattr(m, "_agente_registrar"):
+                m._agente_registrar(sair=True)
+        except Exception:
+            pass
+        time.sleep(0.5)
+        os._exit(0)
+    except Exception as e:
+        print("[vigia] não consegui reiniciar:", e, flush=True)
+    return False
+
+
 def _laco_saude(janela):
     ultimo_cpu = None
     while True:
@@ -253,6 +289,10 @@ def _laco_saude(janela):
                 _SAUDE["falhas"] = 0   # exportação/cálculo longo no JS: não é tela branca, não mexe
                 continue
             _SAUDE["falhas"] += 1
+            if _SAUDE["falhas"] >= 3 and not any(_tipo(p) == "navegador" for p in procs):
+                # ~20 s sem resposta e sem processo do navegador: morto de vez (não é trabalho pesado nem travada)
+                _incidente("WebView2 morreu (tela branca): reiniciando o app", procs, 0, 0.0)
+                _reiniciar_app("navegador do WebView2 morto")
             if _SAUDE["falhas"] < SAUDE_FALHAS:
                 continue
             agora = time.time()

@@ -6291,6 +6291,19 @@ def _servidor_com_ajuda():
     wh.bottle.run = run
 
 
+def _esperar_copia_anterior():
+    """Reinício automático (vigia): a cópia com o WebView2 morto está saindo e ainda segura a instância única; espera ela."""
+    try:
+        pid = int(os.environ.get("KANIVETE_REINICIO_PID") or 0)
+        if pid and pid != os.getpid():
+            from Functions import instancia_unica
+            fim = time.time() + 20
+            while time.time() < fim and instancia_unica._pid_vivo(pid):
+                time.sleep(0.3)
+    except Exception:
+        pass
+
+
 def _abrir_em_outra_copia():
     """App (.exe) já aberto: manda o projeto do duplo clique para ele e esta cópia não abre (senão ficavam dois
     ícones na barra e duas cópias disputando as prévias e as preferências). Vale também pelo código (python main.py,
@@ -6331,6 +6344,7 @@ def _receber_de_outra_copia(pedido):
 def main():
     global webview
 
+    _esperar_copia_anterior()
     primeira_copia = _abrir_em_outra_copia()
     if primeira_copia:
         return
