@@ -185,6 +185,94 @@ def _conter(procs, motivo):
         _estado["contencao"] = 0.0
 
 
+GPU_MB = _env_int("KANIVETE_VIGIA_GPU_MB", 2500)   # processo da placa acima disto e crescendo: recria só ele (sem esperar o crítico)
+
+
+def _gpu_inchada(procs, cresce):
+    """Quase todo incidente de 2026-11 foi o gpu-process do WebView2 inchando (1,6 a 4,6 GB) com o app parado em
+    playback/prévia. Matar só esse processo é seguro (o Chromium recria sozinho, a página não perde estado) e evita a
+    trava de minutos que o pico causava. No máximo uma vez a cada 2 min."""
+    agora = time.time()
+    if agora - _estado.get("gpu_morta", 0) < 120 or cresce < CRESCE_MBS:
+        return
+    gpu = [p for p in procs if _tipo(p) == "gpu-process" and _mb(p) >= GPU_MB]
+    if gpu:
+        _estado["gpu_morta"] = agora
+        print(f"[vigia] gpu-process {gpu[0].pid} com {_mb(gpu[0]):.0f} MB crescendo: recriando só ele", flush=True)
+        _seguro(gpu[0].kill)
+
+
+# --- saúde da página: tela branca / página que não responde mais ---------------------------------------------------
+_SAUDE = {"url": None, "falhas": 0, "recargas": []}
+SAUDE_PASSO_S = 6
+SAUDE_FALHAS = 7          # ~45 s sem resposta, com a página parada (CPU baixa), antes de recarregar
+
+
+def _responde(janela, espera=5.0):
+    """True se a página respondeu a um 1+1 dentro do prazo (a chamada roda numa thread: página presa não prende o vigia)."""
+    caixa = []
+
+    def _t():
+        try:
+            caixa.append(janela.evaluate_js("1+1"))
+        except Exception:
+            caixa.append(None)
+
+    t = threading.Thread(target=_t, daemon=True)
+    t.start()
+    t.join(espera)
+    return bool(caixa) and caixa[0] == 2
+
+
+def _cpu_renderer(procs):
+    try:
+        return sum(sum(p.cpu_times()[:2]) for p in procs if _tipo(p) == "renderer")
+    except Exception:
+        return 0.0
+
+
+def _laco_saude(janela):
+    ultimo_cpu = None
+    while True:
+        time.sleep(SAUDE_PASSO_S)
+        try:
+            if _responde(janela):
+                _SAUDE["falhas"] = 0
+                if not _SAUDE["url"]:
+                    try:
+                        _SAUDE["url"] = janela.get_current_url()
+                    except Exception:
+                        pass
+                ultimo_cpu = None
+                continue
+            procs = _arvore()
+            cpu = _cpu_renderer(procs)
+            ocupada = ultimo_cpu is not None and (cpu - ultimo_cpu) > SAUDE_PASSO_S * 0.5   # página gastando CPU = trabalhando
+            ultimo_cpu = cpu
+            if ocupada:
+                _SAUDE["falhas"] = 0   # exportação/cálculo longo no JS: não é tela branca, não mexe
+                continue
+            _SAUDE["falhas"] += 1
+            if _SAUDE["falhas"] < SAUDE_FALHAS:
+                continue
+            agora = time.time()
+            _SAUDE["recargas"] = [t for t in _SAUDE["recargas"] if agora - t < 600]
+            if len(_SAUDE["recargas"]) >= 3 or not _SAUDE["url"]:   # não fica recarregando em laço
+                continue
+            _SAUDE["recargas"].append(agora)
+            _SAUDE["falhas"] = 0
+            _incidente("página sem resposta (tela branca): recarregando", procs, sum(_mb(p) for p in procs), 0.0)
+            _estado["ultimo_incidente"] = 0.0
+            print("[vigia] página sem resposta: recarregando", flush=True)
+            for p in procs:   # renderer preso: sai da frente, o WebView2 cria outro ao recarregar
+                if _tipo(p) == "renderer":
+                    _seguro(p.kill)
+            time.sleep(1.5)
+            _seguro(lambda: janela.load_url(_SAUDE["url"]))
+        except Exception:
+            time.sleep(10)
+
+
 def _laco():
     amostras = _estado["amostras"]
     while True:
@@ -217,13 +305,15 @@ def _laco():
                 _incidente(motivo, procs, total, cresce)
                 if critico:
                     _conter(procs, motivo)
+                else:
+                    _gpu_inchada(procs, cresce)
             else:
                 _estado["contencao"] = 0.0
         except Exception:
             time.sleep(10)
 
 
-def iniciar(salvar=None):
+def iniciar(salvar=None, janela=None):
     """Liga o vigia (uma vez). `salvar`: função que pede à página para salvar o projeto (rodada com 5 s de prazo)."""
     if psutil is None or os.environ.get("KANIVETE_VIGIA") == "0" or _estado["thread"] is not None:
         return False
@@ -231,4 +321,6 @@ def iniciar(salvar=None):
     t = threading.Thread(target=_laco, name="vigia-webview", daemon=True)
     _estado["thread"] = t
     t.start()
+    if janela is not None and os.environ.get("KANIVETE_VIGIA_SAUDE") != "0":
+        threading.Thread(target=_laco_saude, args=(janela,), name="vigia-saude", daemon=True).start()
     return True

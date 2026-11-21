@@ -13,6 +13,12 @@ import tempfile
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
 
+try:   # nenhum subprocesso abre janela de CMD (Functions/sem_janela.py)
+    from Functions import sem_janela as _sem_janela
+    _sem_janela.instalar()
+except Exception:
+    pass
+
 # =========================
 webview = None
 
@@ -6502,7 +6508,7 @@ def main():
     def _splash_sound():
         try:   # vigia do WebView2: grava evidências e contém o descontrole de memória (Functions/vigia_webview.py)
             from Functions import vigia_webview
-            vigia_webview.iniciar(lambda: window.evaluate_js("typeof veAutosave==='function' && veAutosave(true,true)"))
+            vigia_webview.iniciar(lambda: window.evaluate_js("typeof veAutosave==='function' && veAutosave(true,true)"), window)
         except Exception as e:
             print("[vigia] não iniciou:", e)
         try:   # criações do chat da Kani da sessão anterior (Functions/kani_criar.py): não acumulam
