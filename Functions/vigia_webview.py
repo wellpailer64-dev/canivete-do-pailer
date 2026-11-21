@@ -179,8 +179,16 @@ def _conter(procs, motivo):
             _seguro(alvo.kill)
         return
     if agora - _estado["contencao"] >= CONTENCAO_DEPOIS_S:
-        print(f"[vigia] contenção ({motivo}): encerrando a árvore do WebView2", flush=True)
-        for p in sorted(procs, key=_mb, reverse=True):
+        # Poupa o processo 'navegador' (pequeno, é ele que recria renderer/placa): matá-lo deixava a janela branca para sempre
+        alvos = [p for p in procs if _tipo(p) != "navegador" or _mb(p) >= 1500]
+        print(f"[vigia] contenção ({motivo}): encerrando {len(alvos)} processo(s) do WebView2 (navegador poupado)", flush=True)
+        try:
+            with open(arquivo_log(), "a", encoding="utf-8") as f:
+                f.write(json.dumps({"quando": time.strftime("%Y-%m-%d %H:%M:%S"), "motivo": "CONTENCAO matou: " + motivo,
+                                    "mortos": [(_tipo(p), int(_mb(p))) for p in alvos]}, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        for p in sorted(alvos, key=_mb, reverse=True):
             _seguro(p.kill)
         _estado["contencao"] = 0.0
 
