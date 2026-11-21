@@ -188,7 +188,7 @@ function veTxaDesenho(x, f, txa, estados, tl) {
     cv.width = Math.max(1, Math.ceil((L.w + 2 * pad) * f));
     cv.height = Math.max(1, Math.ceil((L.h + 2 * pad) * f));
     cv._pad = pad;
-    const ctx = cv.getContext('2d');
+    const ctx = cv.getContext('2d', { willReadFrequently: true });   // CPU: não perde o desenho no cache (ver veTxDesenho)
     ctx.scale(f, f);
     ctx.translate(pad, pad);
     const est = estados ? estados.est : null;

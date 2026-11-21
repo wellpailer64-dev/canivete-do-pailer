@@ -129,7 +129,9 @@ function veTxDesenho(x, f) {
     const cv = document.createElement('canvas');
     cv.width = Math.max(1, Math.ceil(L.w * f));
     cv.height = Math.max(1, Math.ceil(L.h * f));
-    const ctx = cv.getContext('2d');
+    // CPU (willReadFrequently): canvas de GPU perde o desenho quando a placa/WebView reinicia e o texto guardado no cache
+    // vira transparente na prévia (reels Carlinhos, 2026-11-21: textos sumindo, render certo)
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
     ctx.scale(f, f);
     if (x.fOn) {
         ctx.fillStyle = veTxRGBA(x.fCor, x.fOp / 100);
