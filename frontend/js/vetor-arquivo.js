@@ -61,6 +61,26 @@
     vkRegistrar('exportar_pdf', 'exportar PDF', async a => {
         // padrao: x4 (PDF/X-4, recomendado) | x1a (PDF/X-1a) | cmyk | rgb. O fechamento roda antes: erro impede (forcar: true passa)
         const padrao = a.padrao || vkPadraoDoc();
+        // separadas: true = um PDF por prancheta, com o nome da prancheta (pasta: destino; sem = escolher; caminho: usa a pasta dele)
+        if (a.separadas) {
+            const ids = (a.pranchetas ? [].concat(a.pranchetas).map(n => (VK.doc.pranchetas.find(p => p.id === n || p.nome === n) || VK.doc.pranchetas[+n - 1] || {}).id).filter(Boolean) : VK.doc.pranchetas.map(p => p.id));
+            if (!ids.length) throw new Error('exportar_pdf: nenhuma prancheta');
+            const f0 = vkFechamento({ padrao });
+            if (f0.erros.length && !a.forcar) { const e = new Error(`fechamento com ${f0.erros.length} erro(s): ${f0.erros.map(x => x.msg).slice(0, 4).join(' | ')} (corrija ou passe forcar: true)`); e.fechamento = f0; throw e; }
+            let pasta = a.pasta || (a.caminho ? String(a.caminho).replace(/[\\/][^\\/]*$/, '') : '') || await api().vk_dialogo('pasta');
+            if (!pasta) return { cancelado: true };
+            pasta = pasta.replace(/[\\/]+$/, '');
+            const usados = new Set(), arquivos = [], problemas = [];
+            for (const [i, id] of ids.entries()) {
+                const p = VK.doc.pranchetas.find(q => q.id === id);
+                let nome = String(p.nome || ('Prancheta ' + (i + 1))).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || ('Prancheta ' + (i + 1));
+                let k = 2; const b = nome; while (usados.has(nome.toLowerCase())) nome = `${b} (${k++})`; usados.add(nome.toLowerCase());
+                const r = await VK_CMDS.exportar_pdf.fn({ ...a, separadas: false, pasta: undefined, forcar: true, pranchetas: [id], caminho: `${pasta}/${nome}.pdf` });
+                arquivos.push(r.caminho); if (!r.verificado) problemas.push(`${nome}: ${(r.problemas || []).join('; ')}`);
+            }
+            vkToast(`${arquivos.length} PDF(s) ${padrao.toUpperCase()}, um por prancheta` + (problemas.length ? ` — verificar ${problemas.length}` : ' — verificados ✓'));
+            return { caminho: arquivos[0], arquivos, pasta, paginas: arquivos.length, verificado: !problemas.length, problemas };
+        }
         const f = vkFechamento({ padrao });
         if (f.erros.length && !a.forcar) {
             const e = new Error(`fechamento com ${f.erros.length} erro(s): ${f.erros.map(x => x.msg).slice(0, 4).join(' | ')} (corrija ou passe forcar: true)`);
