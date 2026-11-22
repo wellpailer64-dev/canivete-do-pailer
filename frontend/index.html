@@ -45,6 +45,7 @@
     <link rel="stylesheet" href="css/kani.css">
     <link rel="stylesheet" href="css/slider.css">
     <link rel="stylesheet" href="css/ata.css">
+    <link rel="stylesheet" href="css/qr.css">
     <link rel="stylesheet" href="css/kaniboard.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
@@ -224,6 +225,11 @@
                 <div class="menu-group">Reuniões</div>
                 <button class="menu-item" data-tool="ata-kanivete" onclick="switchTool('ata-kanivete')" title="Ata Kanivete (Beta) — grava a reunião do Google Meet e a Kani escreve a ATA">
                     <span class="icon"><span class="app-logo al-at">At</span></span><span class="label">Ata Kanivete</span><span class="menu-beta">Beta</span>
+                </button>
+
+                <div class="menu-group">Códigos</div>
+                <button class="menu-item" data-tool="qr-kanivete" onclick="switchTool('qr-kanivete')" title="QR Code personalizado: cores, pontos, logo no centro; salva PNG, SVG e PDF">
+                    <span class="icon"><span class="app-logo al-qr">Qr</span></span><span class="label">QR Code</span>
                 </button>
 
                 <div class="menu-group">Quadros</div>
@@ -608,6 +614,7 @@
                 <div class="tool-page ve-page" id="page-lux-kanivete"></div>
                 <div class="tool-page ve-page" id="page-slider-kanivete"></div>
                 <div class="tool-page ve-page" id="page-ata-kanivete"></div>
+                <div class="tool-page ve-page" id="page-qr-kanivete"></div>
                 <div class="tool-page ve-page" id="page-kaniboard"></div>
                 <div class="tool-page ve-page" id="page-kanivete-encoder"><div class="ve ke-casa" id="ke-casa"></div></div>
                 <div class="tool-page ve-page" id="page-video-cutter">
@@ -2240,6 +2247,7 @@
     <script src="js/lux-ui.js"></script>
     <script src="js/slider.js"></script>
     <script src="js/slider-ui.js"></script>
+    <script src="js/slider-dock.js"></script>
     <script src="js/slider-show.js"></script>
     <script src="js/slider-html.js"></script>
     <script src="js/slider-grafico.js"></script>
@@ -2247,6 +2255,7 @@
     <script src="js/slider-agente.js"></script>
     <script src="js/slider-kani.js"></script>
     <script src="js/ata.js"></script>
+    <script src="js/qr.js"></script>
     <script src="js/kaniboard.js"></script>
     <script src="js/kaniboard-interacao.js"></script>
     <script src="js/kaniboard-lobby.js"></script>

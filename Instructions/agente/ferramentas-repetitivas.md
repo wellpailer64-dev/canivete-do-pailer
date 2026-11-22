@@ -68,3 +68,10 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 
 ## Achar o que não está aqui
 `py -3.13 tools/mapa_geral.py --busca termo` e `brain_search` com `tipo=habilidade`.
+
+## Gerar imagem / upscale fiel / textura / PNG de marca
+Gatilho: precisa de imagem gerada, upscale ou asset no estilo do cliente → **Codex CLI** (conta do ChatGPT), nunca o navegador primeiro.
+`cd PASTA_SAIDA && codex exec --skip-git-repo-check -s workspace-write -i ORIG.png -- "Use a ferramenta de geração de imagem (image_generation, não Python)... Salve como NOME.png na pasta atual"`
+Prompt depois de `--`. ~2 min; paralelo com `&`. Exemplo: `D:/kanivete_testes/scripts/dad/codex_up.sh`. Conferir lado a lado.
+
+- **QR Code personalizado** (cores, pontos, olhos, logo no centro; PNG/SVG/PDF; confere leitura): `py -3.13 Functions/qr_personalizado.py "<link>" --saida pasta/qr [--tipo url|wifi|whatsapp|pix] [--cor #hex --fundo #hex --olho #hex] [--pontos quadrado|arredondado|bolinha] [--logo png --logo-pct 17]`. Sai com código 2 e aviso se não leu em todos os tamanhos. Aba visual "QR Code" (menu Códigos, frontend/js/qr.js) pronta (salva PNG/SVG/PDF e copia); pelo chat: MCP kanivete_qr (sem app aberto).

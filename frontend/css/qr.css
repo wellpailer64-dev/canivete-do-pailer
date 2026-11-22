@@ -1,0 +1,25 @@
+/* QR Code personalizado (Qr, roxo #8B5CF6) — qr.js */
+:root[data-ferramenta="qr-kanivete"] { --primary: #8B5CF6; }
+.content-area:has(#page-qr-kanivete.active) { padding: 10px; overflow: hidden; }
+#page-qr-kanivete { position: relative; height: 100%; }
+.al-qr { background: #8B5CF6; color: #fff; }
+.qr-app { display: flex; gap: 14px; height: 100%; }
+.qr-lado { width: 300px; flex: none; overflow-y: auto; background: var(--bg-1); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.qr-marca { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.qr-lado label { font-size: 11px; opacity: .7; margin-top: 6px; }
+.qr-lado select, .qr-lado textarea, .qr-lado input[type=text] { width: 100%; background: var(--bg-2, #1b1b1f); color: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 7px; font: inherit; resize: vertical; }
+.qr-cores { display: flex; gap: 10px; } .qr-cores > div { flex: 1; display: flex; flex-direction: column; }
+.qr-cores input { width: 100%; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
+.qr-seg { display: flex; } .qr-seg button { flex: 1; padding: 6px 2px; font-size: 11px; background: var(--bg-2, #1b1b1f); color: inherit; border: 1px solid var(--line); cursor: pointer; }
+.qr-seg button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.qr-logo { display: flex; gap: 6px; } .qr-logo button { flex: 1; padding: 7px; background: var(--bg-2, #1b1b1f); color: inherit; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qr-meio { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.qr-tela { position: relative; width: min(100%, 60vh); aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--bg-1); border: 1px solid var(--line); }
+.qr-tela img { width: 100%; height: 100%; display: block; } .qr-tela img:not([src]) { display: none; }
+#qr-vazio { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: .5; text-align: center; padding: 20px; }
+#qr-aviso { font-size: 13px; min-height: 18px; } #qr-aviso.bom { color: #2fc27b; } #qr-aviso.ruim { color: #f5a524; }
+.qr-exp { display: flex; gap: 8px; } .qr-exp button { padding: 9px 16px; background: var(--primary); color: #fff; border: 0; border-radius: 8px; cursor: pointer; font-weight: 600; }
+#qr-msg { font-size: 12px; opacity: .8; max-width: 90%; word-break: break-all; }
+.qr-exp button.sec { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+#qr-vazio[hidden] { display: none; }
+.qr-lado input[type=range] { width: 100%; accent-color: var(--primary); display: block; }

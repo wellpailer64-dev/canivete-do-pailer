@@ -5055,6 +5055,64 @@ class ApiBridge:
             return {"success": False, "cancelado": True}
         return self._kb("exportar_png", caminho, data_url)
 
+    # QR Code personalizado (Functions/qr_personalizado.py, frontend/js/qr.js)
+    def _qr_args(self, p):
+        from Functions import qr_personalizado as q
+        p = json.loads(p) if isinstance(p, str) else p
+        c = q.montar_conteudo(p.get("tipo") or "url", p.get("texto") or "", {"senha": p.get("senha", ""), "mensagem": p.get("mensagem", ""), "seguranca": p.get("seguranca", "WPA")})
+        logo = p.get("logo") or None
+        return q, c, dict(cor=p.get("cor") or "#0D4048", fundo=p.get("fundo") or "#FDF1E0", olho=p.get("olho") or p.get("cor") or "#0D4048",
+                          pontos=p.get("pontos") or "arredondado", logo=logo, logo_pct=int(p.get("logo_pct") or 17))
+
+    def qr_previa(self, p):
+        """Prévia PNG (data URL) + leitura conferida em 3 tamanhos."""
+        try:
+            import base64, io
+            q, c, a = self._qr_args(p)
+            if not c.strip():
+                return {"success": False, "error": "vazio"}
+            M = q._matriz(c, a["logo"])
+            im = q.desenhar_png(M, 900, a["cor"], a["fundo"], a["olho"], a["pontos"], a["logo"], a["logo_pct"])
+            ok = {t: q.ler(im.resize((t, t))) == c for t in (250, 600, 900)}
+            b = io.BytesIO(); im.save(b, "PNG")
+            return {"success": True, "png": "data:image/png;base64," + base64.b64encode(b.getvalue()).decode(), "legivel": all(ok.values()), "teste": ok}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def qr_exportar(self, p, formato):
+        try:
+            q, c, a = self._qr_args(p)
+            ext = {"png": "PNG", "svg": "SVG", "pdf": "PDF"}[formato]
+            r = self.sk_dialogo("salvar", ("%s (*.%s)" % (ext, formato),), "QR Code." + formato)
+            if not r:
+                return {"success": False, "cancelado": True}
+            r = r[0] if isinstance(r, (list, tuple)) else r
+            base = r[:-len(formato) - 1] if r.lower().endswith("." + formato) else r
+            res = q.gerar(c, base, formatos=(formato,), **a)
+            return {"success": True, "arquivo": res["arquivos"][formato], "legivel": res["legivel"]}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def qr_copiar(self, p):
+        """Copia o QR (PNG 1200 px) para a área de transferência do Windows."""
+        try:
+            import os, subprocess, tempfile
+            q, c, a = self._qr_args(p)
+            M = q._matriz(c, a["logo"])
+            im = q.desenhar_png(M, 1200, a["cor"], a["fundo"], a["olho"], a["pontos"], a["logo"], a["logo_pct"])
+            f = os.path.join(tempfile.gettempdir(), "qr_copiar.png"); im.save(f)
+            ps = ("Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
+                  "$i=[System.Drawing.Image]::FromFile('%s');[System.Windows.Forms.Clipboard]::SetImage($i);$i.Dispose()" % f.replace("'", "''"))
+            r = subprocess.run(["powershell", "-NoProfile", "-STA", "-WindowStyle", "Hidden", "-Command", ps], capture_output=True, timeout=20,
+                               creationflags=0x08000000)
+            return {"success": r.returncode == 0, "error": r.stderr.decode("utf-8", "ignore")[:200]}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def qr_escolher_logo(self):
+        r = self.sk_dialogo("abrir", ("Imagem (*.png;*.jpg;*.jpeg;*.webp)",))
+        return (r[0] if isinstance(r, (list, tuple)) else r) or None
+
     # Ata Kanivete (Beta): reunião do Meet → transcrição → ATA da Kani → PDF (Functions/ata_kanivete.py, frontend/js/ata.js)
     _ata_lock = threading.Lock()
 
