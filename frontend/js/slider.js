@@ -206,7 +206,9 @@ function sdCamadaEl(c, modo = 'edit') {
     if (c.mescla && c.mescla !== 'normal') st.mixBlendMode = c.mescla;
     const fx = [];
     if (c.sombra) fx.push(`drop-shadow(${c.sombra.x || 0}px ${c.sombra.y ?? 10}px ${c.sombra.desf ?? 30}px ${c.sombra.cor || 'rgba(0,0,0,.35)'})`);
+    if (c.fx && c.fx.glow && +c.fx.glow.desf) fx.push(`drop-shadow(0 0 ${c.fx.glow.desf}px ${c.fx.glow.cor || '#ffffff'})`);
     if (+c.desfoque) fx.push(`blur(${c.desfoque}px)`);
+    if (c.tipo !== 'imagem' && c.tipo !== 'video') { const cf = sdFxCss(c); if (cf) fx.unshift(cf); }
     if (fx.length) st.filter = fx.join(' ');
     if (c.oculto) { if (modo === 'edit') el.classList.add('sd-oculto'); else st.display = 'none'; }
     if (c.tipo === 'texto') {
@@ -230,14 +232,19 @@ function sdCamadaEl(c, modo = 'edit') {
         el.innerHTML = typeof sdGraficoSvg === 'function' ? sdGraficoSvg(c) : '';
     } else if (c.tipo === 'imagem' || (c.tipo === 'video' && modo === 'foto')) {
         const im = document.createElement('img');
-        im.src = modo === 'foto' ? (SD.dados[c.src + (c.tipo === 'video' ? '#q' : '')] || '') : sdSrc(c.src);
+        const fxk = c.tipo === 'imagem' ? sdFxChave(c, modo === 'foto') : '', assada = fxk && (modo === 'foto' ? SD.dados[fxk] : (SD.fxPrev || {})[fxk]);
+        im.src = assada || (modo === 'foto' ? (SD.dados[c.src + (c.tipo === 'video' ? '#q' : '')] || '') : sdSrc(c.src));
+        if (fxk && !assada && modo !== 'foto') sdFxPrevia(c, fxk);
         im.draggable = false; im.alt = '';
         Object.assign(im.style, { position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', objectFit: SD_AJUSTE[c.ajuste || 'cobrir'] || 'cover',
             objectPosition: `${c.focoX ?? 50}% ${c.focoY ?? 50}%`, borderRadius: (+c.raio || 0) + 'px', display: 'block' });
-        const fl = c.filtros || {};
-        const f2 = [fl.brilho != null && fl.brilho !== 100 ? `brightness(${fl.brilho}%)` : '', fl.contraste != null && fl.contraste !== 100 ? `contrast(${fl.contraste}%)` : '',
-            fl.saturacao != null && fl.saturacao !== 100 ? `saturate(${fl.saturacao}%)` : '', +fl.pb ? `grayscale(${fl.pb}%)` : ''].filter(Boolean).join(' ');
-        if (f2) im.style.filter = f2;
+        const rc = c.rec;
+        if (rc && (rc.l || rc.t || rc.r || rc.b)) {   // recorte por lateral (Alt + alça): a imagem mantém o tamanho, a caixa esconde o resto
+            Object.assign(im.style, { left: -(rc.l || 0) + 'px', top: -(rc.t || 0) + 'px', width: `calc(100% + ${(rc.l || 0) + (rc.r || 0)}px)`, height: `calc(100% + ${(rc.t || 0) + (rc.b || 0)}px)`, borderRadius: '0' });
+            el.style.overflow = 'hidden'; el.style.borderRadius = (+c.raio || 0) + 'px';
+        }
+        const f2 = sdFxCss(c);   // assada (exportação / desfoque de movimento): os pixels já vêm com o filtro
+        if (f2 && !(assada && modo === 'foto')) im.style.filter = f2;
         if (c.borda && +c.borda.esp) { im.style.boxSizing = 'border-box'; im.style.border = `${c.borda.esp}px solid ${c.borda.cor || '#fff'}`; }
         el.appendChild(im);
     } else if (c.tipo === 'video') {
@@ -610,7 +617,7 @@ async function sdCena(html, op = {}) {
             if (f.tagName === 'IMG' || f.tagName === 'VIDEO') {
                 const src = f.dataset.src || f.getAttribute('src');
                 const r = await sdMidiaCmd(f.tagName === 'IMG' ? 'imagem' : 'video', { src, ...b, slide: sdIdx(s) + 1, nome, raio: parseFloat(cs.borderTopLeftRadius) || 0,
-                    ajuste: { contain: 'conter', fill: 'esticar' }[cs.objectFit] || 'cobrir', opac: +cs.opacity, rot, ...(f.tagName === 'VIDEO' ? { loop: f.loop, mudo: f.muted, auto: true } : {}) });
+                    ajuste: { contain: 'conter', fill: 'esticar' }[cs.objectFit] || 'cobrir', opac: +cs.opacity, rot, ...(cs.filter && cs.filter !== 'none' ? { fx: { extra: cs.filter } } : {}), ...(f.tagName === 'VIDEO' ? { loop: f.loop, mudo: f.muted, auto: true } : {}) });
                 novos.push(r.id); continue;
             }
             if (fundoOk || grad || parseFloat(cs.borderTopWidth) > 0) {
@@ -660,6 +667,50 @@ function sdMapa() {
             ...(c.src ? { src: c.src } : {}), ...(c.anim ? { anim: c.anim.tipo } : {}) })) })) };
 }
 
+// ───────────── efeitos (aba Efeitos): filtros prontos, ajustes, glow, desfoque de movimento e radial ─────────────
+function sdFxPresets() {
+    return { nenhum: ['Nenhum', ''], pb: ['P&B', 'grayscale(100%)'], pbforte: ['P&B forte', 'grayscale(100%) contrast(135%)'], sepia: ['Sépia', 'sepia(85%)'],
+        vintage: ['Vintage', 'sepia(35%) contrast(110%) saturate(80%) brightness(105%)'], quente: ['Quente', 'sepia(22%) saturate(135%) hue-rotate(-8deg)'],
+        frio: ['Frio', 'saturate(90%) hue-rotate(14deg) brightness(104%)'], vivo: ['Vivo', 'saturate(160%) contrast(110%)'], contraste: ['Alto contraste', 'contrast(150%) saturate(115%)'],
+        desbotado: ['Desbotado', 'contrast(82%) brightness(112%) saturate(65%)'], dramatico: ['Dramático', 'contrast(135%) brightness(88%) saturate(85%)'],
+        noite: ['Noturno', 'brightness(75%) contrast(120%) saturate(70%) hue-rotate(20deg)'], inverter: ['Inverter', 'invert(100%)'] };
+}
+function sdFxCss(c) {   // filtro CSS do conteúdo (ajustes antigos de imagem + aba Efeitos)
+    const fl = c.filtros || {}, fx = c.fx || {}, P = sdFxPresets();
+    return [fl.brilho != null && fl.brilho !== 100 ? `brightness(${fl.brilho}%)` : '', fl.contraste != null && fl.contraste !== 100 ? `contrast(${fl.contraste}%)` : '',
+        fl.saturacao != null && fl.saturacao !== 100 ? `saturate(${fl.saturacao}%)` : '', +fl.pb ? `grayscale(${fl.pb}%)` : '',
+        (P[fx.preset] || [])[1] || '', +fx.matiz ? `hue-rotate(${fx.matiz}deg)` : '', +fx.sepia ? `sepia(${fx.sepia}%)` : '', +fx.inverter ? `invert(${fx.inverter}%)` : '',
+        fx.extra || ''].filter(Boolean).join(' ');
+}
+function sdFxMov(c) { const fx = c.fx || {}; return { mov: +fx.mov || 0, ang: +fx.movAng || 0, rad: +fx.radial || 0, gir: +fx.giro || 0, cx: fx.radX ?? 50, cy: fx.radY ?? 50 }; }
+// chave da versão assada: na exportação, qualquer filtro (fica nos pixels, vale em PDF/PNG/MP4); na tela, só o que o CSS não faz
+function sdFxChave(c, tudo) {
+    const m = sdFxMov(c), css = sdFxCss(c), mexe = m.mov || m.rad || m.gir;
+    if (!mexe && !(tudo && css)) return '';
+    return c.src + '#fx' + JSON.stringify([tudo ? css : '', m, c.w, c.h]);
+}
+async function sdFxAssar(c, url, comCss) {
+    const img = new Image(); img.src = url; await img.decode();
+    const W = img.naturalWidth, H = img.naturalHeight, k = W / Math.max(1, c.w), m = sdFxMov(c);
+    const base = document.createElement('canvas'); base.width = W; base.height = H;
+    const g = base.getContext('2d'); if (comCss) g.filter = sdFxCss(c) || 'none'; g.drawImage(img, 0, 0);
+    if (!(m.mov || m.rad || m.gir)) return base.toDataURL('image/png');
+    const out = document.createElement('canvas'); out.width = W; out.height = H; const o = out.getContext('2d');
+    const N = 32, a = m.ang * Math.PI / 180, cx = W * m.cx / 100, cy = H * m.cy / 100;
+    for (let i = 0; i < N; i++) {   // média de N cópias (alfa 1/(i+1) = peso igual para todas)
+        const t = i / (N - 1) - 0.5; o.save(); o.globalAlpha = 1 / (i + 1);
+        if (m.mov) o.translate(Math.cos(a) * m.mov * k * t, Math.sin(a) * m.mov * k * t);
+        if (m.rad || m.gir) { const s = 1 + (m.rad / 100) * 0.35 * (t + 0.5); o.translate(cx, cy); o.rotate((m.gir * Math.PI / 180) * t); o.scale(s, s); o.translate(-cx, -cy); }
+        o.drawImage(base, 0, 0); o.restore();
+    }
+    return out.toDataURL('image/png');
+}
+async function sdFxPrevia(c, k) {
+    SD.fxPrev = SD.fxPrev || {}; SD.fxFila = SD.fxFila || {}; if (SD.fxFila[k]) return; SD.fxFila[k] = 1;
+    clearTimeout(SD.fxT); await new Promise(r => { SD.fxT = setTimeout(r, 250); });   // espera o controle parar de mexer
+    try { if (sdFxChave(c, false) !== k) return; SD.fxPrev[k] = await sdFxAssar(c, await sdDataUrl(c.src), false); if (typeof sdRenderMesa === 'function') sdRenderMesa(); }
+    catch (e) { console.warn('efeito', e); } finally { delete SD.fxFila[k]; }
+}
 // ───────────── foto do slide (exportar): o DOM → SVG foreignObject → canvas, fiel à tela ─────────────
 async function sdDataUrl(p) {
     if (SD.dados[p]) return SD.dados[p];
@@ -680,7 +731,7 @@ async function sdPrepararFoto(s) {
     const ps = [];
     if (s.fundo && s.fundo.tipo === 'imagem' && s.fundo.img) ps.push(sdDataUrl(s.fundo.img));
     for (const c of s.camadas) {
-        if (c.tipo === 'imagem' && c.src) ps.push(sdDataUrl(c.src));
+        if (c.tipo === 'imagem' && c.src) ps.push(sdDataUrl(c.src).then(async u => { const k = sdFxChave(c, true); if (k && u && !SD.dados[k]) SD.dados[k] = await sdFxAssar(c, u, true); }));
         if (c.tipo === 'video' && c.src) ps.push(sdQuadroVideo(c));
     }
     await Promise.all(ps);

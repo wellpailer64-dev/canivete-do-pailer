@@ -100,6 +100,12 @@
 .sd-giro::after { content: ""; position: absolute; left: 50%; top: 13px; width: 1.5px; height: 16px; background: var(--sd); }
 .sd-laco { position: absolute; border: 1px solid var(--sd); background: rgba(46, 230, 200, .1); }
 .sd-guia { position: absolute; background: #ff3d8b; }
+.sd-guia.cen { background: #4dd0e1; box-shadow: 0 0 0 1px rgba(77,208,225,.35); }
+.sd-guiau { position: absolute; background: #00b7ff; pointer-events: auto; opacity: .85; }
+.sd-guiau.v { top: 0; bottom: 0; width: 1px; cursor: ew-resize; border-left: 3px solid transparent; margin-left: -1px; background-clip: content-box; } .sd-guiau.h { left: 0; right: 0; height: 1px; cursor: ns-resize; }
+.sd-regua { position: absolute; z-index: 3; cursor: copy; }
+.sd-regua { z-index: 5; } .sd-regua.c { width: 18px; height: 18px; background: #1b1c1e; cursor: default; }
+.sd-regua.h { border-bottom: 1px solid #333; } .sd-regua.v { border-right: 1px solid #333; }
 .sd-guia.v { top: -2000px; bottom: -2000px; width: 1px; } .sd-guia.h { left: -2000px; right: -2000px; height: 1px; }
 .sd-medida { position: absolute; transform: translateX(-50%); padding: 2px 6px; border-radius: 4px; background: var(--sd); color: #04201c; font: 600 11px var(--font-ui); white-space: nowrap; }
 
@@ -133,6 +139,10 @@
 .sd-cam.on { background: var(--sd-soft); color: var(--text); box-shadow: inset 2px 0 0 var(--sd); }
 .sd-cam.oculta .sd-cam-n { opacity: .45; }
 .sd-cam-ic { width: 18px; text-align: center; color: var(--sd); font-weight: 700; }
+.sd-cam-mini { width: 26px; height: 20px; flex: none; border-radius: 3px; border: 1px solid var(--line, #333); background: #222 center/contain no-repeat; overflow: hidden; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; background-image: linear-gradient(45deg,#2a2a2a 25%,transparent 25%,transparent 75%,#2a2a2a 75%),linear-gradient(45deg,#2a2a2a 25%,#1c1c1c 25%,#1c1c1c 75%,#2a2a2a 75%); background-size: 8px 8px; background-position: 0 0, 4px 4px; }
+.sd-cam-mini[style*=background] { background-image: none; }
+.sd-cam-mini img { width: 100%; height: 100%; object-fit: contain; }
+.sd-caixa.sd-conj { border-style: dashed; }
 .sd-cam-n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sd-cam-b { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--text-3); font-size: 10px; cursor: pointer; }
 .sd-cam-b:hover { background: var(--bg-2); color: var(--text); }
@@ -266,3 +276,33 @@
 .sd-kani-status { min-height: 16px; padding-top: 6px; color: var(--text-2); }
 .sd-kani-status.girando::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 7px; border: 2px solid #2ee6c8; border-right-color: transparent; border-radius: 50%; vertical-align: -1px; animation: sd-gira .8s linear infinite; }
 @keyframes sd-gira { to { transform: rotate(360deg); } }
+
+.sd-fx-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sd-fx-p { background: #1b1c1e; border: 1px solid #333; border-radius: 6px; padding: 3px; cursor: pointer; color: #ccc; display: flex; flex-direction: column; gap: 3px; align-items: stretch; }
+.sd-fx-p img, .sd-fx-p span { width: 100%; aspect-ratio: 1.4; object-fit: cover; border-radius: 4px; display: block; }
+.sd-fx-p b { font-size: 10px; font-weight: 500; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-fx-p.on, .sd-fx-p:hover { border-color: var(--primary); }
+
+.sd-dock-lado { display: flex; min-height: 0; background: var(--bg-1); }
+.sd-dock-lado.dir { border-left: 1px solid var(--line); } .sd-dock-lado.esq { border-right: 1px solid var(--line); }
+.sd-dock-col { position: relative; display: flex; flex-direction: column; min-height: 0; flex: none; }
+.sd-dock-col + .sd-dock-col { border-left: 1px solid var(--line); }
+.sd-dock-gr { display: flex; flex-direction: column; min-height: 80px; overflow: hidden; }
+.sd-dock-gr .sd-abas button { cursor: grab; }
+.sd-dock-div { flex: none; height: 5px; cursor: ns-resize; background: var(--line); border-top: 2px solid var(--bg-1); border-bottom: 2px solid var(--bg-1); }
+.sd-dock-borda { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 4; }
+.sd-dock-borda.dir { left: -3px; } .sd-dock-borda.esq { right: -3px; }
+.sd-dock-marca { position: fixed; z-index: 99999; background: var(--primary); pointer-events: none; border-radius: 2px; }
+
+.sd-cam-tam { display: flex; gap: 2px; margin: 2px 0 6px; padding: 2px; background: var(--bg-2); border-radius: 6px; position: sticky; top: 0; z-index: 2; }
+.sd-cam-tam button { flex: 1; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--text-3); font: 600 11px var(--font-ui); cursor: pointer; }
+.sd-cam-tam button.on { background: var(--sd-soft); color: var(--text); }
+#sd-camadas[data-tam=m] .sd-cam { height: 54px; } #sd-camadas[data-tam=m] .sd-cam-mini { width: 64px; height: 42px; } #sd-camadas[data-tam=m] .sd-cam-ic { width: 42px; font-size: 18px; }
+#sd-camadas[data-tam=g] .sd-cam { height: 84px; } #sd-camadas[data-tam=g] .sd-cam-mini { width: 108px; height: 70px; } #sd-camadas[data-tam=g] .sd-cam-ic { width: 70px; font-size: 26px; }
+#sd-camadas[data-tam=m] .sd-cam-n, #sd-camadas[data-tam=g] .sd-cam-n { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+.sd-anc { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 1.5px solid var(--sd); background: radial-gradient(circle, var(--sd) 0 2px, #fff 2.5px); pointer-events: auto; cursor: move; z-index: 3; }
+.sd-anc-grade { display: grid; grid-template-columns: repeat(3, 14px); gap: 3px; align-items: center; margin: 6px 0 2px; position: relative; }
+.sd-anc-grade button { width: 14px; height: 14px; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-2); cursor: pointer; }
+.sd-anc-grade button.on { background: var(--primary); border-color: var(--primary); }
+.sd-anc-grade span { position: absolute; left: 56px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: .7; }

@@ -275,3 +275,9 @@ desenhada na timeline (o .sknv e a exportação já aceitam `curva`), Editor →
   `D:/Kanivete/Sound Kanivete/Exportados`. A pasta é criada apenas ao renderizar.
 - Código: `skKeFilaAtalho`, `skKeTecla`, `skKeAtalhoInstalar` e `skParaKe` em `som-texto.js`;
   `keSomEnviar` em `ke-arquivos.js`. Teste real: `py -3.13 testes/teste_som_atalho_ke.py`, porta 9333.
+
+## Clonar voz de cliente a partir de vídeo (2026-11-20, Alessandro Barbosa)
+- A referência do OmniVoice é cortada em 8 s. Se o corte cai no meio de uma palavra, o modelo "completa" o pedaço no começo de toda fala gerada (ex.: "…automá" → "Tática, dois dias depois…").
+- Correção: cortar antes do bruto um trecho de no máximo 8 s que comece e termine em pausa (`silencedetect`, em oficina barulhenta use `n=-24dB:d=0.18`) e criar a voz com esse wav.
+- Conferir cada trecho gerado transcrevendo (`omnivoice_tool._transcribe_reference`) e comparando as primeiras palavras com o texto; refazer o que não bater.
+- Voz do Alessandro: id `991bcdd9cf1b` (bruto Gordinhos 20260121_133203.mp4, 4,55–12,56 s). Uma frase por cena, `speed` 1.1.

@@ -1856,7 +1856,7 @@ function veMoverGrupo(lista, dt, dtr, alt, legs) {
     // sozinho, e camadas fora da grade (fim da mídia, sincronizadas pelo som) andavam frações de quadro diferentes —
     // abria fresta ou sobrepunha entre elas e tirava a sincronia
     const ref = lista.includes(prim) ? prim : lista[0], minSt = Math.min(...lista.map(c => c.st));
-    let dd = Math.max(veSnapFrame(ref.st + dt) - ref.st, -minSt);
+    let dd = Math.max((VE.pps / VE.fps > 20 ? Math.round((ref.st + dt) * 1000) / 1000 : veSnapFrame(ref.st + dt)) - ref.st, -minSt);
     dd = Math.max(dd + veEncosto(lista.map(c => ({ c, tr: c.tr + dtr, st: c.st + dd, en: veEnd(c) + dd })),
                                  alt ? VE.clips : VE.clips.filter(c => !lista.includes(c))), -minSt);
     if (legs && !alt) veFaixaLegsMover(legs, dd);
@@ -2261,7 +2261,7 @@ function veMoveTarget(i, start) {
     const c = VE.clips[i], len = veLen(c);
     start = Math.max(0, start);
     let ima = null;
-    if (VE.snap) {
+    if (VE.snap && !(VE.drag && VE.drag.semIma)) {   // Ctrl segurado no arraste: solto, sem ímã
         const grupo = VE.drag && VE.drag.grupo, fora = new Set(grupo || [c]);
         let best = null, bd = VE_IMA_PX / VE.pps, onde = null, lado = 0;
         const pts = veImaPontos(fora), dr = VE.drag;
@@ -2283,6 +2283,9 @@ function veMoveTarget(i, start) {
     // encostou: o começo dela na ponta de uma camada da trilha de destino, ou o fim dela no começo de outra
     const tr = VE.drag && VE.drag.tr != null ? VE.drag.tr : c.tr, fora = new Set((VE.drag && VE.drag.grupo) || [c]);
     veImaMarcar(ima, ima != null && (veImaEncostaEm(c, tr, start, fora) || veImaEncostaEm(c, tr, start + len, fora)));
+    // zoom alto (1 quadro > 20 px): passo de 1 ms, não de 1 quadro — ajuste fino (o vídeo mostra o quadro mais próximo)
+    if (ima != null) return start;   // grudou: fica exato (o fim encosta mesmo quando a duração não é quadro inteiro)
+    if (VE.pps / VE.fps > 20) return Math.round(start * 1000) / 1000;
     return veSnapFrame(start);
 }
 
@@ -4085,7 +4088,7 @@ function veDrawMonitor() {
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
     // parcial: alguma camada sem o quadro certo ainda (carregando/buscando) — desenha, mas não guarda no cache
-    let falta = false, parcial = semProxy;
+    let falta = false, parcial = semProxy; VE._rotoFalta = false;   // Pincel Roto marca quando desenhou sem a máscara
     veCamPreparar(t, vis.map(({ c }) => c), virt);
     const itens = vis.map(({ c, i }) => {
         let src = null;
@@ -4164,7 +4167,7 @@ function veDrawMonitor() {
     veDesenharItens(ctx, cv, itens, pv, t);
     if (typeof VECOMP !== 'undefined' && VECOMP.parcial) parcial = true;   // camada de dentro de Comp ainda sem quadro
     veTxDesenhar(ctx);
-    veCacheStore(cv, cw, ch, pv, itens, trans, falta || parcial);
+    veCacheStore(cv, cw, ch, pv, itens, trans, falta || parcial || VE._rotoFalta);
     // caixa com alças e ponto de ancoragem do selecionado (editor-transform.js)
     veTfDesenhar(ctx, cv, pv);
     veRulersDraw();
@@ -6538,10 +6541,10 @@ function veRenderClips() {
 }
 
 function veRefresh() {
+    if (!VE.drag) veLegAcompanharCortes();
     if (typeof veOfxRegistrarClipes === 'function') veOfxRegistrarClipes(VE.clips);
     if (typeof veMidiaUsadasPreparar === 'function') veMidiaUsadasPreparar();
     veTxRender();
-    if (!VE.drag) veLegAcompanharCortes();
     vePjRender();
     if (veMixAtivo()) veAudioEditou();
     veUpdateReadouts();
@@ -7492,6 +7495,7 @@ function veInitEvents() {
             // auto-rolagem nas bordas
             autoRolar();
             const p = veTimeFromEvent(e);
+            d.semIma = e.ctrlKey;   // Ctrl: arraste fino, sem grudar
             d.st = veMoveTarget(d.i, p.t - d.grab);
             d.alt = e.altKey;   // Alt (antes ou durante o arraste): solta uma cópia e o original fica
             // ferramenta A: as legendas do grupo acompanham ao vivo (cópia com Alt não leva legenda)

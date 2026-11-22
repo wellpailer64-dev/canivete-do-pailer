@@ -23,6 +23,7 @@ Comece em `Instructions/agente/fluxo-peca-cliente.md`; fichas em `Instructions/a
 ## Testar
 - Modo agente: `py -3.13 main.py --agente` (CDP na porta identificada por `tools/porta_agente.py`). Quando o Pailer pedir trabalho no app aberto, prefira API, CLI e atalhos; preserve o projeto e o trabalho em andamento. Fechar o app dele exige o ok dele; testes usam o app de teste.
 - App de teste, sempre no disco D: `APPDATA=D:\kanivete_testes\appdata TEMP=D:\kanivete_testes\tmp TMP=D:\kanivete_testes\tmp LOCALAPPDATA=D:\kanivete_testes\localappdata python main.py --agente=9333`; testes `testes/*.py` com o mesmo ambiente. Scripts avulsos em `D:\kanivete_testes\scripts`.
+- Vários agentes ao mesmo tempo: ANTES de abrir, pegue vaga (MCP `kanivete_vaga` pegar com dono = sua aba, ou `py -3.13 D:\Kanivete\Plugins\kanicode\kanivete_vaga.py pegar --dono X`): devolve porta 9333-9340, pastas e comando. Use só a sua porta; nunca feche app de vaga alheia; ao terminar feche e `liberar`.
 - Antes de release: reprodução/áudio → `testes/teste_play.py`; exportação, camadas, efeitos, cor → `testes/teste_export.py`; Photo → `teste_imagem.py`; Vetor → `teste_vetor.py`; ponte → `teste_ponte.py`.
 - Bug novo de exportação: caso novo em `CASOS` que reprova sem a correção.
 

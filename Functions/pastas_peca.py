@@ -6,7 +6,7 @@ O card é a pasta que tem a subpasta PROJETO ou RENDER; vale passar o arquivo do
 import os
 import re
 
-PADRAO = {"bruto": r"BRUTOS?", "assets": r"ASSETS?", "projeto": r"PROJETOS?", "render": r"RENDERS?"}
+PADRAO = {"bruto": r"BRUTOS?", "assets": r"ASSETS?", "projeto": r"PROJETOS?", "render": r"(?:RENDERS?|ENTREGAS?)"}
 ORDEM = ("bruto", "assets", "projeto", "render")
 
 
@@ -51,13 +51,13 @@ def pasta_projeto(caminho):
     return pasta(caminho, "projeto")
 
 
-def criar_subpastas(card, nome_projeto=None):
-    """Garante as 4 subpastas (mantém as que já existem com outro nome). Devolve {chave: caminho}."""
+def criar_subpastas(card, nome_projeto=None, video=True):
+    """Garante as 4 subpastas; a 4ª é RENDER só para vídeo, senão ENTREGA (mantém as que já existem com outro nome). Devolve {chave: caminho}."""
     out = {}
     for i, k in enumerate(ORDEM, 1):
         p = _sub(card, k)
         if not p:
-            nome = {"bruto": "BRUTO", "assets": "ASSETS", "projeto": "PROJETO", "render": "RENDER"}[k]
+            nome = {"bruto": "BRUTO", "assets": "ASSETS", "projeto": "PROJETO", "render": "RENDER" if video else "ENTREGA"}[k]
             if k == "projeto" and nome_projeto:
                 nome += " - " + nome_projeto
             p = os.path.join(card, f"{i:02d} - {nome}")

@@ -570,3 +570,13 @@ Código: `Functions/instancia_unica.py`, `_abrir_em_outra_copia` no main e CLI d
 `plugins/kanivete/kanivete.py`. Teste sem abrir apps: `py -3.13 testes/teste_instancia_unica.py`.
 Executável compilado antigo mantém o comportamento antigo até próxima compilação; não reiniciar nem fechar
 o app do usuário para aplicar esta correção. Guia: `Instructions/modo-agente.md`.
+
+
+## Pessoa repetida em contagem (pessoas_repetidas.py)
+`py -3.13 tools/agente/pessoas_repetidas.py projeto.vknv [--timeline N] [--todos] [--json]`: rostos SFace (busca_rosto) de 3 quadros por número da contagem; ignora rosto que aparece em 3+ mídias (instrutor); REPROVADO quando todas as pessoas de dois números batem; OLHAR quando só um rosto bate ou mesma mídia seguida (grupo), com folha.jpg de pares em %TEMP%/pessoas_repetidas. Cache por trecho; 61 itens ~3 min na 1ª vez, <1 s depois. Integrado ao conferir_edicao.
+
+## Estabilidade e multiagente (2026-11-20)
+- **Sem janela de CMD:** `Functions/sem_janela.py` (instalado no topo do `main.py`) soma `CREATE_NO_WINDOW` em todo `subprocess.Popen`. `Runapp_oculto.vbs` abre o app sem nem piscar o console.
+- **Vigia** (`Functions/vigia_webview.py`): `gpu-process` ≥ 2500 MB e crescendo é recriado sozinho (só ele); `_laco_saude` detecta página sem resposta (~45 s, CPU parada) e recarrega (máx. 3 vezes/10 min). `KANIVETE_VIGIA_SAUDE=0` desliga.
+- **2 agentes no app:** `mcp_kanivete.py` usa trava de arquivo entre processos (`%TEMP%/kanivete_mcp/app_<porta>.lock`) por chamada.
+- **2 agentes no navegador:** `kb.py` manda a sessão (`KANICODE_REGISTRO`); `kanibrowser.definir_sessao` dá a cada agente a sua aba da Kani. Vale após reiniciar o KaniCode.

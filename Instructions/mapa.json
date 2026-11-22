@@ -502,6 +502,7 @@
     "imagem-cena.js",
     "imagem-cor.js",
     "imagem-dissolver.js",
+    "imagem-diversos.js",
     "imagem-dock.js",
     "imagem-estilo.js",
     "imagem-fatias.js",
@@ -517,6 +518,7 @@
     "imagem-paineis.js",
     "imagem-prancheta.js",
     "imagem-recuperar.js",
+    "imagem-retoque.js",
     "imagem-texto.js",
     "imagem-wasm.js",
     "ponte-kanivete.js",
@@ -813,6 +815,17 @@
    "automacao": ""
   },
   {
+   "id": "qr-kanivete",
+   "nome": "QR Code",
+   "grupo": "Códigos",
+   "front": [],
+   "back": [],
+   "api": [],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
    "id": "kaniboard",
    "nome": "KaniBoard",
    "grupo": "Quadros",
@@ -960,6 +973,9 @@
   "kb_midia",
   "kb_midia_arquivo",
   "kb_exportar_png",
+  "qr_previa",
+  "qr_exportar",
+  "qr_escolher_logo",
   "ata_listar",
   "ata_abrir",
   "ata_salvar",
@@ -2317,6 +2333,18 @@
    "args": "data_url, nome=\"KaniBoard\"",
    "modulos": []
   },
+  "qr_previa": {
+   "args": "p",
+   "modulos": []
+  },
+  "qr_exportar": {
+   "args": "p, formato",
+   "modulos": []
+  },
+  "qr_escolher_logo": {
+   "args": "",
+   "modulos": []
+  },
   "ata_listar": {
    "args": "",
    "modulos": [
@@ -3592,6 +3620,7 @@
   "Functions/psd_import.py": "Importar PSD/PSB no editor com as camadas separadas (como o \"Composição — manter tamanhos das camadas\" do After",
   "Functions/psd_so_modelo.py": "Moldes de objeto inteligente incorporado do Photoshop (PlLd + SoLd da camada e o lnk2 global com o arquivo),",
   "Functions/psd_texto_modelo.py": "Moldes de camada de texto do Photoshop (bloco TySh), gerados pelo Photoshop 2026 (Arial 48 px de ponto e 36 px de",
+  "Functions/qr_personalizado.py": "qr_personalizado.py — QR Code personalizado (cores, pontos, olhos, logo no centro) com PNG, SVG e PDF",
   "Functions/rastreador.py": "rastreador.py — Rastrear movimento do Vídeo Kanivete (o Tracker do After Effects)",
   "Functions/recorte_pro.py": "recorte_pro.py — Recorte profissional (Photo Kanivete: Remover plano de fundo; KNV.gerar recortar)",
   "Functions/recuperar.py": "recuperar.py — o miolo das ferramentas de recuperação do Photo Kanivete (como as do Photoshop):",
@@ -3599,6 +3628,7 @@
   "Functions/removerfundo.py": "removerfundo.py",
   "Functions/render_cache.py": "Cache de render em disco do Pocket Editor (como os \"Preview Files\" do Premiere)",
   "Functions/respiros.py": "respiros.py — acha as pausas e respiros de uma fala e devolve os trechos a cortar SEM perder a naturalidade",
+  "Functions/sem_janela.py": "sem_janela.py — nenhum subprocesso do app abre janela de CMD",
   "Functions/sincronizar.py": "Sincronizar clipes pelo áudio (como o \"Sincronizar › Áudio\" do Premiere): duas câmeras gravando a mesma cena",
   "Functions/sk_banco_vozes.py": "Banco de vozes do Texto para Voz (Sound Kanivete)",
   "Functions/sk_espectro.py": "Sound Kanivete — espectrograma, reparo espectral e separação voz/instrumental",

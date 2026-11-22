@@ -96,3 +96,11 @@ largura/altura animadas ficava presa no tamanho parado (`veGrafTamanho` em `edit
   instalada vira AVISO.
 - Pendente: `<svg>` de filtro (0×0) sem `data-kv` derruba o amostrador (`KV.isolar` devolve tamanho nulo); `data-kv="raster"`
   não existe (camada some calada; usar `caixa`); `filter: drop-shadow()` em `<img>` se perde; `filter:url(#ruído)` também.
+
+## Reels animado com personagem: regras do Pailer (2026-11-20, Reels Pós-venda Oficina Produtiva)
+- **Fundo variado:** nunca o mesmo fundo em todas as cenas. Ter um banco de 4-6 fundos do universo do cliente (fotos reais ou geradas no estilo do lugar real dele) e trocar por cena.
+- **Tela cheia sempre:** fundo com `left:0;top:0;width:1080px;height:1920px` (imagem já em 1080x1920) e zoom só crescendo (1 → 1,08); deslocamento negativo ou `object-fit` não viram escala no conversor e deixam faixa lisa embaixo. Conferir as últimas linhas do quadro em número (desvio ~0 = faixa).
+- **Abertura com marca viva:** elemento da marca animado atrás do personagem herói (ex.: engrenagem do logo girando), entre o fundo e a pessoa.
+- **Mensagens de chat:** cada balão que entra tem som de pop sincronizado; as mensagens da marca levam 1 emoji, só um.
+- **Tela final:** humanização simples (personagem recortado), composição simétrica e centralizada, CTA bem evidente (botão/faixa de cor de destaque), logo menor e em cima.
+- **Narração:** se o cliente tiver voz clonada (Sound Kanivete/OmniVoice), narrar com ela e baixar a trilha por baixo da fala.

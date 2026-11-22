@@ -3,7 +3,7 @@
 // redimensionar, girar, encaixe com guias, editar texto no lugar), painéis Design (propriedades do objeto/slide/tema)
 // e Camadas, notas do apresentador. Tudo que muda o documento passa por sdCmd (slider.js) — o mesmo caminho do agente.
 // =========================================================
-const SDU = { z: 1, ajustar: true, vivo: false, mapa: new Map(), clip: null, menu: null, aba: 'design', fontes: [], guias: true, slideArr: null };
+const SDU = { z: 1, ajustar: true, vivo: false, mapa: new Map(), clip: null, menu: null, aba: 'design', fontes: [], guias: true, reguas: true, slideArr: null };
 const sdEl = id => document.getElementById(id);
 const SD_FORMAS = [['ret', 'Retângulo'], ['elipse', 'Elipse'], ['tri', 'Triângulo'], ['losango', 'Losango'], ['estrela', 'Estrela'], ['hexagono', 'Hexágono'],
     ['seta', 'Seta'], ['linha', 'Linha'], ['coracao', 'Coração'], ['balao', 'Balão de fala']];
@@ -62,8 +62,8 @@ function sdMontarUI() {
         <aside class="sd-lista" id="sd-lista"></aside>
         <main class="sd-mesa" id="sd-mesa"><div class="sd-papel" id="sd-papel"><div class="sd-palco" id="sd-palco"></div><div class="sd-sobre" id="sd-sobre"></div></div></main>
         <aside class="sd-lado">
-          <div class="sd-abas"><button data-aba="design" class="on">Design</button><button data-aba="cores">Cores</button><button data-aba="camadas">Camadas</button></div>
-          <div class="sd-painel" id="sd-props"></div><div class="sd-painel" id="sd-cores" hidden></div><div class="sd-painel" id="sd-camadas" hidden></div>
+          <div class="sd-abas"><button data-aba="design" class="on">Design</button><button data-aba="cores">Cores</button><button data-aba="efeitos">Efeitos</button><button data-aba="camadas">Camadas</button></div>
+          <div class="sd-painel" id="sd-props"></div><div class="sd-painel" id="sd-efeitos" hidden></div><div class="sd-painel" id="sd-cores" hidden></div><div class="sd-painel" id="sd-camadas" hidden></div>
         </aside>
       </div>
       <footer class="sd-rodape"><textarea id="sd-notas" placeholder="Notas do apresentador (aparecem na visão do apresentador e vão para o PPTX)…"></textarea><div class="sd-status" id="sd-status"></div></footer>
@@ -81,7 +81,7 @@ function sdMontarUI() {
     }, { passive: false });
     sdEl('sd-notas').addEventListener('input', e => { const s = sdSlide(); if (s) { s.notas = e.target.value; SD.sujo = true; clearTimeout(SD.tg); SD.tg = setTimeout(sdGuardarRascunho, 1200); } });
     sdEl('sd-notas').addEventListener('change', () => sdTitulo());
-    sdMontarMesa(); sdMontarLista(); sdMontarPaineis(); if (typeof sdcMontar === 'function') sdcMontar();
+    sdMontarMesa(); sdMontarLista(); sdMontarPaineis(); if (typeof sdcMontar === 'function') sdcMontar(); if (typeof sdDockAplicar === 'function') sdDockAplicar();
     raiz.addEventListener('mousedown', e => { SDU.foco = e.target.closest('#sd-lista') ? 'lista' : e.target.closest('#sd-mesa') ? 'mesa' : SDU.foco; }, true);
     SD.ouvintes.push(sdAoMudar);
     new ResizeObserver(() => { if (SDU.ajustar) sdAjustarZoom(); }).observe(sdEl('sd-mesa'));
@@ -174,6 +174,7 @@ async function sdClique(e) {
     sdAcao(b.dataset.a);
 }
 function sdAba(aba) {
+    if (typeof sdDockAtivar === 'function' && SDU.dock) { sdDockAtivar(aba); return; }
     SDU.aba = aba; document.querySelectorAll('.sd-abas button').forEach(x => x.classList.toggle('on', x.dataset.aba === aba));
     sdEl('sd-props').hidden = aba !== 'design'; sdEl('sd-cores').hidden = aba !== 'cores'; sdEl('sd-camadas').hidden = aba !== 'camadas'; sdRenderPaineis();
 }
@@ -257,10 +258,10 @@ function sdItensMenu(m) {
                 .map(([k, n]) => [n, '', () => sdUi('alinhar', { como: k }), !temSel]),
             ['Distribuir na horizontal', '', () => sdUi('distribuir', { eixo: 'h' }), SD.sel.length < 3], ['Distribuir na vertical', '', () => sdUi('distribuir', { eixo: 'v' }), SD.sel.length < 3], ['-'],
             ['Agrupar', 'Ctrl+G', () => sdUi('agrupar', {}), SD.sel.length < 2], ['Desagrupar', 'Ctrl+Shift+G', () => sdUi('desagrupar', {}), !sdAlvos({}).some(c => c.grupo)], ['-'],
-            ['Travar / destravar', 'Ctrl+L', () => sdAlternar('trava'), !temSel], ['Ocultar / mostrar', 'Ctrl+H', () => sdAlternar('oculto'), !temSel]],
+            ['Travar / destravar', 'Ctrl+2', () => sdAlternar('trava'), !temSel], ['Ocultar / mostrar', 'Ctrl+H', () => sdAlternar('oculto'), !temSel]],
         exibir: [['Apresentar do início', 'F5', () => sdApresentar(0)], ['Apresentar deste slide', 'Shift+F5', () => sdApresentar(SD.atual)], ['Prever animações deste slide', '', () => { if (!sdPreverAnim()) sdToast('Este slide não tem animações', 'aviso'); }], ['-'],
             ['Ajustar à tela', 'Ctrl+0', () => sdAcao('ajustar')], ['Tamanho real (100%)', 'Ctrl+1', () => sdAcao('z100')], ['Ampliar', 'Ctrl+=', () => sdAcao('zoom+')], ['Reduzir', 'Ctrl+−', () => sdAcao('zoom-')], ['-'],
-            [(SDU.guias ? '✓ ' : '') + 'Guias inteligentes', '', () => { SDU.guias = !SDU.guias; }], [(sdEl('sd').classList.contains('sem-notas') ? '' : '✓ ') + 'Notas do apresentador', '', () => sdEl('sd').classList.toggle('sem-notas')]],
+            [(SDU.guias ? '✓ ' : '') + 'Guias inteligentes', '', () => { SDU.guias = !SDU.guias; }], [(SDU.reguas ? '✓ ' : '') + 'Réguas e guias', 'Ctrl+R', () => { SDU.reguas = !SDU.reguas; sdRenderReguas(); sdRenderSobre(); }], ['Redefinir painéis', '', () => sdDockRedefinir()], ['Limpar guias', '', () => { sdHist(); SD.doc.guias = { v: [], h: [] }; sdMudou('guias'); sdRenderSobre(); }], [(sdEl('sd').classList.contains('sem-notas') ? '' : '✓ ') + 'Notas do apresentador', '', () => sdEl('sd').classList.toggle('sem-notas')]],
     };
     return L[m] || [];
 }
@@ -304,7 +305,7 @@ function sdAplicarZoom() {
     p.style.width = SD.doc.largura * SDU.z + 'px'; p.style.height = SD.doc.altura * SDU.z + 'px';
     palco.style.transform = `scale(${SDU.z})`;
     sdEl('sd-zoom').textContent = Math.round(SDU.z * 100) + '%';
-    sdRenderSobre();
+    sdRenderSobre(); sdRenderReguas();
 }
 
 // ───────────── mesa: desenho incremental (vídeo não recarrega quando só a posição muda) ─────────────
@@ -341,6 +342,19 @@ function sdRenderMesa(tudo = false) {
 }
 
 // sobreposição: caixa da seleção, alças, giro, guias e laço
+function sdAnc(c) { const a = c.anc || {}; return { x: a.x ?? 0.5, y: a.y ?? 0.5 }; }
+function sdAncMundo(c) {   // posição do ponto de ancoragem no slide (gira junto com a caixa)
+    const a = sdAnc(c), r = (+c.rot || 0) * Math.PI / 180, dx = (a.x - 0.5) * c.w, dy = (a.y - 0.5) * c.h;
+    return { x: c.x + c.w / 2 + dx * Math.cos(r) - dy * Math.sin(r), y: c.y + c.h / 2 + dx * Math.sin(r) + dy * Math.cos(r) };
+}
+function sdAncDefinir(fx, fy) {   // define o ponto (frações 0..1) nos selecionados; o objeto não se move
+    sdHist(); sdAlvos({}).forEach(c => { if (fx === 0.5 && fy === 0.5) delete c.anc; else c.anc = { x: fx, y: fy }; }); sdMudou('camadas');
+}
+function sdAncInstalar() {
+    if (window._sdAncOk) return; window._sdAncOk = 1;
+    document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-anc]'); if (!b) return; const [x, y] = b.dataset.anc.split(',').map(Number); sdAncDefinir(x, y); });
+}
+sdAncInstalar();
 function sdRenderSobre() {
     const sob = sdEl('sd-sobre'), s = sdSlide(); if (!sob || !s) return;
     const z = SDU.z, cs = SD.sel.map(id => sdCamada(id, s)).filter(Boolean);
@@ -348,12 +362,82 @@ function sdRenderSobre() {
     for (const c of cs) {
         const um = cs.length === 1 && !c.trava && SDU.editando !== c.id, peq = c.w * z < 44 || c.h * z < 44;
         h += `<div class="sd-caixa${c.trava ? ' trava' : ''}${peq ? ' peq' : ''}" data-cx="${c.id}" style="left:${c.x * z}px;top:${c.y * z}px;width:${c.w * z}px;height:${c.h * z}px;transform:rotate(${+c.rot || 0}deg)">` +
-            (um ? ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(k => `<i class="sd-alca a-${k}" data-alca="${k}"></i>`).join('') + '<i class="sd-giro" data-alca="giro"></i>' : '') + '</div>';
+            (um ? ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(k => `<i class="sd-alca a-${k}" data-alca="${k}"></i>`).join('') + '<i class="sd-giro" data-alca="giro"></i>' + `<i class="sd-anc" data-alca="anc" title="Ponto de ancoragem (giro e Alt+escala)" style="left:${sdAnc(c).x * 100}%;top:${sdAnc(c).y * 100}%"></i>` : '') + '</div>';
+    }
+    const livres = cs.filter(c => !c.trava);
+    if (livres.length > 1 && !SDU.editando) {   // vários selecionados: caixa do conjunto com alças (escala uniforme)
+        const x0 = Math.min(...livres.map(c => c.x)), y0 = Math.min(...livres.map(c => c.y)), x1 = Math.max(...livres.map(c => c.x + c.w)), y1 = Math.max(...livres.map(c => c.y + c.h));
+        h += `<div class="sd-caixa sd-conj" style="left:${x0 * z}px;top:${y0 * z}px;width:${(x1 - x0) * z}px;height:${(y1 - y0) * z}px">` + ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(k => `<i class="sd-alca a-${k}" data-alca="${k}"></i>`).join('') + '</div>';
     }
     if (SDU.laco) { const [x0, y0, x1, y1] = SDU.laco; h += `<div class="sd-laco" style="left:${Math.min(x0, x1) * z}px;top:${Math.min(y0, y1) * z}px;width:${Math.abs(x1 - x0) * z}px;height:${Math.abs(y1 - y0) * z}px"></div>`; }
-    for (const g of SDU.guiasAtivas || []) h += g.x != null ? `<div class="sd-guia v" style="left:${g.x * z}px"></div>` : `<div class="sd-guia h" style="top:${g.y * z}px"></div>`;
+    const GU = sdGuiasUser();
+    if (SDU.reguas) { GU.v.forEach((x, i) => { h += `<div class="sd-guiau v" data-gu="v:${i}" style="left:${x * z}px"></div>`; }); GU.h.forEach((y, i) => { h += `<div class="sd-guiau h" data-gu="h:${i}" style="top:${y * z}px"></div>`; }); }
+    const W2 = SD.doc.largura / 2, H2 = SD.doc.altura / 2;
+    for (const g of SDU.guiasAtivas || []) { const cen = g.x != null ? Math.abs(g.x - W2) < .5 : Math.abs(g.y - H2) < .5; h += g.x != null ? `<div class="sd-guia v${cen ? ' cen' : ''}" style="left:${g.x * z}px"></div>` : `<div class="sd-guia h${cen ? ' cen' : ''}" style="top:${g.y * z}px"></div>`; }
     if (SDU.medida) h += `<div class="sd-medida" style="left:${SDU.medida.x * z}px;top:${SDU.medida.y * z}px">${SDU.medida.t}</div>`;
     sob.innerHTML = h;
+}
+// réguas (como no Photo): arrastar da régua cria guia; guia arrastada para fora da página some; Ctrl+R liga/desliga
+function sdGuiasUser() { const d = SD.doc || {}; if (!d.guias || !Array.isArray(d.guias.v)) d.guias = { v: [], h: [] }; return d.guias; }
+function sdRenderReguas() {   // réguas presas na borda da área de trabalho (não da página), acompanham rolagem e zoom
+    const mesa = sdEl('sd-mesa'), papel = sdEl('sd-papel'); if (!mesa || !papel || !SD.doc) return;
+    const corpo = mesa.parentElement; let rh = sdEl('sd-regua-h'), rv = sdEl('sd-regua-v'), rc = sdEl('sd-regua-c');
+    if (!rh || rh.parentElement !== corpo) {
+        [rh, rv, rc].forEach(x => x && x.remove());
+        corpo.style.position = 'relative';
+        rh = document.createElement('canvas'); rh.id = 'sd-regua-h'; rh.className = 'sd-regua h';
+        rv = document.createElement('canvas'); rv.id = 'sd-regua-v'; rv.className = 'sd-regua v';
+        rc = document.createElement('div'); rc.id = 'sd-regua-c'; rc.className = 'sd-regua c';
+        corpo.append(rh, rv, rc);
+        rh.addEventListener('mousedown', sdReguaMouse); rv.addEventListener('mousedown', sdReguaMouse);
+        mesa.addEventListener('mousedown', sdReguaMouse, true);
+        mesa.addEventListener('scroll', () => sdRenderReguas(), { passive: true });
+        new ResizeObserver(() => sdRenderReguas()).observe(mesa);
+    }
+    [rh, rv, rc].forEach(x => x.style.display = SDU.reguas ? '' : 'none');
+    mesa.style.paddingTop = mesa.style.paddingLeft = SDU.reguas ? '50px' : '';
+    if (!SDU.reguas) return;
+    const z = SDU.z, dpr = devicePixelRatio || 1, T = 18, mr = mesa.getBoundingClientRect(), pr = papel.getBoundingClientRect();
+    const Lw = mesa.clientWidth, Lh = mesa.clientHeight;
+    rh.style.left = rc.style.left = rv.style.left = mesa.offsetLeft + 'px'; rh.style.top = rv.style.top = rc.style.top = mesa.offsetTop + 'px';
+    const passo = [10, 25, 50, 100, 250, 500, 1000, 2000].find(q => q * z >= 60) || 2000, sub = passo / 5;
+    const desenha = (cv, L, hor, ox) => {
+        cv.width = (hor ? L : T) * dpr; cv.height = (hor ? T : L) * dpr; cv.style.width = (hor ? L : T) + 'px'; cv.style.height = (hor ? T : L) + 'px';
+        const g = cv.getContext('2d'); g.scale(dpr, dpr); g.fillStyle = '#1b1c1e'; g.fillRect(0, 0, hor ? L : T, hor ? T : L);
+        const comp = SD.doc[hor ? 'largura' : 'altura'];
+        g.fillStyle = '#26282b'; if (hor) g.fillRect(ox, 0, comp * z, T); else g.fillRect(0, ox, T, comp * z);
+        g.strokeStyle = '#5a5d63'; g.fillStyle = '#9aa0a6'; g.font = '9px sans-serif'; g.lineWidth = 1; g.beginPath();
+        const v0 = Math.floor(-ox / z / sub) * sub, v1 = (L - ox) / z;
+        for (let v = v0; v <= v1; v += sub) {
+            const q = Math.round(ox + v * z) + .5, r = Math.round(v / sub), grande = r % 5 === 0, t = grande ? T : T * .3;
+            if (hor) { g.moveTo(q, T); g.lineTo(q, T - t); } else { g.moveTo(T, q); g.lineTo(T - t, q); }
+            if (grande) { const tx = String(Math.round(v)); if (hor) g.fillText(tx, q + 2, 9); else { g.save(); g.translate(9, q + 2); g.rotate(Math.PI / 2); g.fillText(tx, 0, 0); g.restore(); } }
+        }
+        g.stroke();
+        g.fillStyle = 'rgba(77,208,225,.9)'; const m = Math.round(ox + comp / 2 * z); if (hor) g.fillRect(m - 1, 0, 2, 6); else g.fillRect(0, m - 1, 6, 2);
+    };
+    desenha(rh, Lw, true, pr.left - mr.left); desenha(rv, Lh, false, pr.top - mr.top);
+}
+function sdReguaMouse(e) {
+    if (e.button !== 0 || !SD.doc) return;
+    const reg = e.target.closest('canvas.sd-regua'), gu = e.target.closest('[data-gu]'); if (!reg && !gu) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const GU = sdGuiasUser(), papel = sdEl('sd-papel');
+    let eixo, i;
+    if (gu) { [eixo, i] = gu.dataset.gu.split(':'); i = +i; } else { eixo = reg.classList.contains('h') ? 'h' : 'v'; GU[eixo].push(-9999); i = GU[eixo].length - 1; }
+    sdHist();
+    const mm = ev => {
+        const r = papel.getBoundingClientRect(); let v = eixo === 'v' ? (ev.clientX - r.left) / SDU.z : (ev.clientY - r.top) / SDU.z;
+        const lim = SD.doc[eixo === 'v' ? 'largura' : 'altura']; if (!ev.altKey) for (const a of [0, lim / 2, lim]) if (Math.abs(a - v) < 6 / SDU.z) v = a;
+        GU[eixo][i] = Math.round(v); SDU.medida = { x: eixo === 'v' ? v : 4, y: eixo === 'v' ? 24 / SDU.z : v, t: String(Math.round(v)) }; sdRenderSobre();
+    };
+    const mu = ev => {
+        removeEventListener('mousemove', mm); removeEventListener('mouseup', mu); SDU.medida = null;
+        const r = papel.getBoundingClientRect(), fora = eixo === 'v' ? ev.clientX < r.left || ev.clientX > r.right : ev.clientY < r.top || ev.clientY > r.bottom;
+        if (fora || GU[eixo][i] === -9999) GU[eixo].splice(i, 1);
+        sdMudou('guias'); sdRenderSobre();
+    };
+    addEventListener('mousemove', mm); addEventListener('mouseup', mu);
 }
 function sdMontarMesa() {
     const mesa = sdEl('sd-mesa'), papel = sdEl('sd-papel');
@@ -364,7 +448,7 @@ function sdMontarMesa() {
         if (SDU.editando) sdFimEdicao();
         const s = sdSlide(), [mx, my] = pos(e);
         const alca = e.target.closest('[data-alca]');
-        if (alca) { sdArrastar(e, alca.dataset.alca === 'giro' ? 'giro' : 'alca', alca.dataset.alca, mx, my); return; }
+        if (alca) { sdArrastar(e, alca.dataset.alca === 'giro' ? 'giro' : alca.dataset.alca === 'anc' ? 'anc' : 'alca', alca.dataset.alca, mx, my); return; }
         const camEl = e.target.closest('#sd-palco .sd-c'), cx = e.target.closest('[data-cx]');
         let id = camEl ? camEl.dataset.id : cx ? cx.dataset.cx : null;
         // clique em cima de um selecionado ganha do que está por baixo (permite arrastar o grupo)
@@ -395,7 +479,7 @@ function sdMontarMesa() {
         SDU.ctx = SD.sel.length ? 'objeto' : 'mesa';
         sdAbrirMenuItens(SD.sel.length ? [['Recortar', 'Ctrl+X', () => { sdCopiar(); sdUi('apagar', {}); }], ['Copiar', 'Ctrl+C', sdCopiar], ['Colar', 'Ctrl+V', sdColar, !SDU.clip], ['Duplicar', 'Ctrl+D', () => sdUi('duplicar', {})], ['Apagar', 'Del', () => sdUi('apagar', {})], ['-'],
             ['Trazer para a frente', 'Ctrl+]', () => sdUi('ordem', { para: 'frente' })], ['Enviar para trás', 'Ctrl+[', () => sdUi('ordem', { para: 'tras' })], ['Trazer para o topo', '', () => sdUi('ordem', { para: 'topo' })], ['Enviar para o fundo', '', () => sdUi('ordem', { para: 'fundo' })], ['-'],
-            ['Travar / destravar', 'Ctrl+L', () => sdAlternar('trava')], ['Ocultar / mostrar', 'Ctrl+H', () => sdAlternar('oculto')], ['Usar como fundo do slide', '', () => sdComoFundo(), !SD.sel.map(i => sdCamada(i)).some(c => c && c.tipo === 'imagem')]]
+            ['Travar / destravar', 'Ctrl+2', () => sdAlternar('trava')], ['Ocultar / mostrar', 'Ctrl+H', () => sdAlternar('oculto')], ['Usar como fundo do slide', '', () => sdComoFundo(), !SD.sel.map(i => sdCamada(i)).some(c => c && c.tipo === 'imagem')]]
             : [['Colar', 'Ctrl+V', sdColar, !SDU.clip], ['Texto', 'T', () => sdAcao('texto')], ['Imagem ou GIF…', '', () => sdAcao('imagem')], ['Vídeo…', '', () => sdAcao('video')], ['-'], ['Novo slide', 'Ctrl+M', () => sdUi('slide_novo', {})], ['Selecionar tudo', 'Ctrl+A', () => sdUi('selecionar', { ids: sdSlide().camadas.map(c => c.id) })]], [e.clientX, e.clientY]);
     });
     mesa.addEventListener('wheel', e => {
@@ -457,12 +541,19 @@ async function sdTrocarMidia(c) {
 function sdArrastar(e, modo, alca, mx, my) {
     e.preventDefault();
     const s = sdSlide(), W = SD.doc.largura, H = SD.doc.altura, papel = sdEl('sd-papel');
-    const cs = SD.sel.map(i => sdCamada(i, s)).filter(c => c && !c.trava);
-    const ini = cs.map(c => ({ c, x: c.x, y: c.y, w: c.w, h: c.h, rot: +c.rot || 0 }));
-    let mudou = false, histFeito = false;
+    if (modo === 'alca' && alca === 'anc') modo = 'anc';
+    let cs = SD.sel.map(i => sdCamada(i, s)).filter(c => c && !c.trava);
+    let altDup = false;
+    if (modo === 'mover' && e.altKey && cs.length) {   // Alt+arrastar duplica (como no Photo): a cópia vai por cima e é ela que se move
+        sdHist(); altDup = true; const gs = {};
+        cs = cs.map(c => { const n = sdClone(c); n.id = sdId(); if (n.grupo) n.grupo = gs[n.grupo] = gs[n.grupo] || sdId(); s.camadas.splice(s.camadas.indexOf(c) + 1, 0, n); return n; });
+        SD.sel = cs.map(c => c.id); sdMudou('camadas');
+    }
+    const ini = cs.map(c => ({ c, x: c.x, y: c.y, w: c.w, h: c.h, rot: +c.rot || 0, tam: c.tam, esp: c.espessura, raio: c.raio, pad: c.pad, rec: { l: 0, t: 0, r: 0, b: 0, ...(c.rec || {}) }, piv: sdAncMundo(c) }));
+    let mudou = false, histFeito = altDup;
     const hist = () => { if (!histFeito) { sdHist(); histFeito = true; } };
     const outros = s.camadas.filter(c => !SD.sel.includes(c.id) && !c.oculto);
-    const alvosX = [0, W / 2, W, ...outros.flatMap(c => [c.x, c.x + c.w / 2, c.x + c.w])], alvosY = [0, H / 2, H, ...outros.flatMap(c => [c.y, c.y + c.h / 2, c.y + c.h])];
+    const GU = sdGuiasUser(), alvosX = [0, W / 2, W, ...(SDU.reguas ? GU.v : []), ...outros.flatMap(c => [c.x, c.x + c.w / 2, c.x + c.w])], alvosY = [0, H / 2, H, ...(SDU.reguas ? GU.h : []), ...outros.flatMap(c => [c.y, c.y + c.h / 2, c.y + c.h])];
     const mm = ev => {
         const r = papel.getBoundingClientRect(), x = (ev.clientX - r.left) / SDU.z, y = (ev.clientY - r.top) / SDU.z;
         let dx = x - mx, dy = y - my;
@@ -488,21 +579,62 @@ function sdArrastar(e, modo, alca, mx, my) {
             const lx = dx * cos + dy * sin, ly = -dx * sin + dy * cos;
             const sx = alca.includes('e') ? 1 : alca.includes('w') ? -1 : 0, sy = alca.includes('s') ? 1 : alca.includes('n') ? -1 : 0;
             let w = Math.max(8, o.w + sx * lx), h = Math.max(8, o.h + sy * ly);
-            const prop = (o.c.tipo === 'imagem' || o.c.tipo === 'video') ? !ev.shiftKey : ev.shiftKey;
-            if (prop && sx && sy) { const k = Math.max(w / o.w, h / o.h); w = o.w * k; h = o.h * k; }
-            if (ev.altKey) { o.c.w = Math.round(w + (w - o.w) * (sx ? 1 : 0)); o.c.h = Math.round(h + (h - o.h) * (sy ? 1 : 0)); o.c.x = Math.round(o.x + o.w / 2 - o.c.w / 2); o.c.y = Math.round(o.y + o.h / 2 - o.c.h / 2); }
+            if (!ev.altKey) {   // escala em volta do ponto de ancoragem: a borda arrastada segue o mouse
+                const an0 = sdAnc(o.c), dX = sx > 0 ? (1 - an0.x) * o.w : sx < 0 ? an0.x * o.w : 0, dY = sy > 0 ? (1 - an0.y) * o.h : sy < 0 ? an0.y * o.h : 0;
+                if (dX > 1) w = Math.max(8, o.w * (dX + sx * lx) / dX); if (dY > 1) h = Math.max(8, o.h * (dY + sy * ly) / dY);
+            }
+            const escalaTexto = o.c.tipo === 'texto' && sx && sy && !ev.ctrlKey && o.tam;   // ponta diagonal do texto: escala a fonte junto
+            const prop = ev.shiftKey || escalaTexto || ((o.c.tipo === 'imagem' || o.c.tipo === 'video') && !ev.ctrlKey);
+            if (prop && !ev.altKey) { const k = sx && sy ? Math.max(w / o.w, h / o.h) : sx ? w / o.w : h / o.h; w = o.w * k; h = o.h * k; }
+            else if (prop && sx && sy) { const k = Math.max(w / o.w, h / o.h); w = o.w * k; h = o.h * k; }
+            const recorta = ev.altKey && (o.c.tipo === 'imagem' || o.c.tipo === 'video');
+            if (recorta) {   // Alt nas imagens: esconde a lateral arrastada sem esticar (como o Alt do Editor)
+                const R = { ...o.rec };
+                if (sx > 0) R.r = Math.max(0, Math.min(o.rec.r - lx, o.rec.r + o.w - 8)); if (sx < 0) R.l = Math.max(0, Math.min(o.rec.l + lx, o.rec.l + o.w - 8));
+                if (sy > 0) R.b = Math.max(0, Math.min(o.rec.b - ly, o.rec.b + o.h - 8)); if (sy < 0) R.t = Math.max(0, Math.min(o.rec.t + ly, o.rec.t + o.h - 8));
+                for (const k in R) R[k] = Math.round(R[k]);
+                w = o.w + (o.rec.l + o.rec.r) - (R.l + R.r); h = o.h + (o.rec.t + o.rec.b) - (R.t + R.b);
+                o.c.rec = (R.l || R.t || R.r || R.b) ? R : undefined; if (!o.c.rec) delete o.c.rec;
+            }
+            if (!ev.altKey && !recorta) {   // ponto de ancoragem definido: ele fica parado enquanto o objeto cresce/encolhe
+                const an = sdAnc(o.c), P = o.piv, dxa = (an.x - 0.5) * w, dya = (an.y - 0.5) * h;
+                o.c.w = Math.round(w); o.c.h = Math.round(h);
+                o.c.x = Math.round(P.x - (dxa * cos - dya * sin) - w / 2); o.c.y = Math.round(P.y - (dxa * sin + dya * cos) - h / 2);
+            } else if (ev.altKey && !recorta) { o.c.w = Math.round(w + (w - o.w) * (sx ? 1 : 0)); o.c.h = Math.round(h + (h - o.h) * (sy ? 1 : 0)); o.c.x = Math.round(o.x + o.w / 2 - o.c.w / 2); o.c.y = Math.round(o.y + o.h / 2 - o.c.h / 2); }
             else {
                 const dw = w - o.w, dh = h - o.h, cxo = o.x + o.w / 2 + (sx * dw / 2) * cos - (sy * dh / 2) * sin, cyo = o.y + o.h / 2 + (sx * dw / 2) * sin + (sy * dh / 2) * cos;
                 o.c.w = Math.round(w); o.c.h = Math.round(h); o.c.x = Math.round(cxo - w / 2); o.c.y = Math.round(cyo - h / 2);
             }
+            if (escalaTexto) { o.c.tam = Math.max(4, Math.round(o.tam * (o.c.w / o.w) * 10) / 10); if (o.pad) o.c.pad = Math.round(o.pad * o.c.w / o.w); }
             SDU.medida = { x: o.c.x + o.c.w, y: o.c.y + o.c.h + 8 / SDU.z, t: `${o.c.w} × ${o.c.h}` };
+        } else if (modo === 'alca' && ini.length > 1) {   // conjunto: escala uniforme ancorada no lado oposto (Alt = no centro)
+            const bx = Math.min(...ini.map(o => o.x)), by = Math.min(...ini.map(o => o.y)), bw = Math.max(...ini.map(o => o.x + o.w)) - bx, bh = Math.max(...ini.map(o => o.y + o.h)) - by;
+            const sx = alca.includes('e') ? 1 : alca.includes('w') ? -1 : 0, sy = alca.includes('s') ? 1 : alca.includes('n') ? -1 : 0, m = ev.altKey ? 2 : 1;
+            const kx = sx ? (bw + sx * dx * m) / bw : 0, ky = sy ? (bh + sy * dy * m) / bh : 0;
+            const k = Math.max(0.02, sx && sy ? Math.max(kx, ky) : (kx || ky));
+            const ax = ev.altKey || !sx ? bx + bw / 2 : sx > 0 ? bx : bx + bw, ay = ev.altKey || !sy ? by + bh / 2 : sy > 0 ? by : by + bh;
+            ini.forEach(o => {
+                const c = o.c; c.x = Math.round(ax + (o.x - ax) * k); c.y = Math.round(ay + (o.y - ay) * k); c.w = Math.max(1, Math.round(o.w * k)); c.h = Math.max(1, Math.round(o.h * k));
+                if (o.tam) c.tam = Math.max(4, Math.round(o.tam * k * 10) / 10); if (o.esp) c.espessura = Math.round(o.esp * k * 10) / 10; if (o.raio) c.raio = Math.round(o.raio * k); if (o.pad) c.pad = Math.round(o.pad * k);
+                const R = o.rec; if (R.l || R.t || R.r || R.b) c.rec = { l: Math.round(R.l * k), t: Math.round(R.t * k), r: Math.round(R.r * k), b: Math.round(R.b * k) };
+            });
+            SDU.medida = { x: ax, y: by + bh * k + 8 / SDU.z, t: `${Math.round(k * 100)}%` };
+        } else if (modo === 'anc' && ini.length === 1) {   // arrasta o ponto de ancoragem (encaixa em borda/meio)
+            const o = ini[0], a = o.rot * Math.PI / 180, ox = x - (o.x + o.w / 2), oy = y - (o.y + o.h / 2);
+            const lx = ox * Math.cos(a) + oy * Math.sin(a), ly = -ox * Math.sin(a) + oy * Math.cos(a), t = 8 / SDU.z;
+            let fx = lx / o.w + 0.5, fy = ly / o.h + 0.5;
+            for (const g of [0, 0.5, 1]) { if (Math.abs(fx - g) * o.w < t) fx = g; if (Math.abs(fy - g) * o.h < t) fy = g; }
+            if (fx === 0.5 && fy === 0.5) delete o.c.anc; else o.c.anc = { x: fx, y: fy };
         } else if (modo === 'giro' && ini.length === 1) {
-            const o = ini[0], cx = o.x + o.w / 2, cy = o.y + o.h / 2;
-            let ang = o.rot + (Math.atan2(y - cy, x - cx) - Math.atan2(my - cy, mx - cx)) * 180 / Math.PI;
+            const o = ini[0], P = o.piv;   // gira em volta do ponto de ancoragem (o centro é o padrão)
+            let ang = o.rot + (Math.atan2(y - P.y, x - P.x) - Math.atan2(my - P.y, mx - P.x)) * 180 / Math.PI;
             ang = ((ang % 360) + 540) % 360 - 180;
             if (ev.shiftKey) ang = Math.round(ang / 15) * 15; else for (const g of [-180, -90, 0, 90, 180]) if (Math.abs(ang - g) < 3) ang = g;
-            o.c.rot = Math.round(ang * 10) / 10;
-            SDU.medida = { x: cx, y: o.y - 50 / SDU.z, t: `${o.c.rot}°` };
+            ang = Math.round(ang * 10) / 10;
+            const d = (ang - o.rot) * Math.PI / 180, ccx = o.x + o.w / 2 - P.x, ccy = o.y + o.h / 2 - P.y;
+            const ncx = P.x + ccx * Math.cos(d) - ccy * Math.sin(d), ncy = P.y + ccx * Math.sin(d) + ccy * Math.cos(d);
+            o.c.rot = ang; o.c.x = Math.round(ncx - o.w / 2); o.c.y = Math.round(ncy - o.h / 2);
+            SDU.medida = { x: P.x, y: o.y - 50 / SDU.z, t: `${o.c.rot}°` };
         }
         sdRenderMesa();
     };
@@ -656,8 +788,9 @@ function sdMarcarLista() {
 function sdRenderNotas() { const n = sdEl('sd-notas'), s = sdSlide(); if (n && s && document.activeElement !== n) n.value = s.notas || ''; }
 
 // ───────────── painéis Design e Camadas ─────────────
-function sdMontarPaineis() {
-    const P = sdEl('sd-props');
+function sdMontarPaineis() { sdLigarPainel(sdEl('sd-props')); sdLigarPainel(sdEl('sd-efeitos')); sdLigarCamadas(); }
+function sdLigarPainel(P) {   // controles data-p / data-pa de um painel (Design e Efeitos)
+    if (!P || P.dataset.ligado) return; P.dataset.ligado = '1';
     const valor = inp => inp.type === 'checkbox' ? (inp.checked || null) : inp.type === 'number' || inp.type === 'range' ? (inp.value === '' ? null : +inp.value * (+inp.dataset.k_ || 1)) : inp.value;
     const aplicar = (inp, final) => {
         const k = inp.dataset.p, alvo = inp.dataset.alvo || 'camada', v = valor(inp);
@@ -688,8 +821,11 @@ function sdMontarPaineis() {
     // escolheu o efeito: toca na mesa
     P.addEventListener('change', e => { const p = e.target.dataset && e.target.dataset.p; if (p && p.startsWith('anim.')) setTimeout(() => sdPreverAnim(SD.sel), 30); else if (p && p.startsWith('transicao.')) setTimeout(sdPreverTransicao, 30); });
     P.addEventListener('focusin', e => { if (e.target.closest('[data-alvo="tema"]') && !SDU.temaAntes) SDU.temaAntes = sdClone(SD.doc.tema); });
+}
+function sdLigarCamadas() {
     const C = sdEl('sd-camadas');
     C.addEventListener('click', e => {
+        const tb = e.target.closest('[data-tam]'); if (tb) { localStorage.setItem('sd_cam_tam', tb.dataset.tam); sdRenderCamadas(C); return; }
         const b = e.target.closest('[data-cv]'); if (b) { e.stopPropagation(); const c = sdCamada(b.dataset.id, sdSlide()); sdUi('editar', { ids: [c.id], [b.dataset.cv]: c[b.dataset.cv] ? null : true }); return; }
         const it = e.target.closest('[data-ci]'); if (!it) return;
         const id = it.dataset.ci;
@@ -713,19 +849,56 @@ function sdMontarPaineis() {
 function sdRenderPaineis() {
     if (!SD.doc) return;
     const P = sdEl('sd-props'), C = sdEl('sd-camadas'); if (!P) return;
-    if (SDU.aba === 'camadas') sdRenderCamadas(C);
-    if (SDU.aba === 'cores' && typeof sdcRender === 'function') { const f = document.activeElement; if (!(f && f.closest && f.closest('#sd-cores input'))) sdcRender(); }
+    const ve = id => SDU.dock && typeof sdDockVisivel === 'function' ? sdDockVisivel(id) : SDU.aba === id;
+    if (ve('camadas')) sdRenderCamadas(C);
+    const E = sdEl('sd-efeitos'), foco = document.activeElement, editando = el => el && el.contains(foco) && foco.matches('input[type=text],input[type=number],textarea');
+    if (E && ve('efeitos') && !editando(E)) E.innerHTML = sdPainelEfeitos(sdAlvos({}));
+    if (ve('cores') && typeof sdcRender === 'function') { const f = document.activeElement; if (!(f && f.closest && f.closest('#sd-cores input'))) sdcRender(); }
     if (P.contains(document.activeElement) && document.activeElement.matches('input[type=text],input[type=number],textarea')) return;
     const cs = sdAlvos({});
-    P.innerHTML = cs.length ? sdPainelCamada(cs) : sdPainelSlide();
+    if (ve('design')) P.innerHTML = cs.length ? sdPainelCamada(cs) : sdPainelSlide();
+}
+function sdMiniCamada(c, ic) {   // miniatura da camada no painel
+    const u = c.tipo === 'imagem' && c.src && (SD.urls[c.src] || (/^(https?:|data:|blob:)/.test(c.src) ? c.src : ''));
+    if (u) return `<span class="sd-cam-mini"><img src="${sdEsc(u)}" alt=""></span>`;
+    if (c.tipo === 'forma') { const f = c.preench2 ? `linear-gradient(${c.angulo ?? 90}deg,${c.preench || '#888'},${c.preench2})` : (c.preench || 'transparent'); return `<span class="sd-cam-mini" style="background:${sdEsc(f)};${c.traco ? 'border-color:' + sdEsc(c.traco) : ''}"></span>`; }
+    if (c.tipo === 'texto') return `<span class="sd-cam-mini txt" style="color:${sdEsc(c.cor || '#fff')}">T</span>`;
+    return `<span class="sd-cam-ic">${ic[c.tipo] || '•'}</span>`;
+}
+function sdPainelEfeitos(cs) {
+    if (!cs.length) return '<div style="padding:16px;opacity:.7">Selecione um item para aplicar efeitos.</div>';
+    const c = cs[0], fx = c.fx || {}, img = cs.every(x => x.tipo === 'imagem'), P = sdFxPresets();
+    const u = c.tipo === 'imagem' && c.src && (SD.urls[c.src] || (/^(https?:|data:|blob:)/.test(c.src) ? c.src : ''));
+    const amostra = f => u ? `<img src="${sdEsc(u)}" style="filter:${f}">` : `<span style="background:linear-gradient(135deg,#e8743b,#3b8be8 60%,#46c47a);filter:${f}"></span>`;
+    let h = sdSec('Filtros prontos', `<div class="sd-fx-grade">${Object.entries(P).map(([k, [n, f]]) => `<button class="sd-fx-p${(fx.preset || 'nenhum') === k ? ' on' : ''}" onclick="sdFxAplicar({preset:'${k}'})" title="${n}">${amostra(f || 'none')}<b>${n}</b></button>`).join('')}</div>`);
+    h += sdSec('Ajustes', `${sdR('fx.matiz', 'Matiz', fx.matiz || 0, -180, 180)}${sdR('fx.sepia', 'Sépia', fx.sepia || 0, 0, 100)}${sdR('fx.inverter', 'Inverter', fx.inverter || 0, 0, 100)}
+        ${sdR('filtros.brilho', 'Brilho', c.filtros?.brilho ?? 100, 0, 200)}${sdR('filtros.contraste', 'Contraste', c.filtros?.contraste ?? 100, 0, 200)}${sdR('filtros.saturacao', 'Saturação', c.filtros?.saturacao ?? 100, 0, 200)}
+        ${sdR('opac', 'Opacidade', c.opac ?? 1, 0, 1, 0.01)}`);
+    const temS = cs.every(x => x.sombra);
+    h += sdSec('Sombra e brilho', `<button class="sd-btn sd-larga${temS ? ' on' : ''}" onclick="sdFxAplicar({sombra: ${temS ? 'null' : "{ x: 0, y: 12, desf: 36, cor: 'rgba(0,0,0,.35)' }"}})">${temS ? '✓ ' : ''}Sombra projetada</button>
+        ${c.sombra ? `<div class="sd-grade2">${sdN('sombra.x', 'X', c.sombra.x || 0)}${sdN('sombra.y', 'Y', c.sombra.y ?? 12)}</div>${sdR('sombra.desf', 'Suavidade', c.sombra.desf ?? 36, 0, 120)}${sdCor('sombra.cor', 'Cor', c.sombra.cor || 'rgba(0,0,0,.35)')}` : ''}
+        ${sdR('fx.glow.desf', 'Brilho externo', fx.glow?.desf || 0, 0, 80)}${fx.glow?.desf ? sdCor('fx.glow.cor', 'Cor do brilho', fx.glow.cor || '#ffffff') : ''}`);
+    h += sdSec('Desfoques', `${sdR('desfoque', 'Gaussiano', c.desfoque || 0, 0, 60)}
+        ${img ? `${sdR('fx.mov', 'Movimento', fx.mov || 0, 0, 200)}${fx.mov ? sdR('fx.movAng', 'Ângulo', fx.movAng || 0, -180, 180) : ''}
+        ${sdR('fx.radial', 'Zoom (radial)', fx.radial || 0, 0, 100)}${sdR('fx.giro', 'Giro (radial)', fx.giro || 0, 0, 45)}
+        ${fx.radial || fx.giro ? sdR('fx.radX', 'Centro ↔', fx.radX ?? 50, 0, 100) + sdR('fx.radY', 'Centro ↕', fx.radY ?? 50, 0, 100) : ''}` : '<div style="opacity:.6;font-size:11px;padding:4px 0">Movimento e radial: só em imagens.</div>'}`);
+    h += `<button class="sd-btn sd-larga" onclick="sdFxAplicar({fx:null,filtros:null,sombra:null,desfoque:null})">Zerar efeitos</button>`;
+    return h;
+}
+function sdFxAplicar(m) {   // botões da aba Efeitos (preset mescla dentro de fx; o resto vai direto)
+    const cs = sdAlvos({}); if (!cs.length) return; sdHist();
+    cs.forEach(c => { for (const [k, v] of Object.entries(m)) { if (k === 'preset') { c.fx = { ...(c.fx || {}) }; if (v === 'nenhum') delete c.fx.preset; else c.fx.preset = v; } else if (v === null) delete c[k]; else c[k] = v; } });
+    sdMudou('camadas');
 }
 function sdRenderCamadas(C) {
     const s = sdSlide(), ic = { texto: 'T', forma: '◆', imagem: '▣', video: '▶', grafico: '▥' };
-    C.innerHTML = s.camadas.length ? [...s.camadas].reverse().map(c => `<div class="sd-cam${SD.sel.includes(c.id) ? ' on' : ''}${c.oculto ? ' oculta' : ''}" data-ci="${c.id}" draggable="true">
-        <span class="sd-cam-ic">${ic[c.tipo] || '•'}</span>${c.grupo ? '<span class="sd-cam-g" title="Em grupo">⧉</span>' : ''}<span class="sd-cam-n">${sdEsc(c.nome || (c.tipo === 'texto' ? sdTextoPuro(c).slice(0, 30) : c.tipo))}</span>
+    const tam = localStorage.getItem('sd_cam_tam') || 'p'; C.dataset.tam = tam;
+    const barra = `<div class="sd-cam-tam">${[['p', 'Pequeno'], ['m', 'Médio'], ['g', 'Grande']].map(([k, n]) => `<button data-tam="${k}" class="${tam === k ? 'on' : ''}" title="Cards ${n.toLowerCase()}s">${n}</button>`).join('')}</div>`;
+    C.innerHTML = barra + (s.camadas.length ? [...s.camadas].reverse().map(c => `<div class="sd-cam${SD.sel.includes(c.id) ? ' on' : ''}${c.oculto ? ' oculta' : ''}" data-ci="${c.id}" draggable="true">
+        ${sdMiniCamada(c, ic)}${c.grupo ? '<span class="sd-cam-g" title="Em grupo">⧉</span>' : ''}<span class="sd-cam-n">${sdEsc(c.nome || (c.tipo === 'texto' ? sdTextoPuro(c).slice(0, 30) : c.tipo))}</span>
         <button class="sd-cam-b${c.oculto ? ' off' : ''}" data-cv="oculto" data-id="${c.id}" title="Ocultar / mostrar">${c.oculto ? '◌' : '●'}</button>
         <button class="sd-cam-b${c.trava ? ' on' : ''}" data-cv="trava" data-id="${c.id}" title="Travar / destravar">${c.trava ? '🔒' : '🔓'}</button></div>`).join('')
-        : '<p class="sd-vazio">Slide sem camadas. Use a barra acima para inserir texto, formas, imagens e vídeos.</p>';
+        : '<p class="sd-vazio">Slide sem camadas. Use a barra acima para inserir texto, formas, imagens e vídeos.</p>');
 }
 // linhas de propriedades
 const sdN = (p, rot, v, o = {}) => `<label class="sd-row"><span title="${rot}">${rot}</span><input type="number" data-p="${p}" value="${v ?? ''}" step="${o.step || 1}"${o.min != null ? ` min="${o.min}"` : ''}${o.max != null ? ` max="${o.max}"` : ''}${o.alvo ? ` data-alvo="${o.alvo}"` : ''}></label>`;
@@ -739,6 +912,7 @@ function sdPainelCamada(cs) {
     const c = cs[0], tipos = new Set(cs.map(x => x.tipo)), um = tipos.size === 1 ? c.tipo : null;
     let h = sdSec(cs.length > 1 ? `${cs.length} objetos` : ({ texto: 'Texto', forma: 'Forma', imagem: c.src && /\.gif$/i.test(c.src) ? 'GIF' : 'Imagem', video: 'Vídeo', grafico: 'Gráfico' }[c.tipo]),
         `<div class="sd-grade2">${sdN('x', 'X', Math.round(c.x))}${sdN('y', 'Y', Math.round(c.y))}${sdN('w', 'Larg.', Math.round(c.w), { min: 1 })}${sdN('h', 'Alt.', Math.round(c.h), { min: 1 })}${sdN('rot', 'Giro °', c.rot || 0, { step: 1 })}</div>
+        ${cs.length === 1 ? `<div class="sd-anc-grade" title="Ponto de ancoragem">${[0, .5, 1].map(fy => [0, .5, 1].map(fx => `<button data-anc="${fx},${fy}" class="${sdAnc(c).x === fx && sdAnc(c).y === fy ? 'on' : ''}"></button>`).join('')).join('')}<span>Ancoragem</span></div>` : ''}
         ${sdR('opac', 'Opacidade', Math.round((c.opac ?? 1) * 100), 0, 100, 1, { k: 0.01, mostra: Math.round((c.opac ?? 1) * 100) + '%' })}`);
     if (um === 'texto') h += sdSec('Tipografia', `${sdT('fonte', 'Fonte', c.fonte, { list: 'sd-fontes' })}<div class="sd-grade2">${sdN('tam', 'Tamanho', c.tam, { min: 4 })}${sdS('peso', 'Peso', c.peso || 400, [[100, 'Fino'], [200, 'Extraleve'], [300, 'Leve'], [400, 'Normal'], [500, 'Médio'], [600, 'Seminegrito'], [700, 'Negrito'], [800, 'Extranegrito'], [900, 'Preto']])}</div>
         ${sdCor('cor', 'Cor', c.cor)}<div class="sd-grade2">${sdS('alin', 'Alinhar', c.alin || 'esq', [['esq', 'Esquerda'], ['centro', 'Centro'], ['dir', 'Direita'], ['just', 'Justificado']])}${sdS('valin', 'Vertical', c.valin || 'topo', [['topo', 'Topo'], ['meio', 'Meio'], ['base', 'Base']])}</div>
@@ -820,7 +994,9 @@ document.addEventListener('keydown', e => {
     if (ctrl && k === 'd') { feito(); sdUi('duplicar', {}); return; }
     if (ctrl && k === 'a') { feito(); sdUi('selecionar', { ids: sdSlide().camadas.filter(c => !c.trava && !c.oculto).map(c => c.id) }); return; }
     if (ctrl && k === 'g') { feito(); sdUi(e.shiftKey ? 'desagrupar' : 'agrupar', {}); return; }
-    if (ctrl && k === 'l') { feito(); sdAlternar('trava'); return; }
+    if (ctrl && e.altKey && (k === '2' || e.code === 'Digit2')) { feito(); const ts = sdSlide().camadas.filter(c => c.trava); if (ts.length) { sdHist(); ts.forEach(c => { delete c.trava; }); SD.sel = ts.map(c => c.id); sdMudou('camadas'); sdAvisar('sel'); sdToast(ts.length + ' camada(s) destravada(s)'); } return; }
+    if (ctrl && k === 'r') { feito(); SDU.reguas = !SDU.reguas; sdRenderReguas(); sdRenderSobre(); return; }
+    if (ctrl && (k === 'l' || k === '2')) { feito(); sdAlternar('trava'); return; }
     if (ctrl && k === 'h') { feito(); sdAlternar('oculto'); return; }
     if (ctrl && (k === ']' || k === '[' || k === '}' || k === '{')) { feito(); sdUi('ordem', { para: (k === ']' || k === '}') ? (e.shiftKey ? 'topo' : 'frente') : (e.shiftKey ? 'fundo' : 'tras') }); return; }
     if (ctrl && (k === '=' || k === '+')) { feito(); sdAcao('zoom+'); return; }

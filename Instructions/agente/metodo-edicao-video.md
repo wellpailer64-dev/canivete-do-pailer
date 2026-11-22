@@ -91,6 +91,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 - B-roll casa com o que é dito naquele instante. Só plano estável e bem composto; não repetir imagem.
 - Drone: cortar a correção de ângulo e começar no trecho estável (2026-10-24).
 - Tomada boa e curta: esticar no máximo até 75% de velocidade (2026-10-14).
+- Contagem/desfile de pessoas (aprovados, alunos, clientes): cada pessoa entra UMA vez. Pasta de bruto costuma ter 2 takes seguidos da mesma pessoa (horários colados no nome do arquivo); ouvir não mostra quem é. Conferir por rosto: `tools/agente/pessoas_repetidas.py projeto.vknv` (o conferir_edicao já roda quando há números na tela). Ao escolher takes, agrupar antes os arquivos de horário próximo e ficar com 1 por pessoa (Carlinhos 6/7, 2026-11-19).
 
 ### Transições e ritmo
 - Corte seco é o padrão. Em apoios, transição em cerca de 1 a cada 3; nunca dissolve longo em reel (2026-09-30).

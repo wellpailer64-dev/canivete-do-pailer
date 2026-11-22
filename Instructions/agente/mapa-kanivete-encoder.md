@@ -50,6 +50,11 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | `first_run.py` | ffmpeg FIXO na série 8.1 (campo `versao`) |
 
 ## 3. Regras que valem para tudo
+- **Limpeza antes do render**: `export_placa.preparar_placa` roda antes da exportação final com GPU e da conversão
+  H.264/HEVC com GPU no Encoder. Cancela a prévia descartável, libera modelos registrados em `memoria` e o cache
+  CUDA já carregado, sem importar motores de IA. Não roda em áudio, CPU explícita, prévias ou Comps transparentes.
+  Não libera memória de outros programas nem garante GPU para efeitos incompatíveis; a checagem de memória e a
+  tentativa em blocos continuam valendo.
 - **Cópias Full HD automáticas** (`otimizar.usar_otimizados`, no começo do `exportar_video`): camada de vídeo com cópia
   em "Otimizados FullHD" (mais nova que o original) e que aparece em até 1080 no lado menor é lida da cópia, com escala,
   quadros-chave e âncora ajustados. Fora da prévia renderizada e das Comps.

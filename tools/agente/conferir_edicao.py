@@ -163,6 +163,17 @@ for q in seqs:
         # onda encostada na borda = palavra comida no início ou no fim (regra do Pailer, 2026-11-13): reprova, não é "ouvir"
         for lin in [x for x in o.splitlines() if " voz na borda " in x and "voz na borda nan" not in x]:
             relato("REPROVADO", "início de corte" if " início " in lin else "fim de corte", lin.strip())
+# contagem (textos só com número): mesma pessoa em dois números reprova — ouvir não mostra quem é (Carlinhos 6/7, 2026-11-19)
+for q in seqs:
+    if sum(1 for c in (q.get("clips") or []) if str(c.get("tx", {}).get("t", "")).strip().isdigit()) >= 3:
+        from pessoas_repetidas import conferir as _repetidas
+        r_ = _repetidas(a.projeto, q["name"])
+        for x in r_["repetidas"]:
+            relato("REPROVADO", x["tipo"], f"números {', '.join(x['itens'])} ({', '.join(x['arquivos'])}): tools/agente/pessoas_repetidas.py")
+        for x in r_["olhar"]:
+            relato("OLHAR", x["tipo"], f"números {', '.join(x['itens'])}")
+        if r_.get("folha"):
+            relato("OLHAR", "folha de rostos", r_["folha"])
 if a.render:
     print("## render", os.path.basename(a.render))
     som = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", a.render, "-af", "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
