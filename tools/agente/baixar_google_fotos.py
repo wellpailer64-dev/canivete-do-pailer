@@ -23,7 +23,7 @@ except Exception:
     pass
 KB = r"D:/Kanivete/Plugins/kanibrowser/kb.py"
 COLETOR = r"""(async()=>{const z=ms=>new Promise(r=>setTimeout(r,ms));const S=new Map();
-const col=()=>document.querySelectorAll('a[href*="/photo/"]').forEach(a=>{const d=a.querySelector('[style*="background-image"]')||a.parentElement.querySelector('[style*="background-image"]');const m=d&&d.style.backgroundImage.match(/url\("?([^")]+)/);if(m)S.set(a.getAttribute('href'),[a.getAttribute('aria-label')||'',m[1].split('=')[0]]);});
+const col=()=>document.querySelectorAll('a[href*="/photo/"]').forEach(a=>{const d=a.querySelector('[style*="background-image"]')||a.parentElement.querySelector('[style*="background-image"]');const m=d&&d.style.backgroundImage.match(/url\("?([^")]+)/);const im=!m&&a.querySelector('img[src*="googleusercontent.com/pw/"]');if(m)S.set(a.getAttribute('href'),[a.getAttribute('aria-label')||'',m[1].split('=')[0]]);else if(im)S.set(a.getAttribute('href'),[a.getAttribute('aria-label')||'',im.src.split('=')[0]]);});
 const sc=[...document.querySelectorAll('*')].filter(e=>e.scrollHeight>e.clientHeight+200&&/(auto|scroll)/.test(getComputedStyle(e).overflowY));
 let parado=0,antes=-1;
 for(let i=0;i<200&&parado<6;i++){col(); sc.forEach(e=>e.scrollTop+=700); window.scrollBy(0,700); await z(450);
@@ -41,7 +41,16 @@ def kb(*args, timeout=180):
 
 def coletar(link):
     kb("ir", link)
-    time.sleep(4)
+    # espera a grade aparecer (navegador lento chegou a levar >30 s; 4 s fixos coletavam 0 itens)
+    for _ in range(30):
+        time.sleep(2)
+        try:
+            n = kb("js", "document.querySelectorAll('a[href*=\"/photo/\"]').length", timeout=30).strip().splitlines()
+            if n and n[0].strip().isdigit() and int(n[0]) > 0:
+                break
+        except SystemExit:
+            pass
+    time.sleep(2)
     pasta = os.environ.get("TEMP", "D:/kanivete_testes/tmp")
     arq = os.path.join(pasta, "gf_coletor.js")
     with open(arq, "w", encoding="utf-8") as f:
@@ -62,6 +71,13 @@ def baixar(itens, dest, reserva):
     ok = pulados = erros = 0
     for i, (rot, base) in enumerate(itens, 1):
         sufixo = "=dv" if rot.lower().startswith("v") else "=d"
+        if not rot:  # álbum de 1 item (img sem rótulo): tenta vídeo; se não for, cai para foto
+            try:
+                rr = urllib.request.urlopen(urllib.request.Request(base + "=dv", method="HEAD",
+                                            headers={"User-Agent": "Mozilla/5.0"}), timeout=60)
+                sufixo = "=dv" if rr.headers.get("Content-Type", "").startswith("video") else "=d"
+            except Exception:
+                sufixo = "=d"
         for t in range(3):
             try:
                 r = urllib.request.urlopen(urllib.request.Request(base + sufixo, headers={"User-Agent": "Mozilla/5.0"}),
