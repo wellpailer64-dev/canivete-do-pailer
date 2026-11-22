@@ -46,7 +46,12 @@
     const inserir = (o, a) => {
         const cam = camadaAlvo(a);
         if (cam.trava) throw new Error(`camada "${cam.nome}" está travada`);
-        cam.itens.push(o); VK.sel = [o.id];
+        // ordem na criação: atras:true (fundo da camada) ou abaixo_de/acima_de:'nome' (vizinho na mesma camada)
+        const viz = a.abaixo_de || a.acima_de, j = viz ? cam.itens.findIndex(x => x.nome === viz) : -1;
+        if (viz && j < 0) throw new Error(`abaixo_de/acima_de: "${viz}" não está na camada "${cam.nome}"`);
+        if (j >= 0) cam.itens.splice(a.abaixo_de ? j : j + 1, 0, o);
+        else if (a.atras) cam.itens.unshift(o); else cam.itens.push(o);
+        VK.sel = [o.id];
         return o;
     };
     // "Arial Bold" (família + estilo juntos, como agentes e PDFs costumam mandar) → fam "Arial", estilo "Bold"
@@ -136,6 +141,21 @@
         if (a.nome) o.nome = a.nome;
         inserir(o, a);
         return { ...res(o), ppi_efetivo: Math.round(72 / s), modo: r.modo };
+    });
+    // troca o arquivo de imagens já colocadas mantendo posição, rotação, ordem e nome; manter: 'largura' (padrão) | 'altura'
+    vkRegistrar('trocar_imagem', 'trocar imagem', async a => {
+        const objs = alvos(a).filter(o => o.tipo === 'imagem');
+        if (!objs.length) throw new Error('trocar_imagem: nenhuma imagem nos alvos (use nomes/ids)');
+        const r = await vkApi().vk_imagem_info(a.arquivo);
+        if (!r || !r.success) throw new Error('não abriu a imagem: ' + a.arquivo);
+        const iid = vkId('i'); VK.doc.imagens[iid] = { arquivo: r.arquivo, origem: r.arquivo, assin: r.assin, w: r.w, h: r.h, modo: r.modo, url: r.url, nome: r.nome, alfa: r.alfa };
+        const out = [];
+        for (const o of objs) {
+            const v = VK.doc.imagens[o.img] || r, k = a.manter === 'altura' ? v.h / r.h : v.w / r.w;
+            o.m = [o.m[0] * k, o.m[1] * k, o.m[2] * k, o.m[3] * k, o.m[4], o.m[5]]; o.img = iid;
+            out.push({ ...res(o), ppi_efetivo: Math.round(72 / Math.hypot(o.m[0], o.m[1])) });
+        }
+        return { trocadas: out.length, itens: out };
     });
     // ── alterar ──
     vkRegistrar('alterar', 'alterar', async a => {

@@ -102,12 +102,15 @@ Unidades de agente: **mm relativos ao canto da prancheta** (`prancheta: nome|id|
 `un:'pt'` = pontos absolutos (a interface usa). Alvos: `ids` ou `nomes` (sem = seleção). Cores em texto:
 `#ff0000`, `C0 M100 Y100 K0`, `100K`, `cmyk(0,100,100,0)`, `spot:PANTONE 286 C:100,75,0,0[:tint]`, `registro`, nome de amostra, `nenhum`.
 Comandos (`VKN.comandos()`): novo, documento, abrir, importar, salvar, exportar_pdf, exportar_imagem, exportar_svg,
-retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, alterar, mover,
+retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, trocar_imagem, alterar, mover,
 posicionar, redimensionar, girar, refletir, matriz, alinhar, distribuir, organizar, agrupar, desagrupar, mascara,
 soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), setor, arco, qrcode, icone, vetorizar, bibliotecas_cor, cores_biblioteca, cor_biblioteca, cores_arte, recolorir, criar_padrao, padrao, criar_simbolo, colocar_simbolo, redefinir_simbolo, soltar_simbolo, simbolos, recuperacao, mascara_opacidade, soltar_mascara_opacidade, degrade (tipo, cores|paradas, angulo, traco), mesclar (2 caminhos, passos; VIVO por padrão: grupo {mescla:{passos, espinha}, itens:[A,B]}, passos calculados na hora — mexer em A/B refaz; espinha = caminho que segue; vivo:false = assado), mescla (passos, espinha|null), expandir_mescla, ferramenta Degradê G (arraste; Alt = radial; mantém as cores do degradê), aparencia, efeito, expandir_aparencia, lapis, simplificar, bolha, borracha, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
 nova_prancheta, prancheta, mover_prancheta, amostra, cores_padrao, definir_subs, converter_cmyk, preto_texto,
 sobreimprimir_preto, tirar_sobre_branco, engrossar_tracos, limpar, mapa, info, ajuda.
 Fonte "Arial Bold" (família + estilo juntos) é entendida. Só `preench` informado = sem traço.
+Ordem já na criação (qualquer comando que cria): `atras:true` (fundo da camada), `abaixo_de:'nome'` ou `acima_de:'nome'`
+(vizinho na mesma camada) — dispensa `organizar`. `trocar_imagem` {nomes, arquivo, manter:'largura'|'altura'}: troca
+o arquivo mantendo posição, rotação, ordem e nome (não apagar e recriar).
 
 Worker: `"app": "vetor"` (tools/worker/worker.py), objetos pelo NOME, condições `existe|cor|traco|texto|tamanho|x|y|larg|alt|sobreimprimir:NOME=valor`,
 `sem:NOME`, `objetos:N`, `fechamento_ok:x4`, `exportado`. Ver `Instructions/agente/worker.md`.
