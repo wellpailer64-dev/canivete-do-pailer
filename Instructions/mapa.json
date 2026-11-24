@@ -975,6 +975,7 @@
   "kb_exportar_png",
   "qr_previa",
   "qr_exportar",
+  "qr_copiar",
   "qr_escolher_logo",
   "ata_listar",
   "ata_abrir",
@@ -2341,6 +2342,10 @@
    "args": "p, formato",
    "modulos": []
   },
+  "qr_copiar": {
+   "args": "p",
+   "modulos": []
+  },
   "qr_escolher_logo": {
    "args": "",
    "modulos": []
@@ -3163,6 +3168,7 @@
   "caminho": "caminho",
   "texto": "texto",
   "imagem": "colocar imagem",
+  "trocar_imagem": "trocar imagem",
   "alterar": "alterar",
   "mover": "mover",
   "posicionar": "posicionar",
@@ -3411,6 +3417,7 @@
   "tools/worker/entrevista.py": "Entrevista do assistente local (Canivete Worker): mesmos pedidos para cada modelo do Ollama, mede acerto de",
   "tools/worker/worker.py": "Canivete Worker: executa um contrato de tarefa (Task Contract) no Photo Kanivete com um modelo local (Ollama),",
   "tools/aplicar.py": "Aplica mudanças no app ABERTO sem recarregar a página (o projeto, as janelas soltas e o Ctrl+Z continuam)",
+  "tools/atalho_drive.py": "Atalho .url para uma pasta/arquivo do Drive (duplo clique abre direto no navegador)",
   "tools/atalho_runapp.py": "Atalho do KANIVETE pelo código (o Runapp sem console): pythonw + main.py, ícone do app e o AppUserModelID do processo",
   "tools/briefing.py": "Briefing barato de uma pasta do cliente: lê PDF/imagens/áudios/vídeos e devolve UM resumo em texto + poucas folhas",
   "tools/contorno.py": "Qualidade do contorno de um logo (o \"pente de curvatura\" do RoboFont/Glyphs, para conferir sem olhar a olho)",
@@ -3473,6 +3480,7 @@
   "Instructions/agente/diretor-de-arte.md": "Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)",
   "Instructions/agente/efeitos-sonoros-video.md": "Efeitos sonoros do Vídeo Kanivete — referência rápida",
   "Instructions/agente/equalizador.md": "Equalizador paramétrico (Vídeo Kanivete)",
+  "Instructions/agente/estudo-teaser-expocatadores.md": "Estudo: Teaser ExpoCatadores (edição do Pailer, aprovada pela equipe)",
   "Instructions/agente/ferramentas-repetitivas.md": "Ferramentas prontas: gatilho → comando",
   "Instructions/agente/fluxo-peca-cliente.md": "Peça de cliente: do card à aprovação",
   "Instructions/agente/guia-edicao.md": "Guia de edição :: Vídeo Kanivete — para agentes de IA",

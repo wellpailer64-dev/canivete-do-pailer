@@ -90,6 +90,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 - Sem pisca: B-roll vai até a troca de cena ou sobra ao menos 1,5 s de rosto. Sem buraco preto (2026-10-22).
 - B-roll casa com o que é dito naquele instante. Só plano estável e bem composto; não repetir imagem.
 - Drone: cortar a correção de ângulo e começar no trecho estável (2026-10-24).
+- **Motion avançado em ponto alto (teaser/evento/abertura):** placa que abre (revelação por vazado + zoom de passagem) e logo/texto por trás da silhueta. Nomes, gatilhos e como montar: `Instructions/agente/motions-avancados-catalogo.md`. Poucos por vídeo, só se ficar limpo e profissional.
 - **Escolha do take: o momento, visto no bruto inteiro (estudo do Teaser ExpoCatadores, 2026-11-24).** Nunca pegar o começo do arquivo ou o primeiro trecho estável. Antes de escolher, ver o bruto inteiro em tira: `py -3.13 tools/agente/escolher_take.py take BRUTO.mov` (risca borrado, câmera procurando, rosto cortado e estouro; mostra um candidato limpo a cada 2 s). Nitidez e tremor só eliminam; quem decide é o conteúdo, no olho:
   - auge do gesto ou da reação (aceno, abraço, sorriso, olhar que sobe), não o meio da fala nem o quadro morno entre duas ações;
   - contexto: gente junto e a marca do evento no quadro (painel, logo, frase); plano mais aberto que aguente recorte depois, em vez de close gigante de microfone (ele escolheu rosto com metade do tamanho do resto do bruto);
