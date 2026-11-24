@@ -4574,6 +4574,10 @@ class ApiBridge:
         from Functions import pincel_roto
         return pincel_roto.estado(rid)
 
+    def ve_roto_saude(self, rid, reparar=True):
+        from Functions import pincel_roto
+        return pincel_roto.saude(rid, bool(reparar))
+
     def ve_roto_base(self, rid, quadro, pontos, seguir=True):
         from Functions import pincel_roto
         try:

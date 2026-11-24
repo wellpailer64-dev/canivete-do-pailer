@@ -409,6 +409,61 @@ def estado(rid):
             "fila": sum(1 for x in _fila if x[0] == rid), **e}
 
 
+def saude(rid, reparar=True):
+    """Diagnóstico por número do recorte (o motivo de um quadro sair sem máscara) e, com reparar, conserta sozinho:
+    prévia sumida (limpador do cache, antivírus) volta do alfa; sem alfa volta da probabilidade (refinar); sem nada,
+    o quadro é seguido de novo (Freeze). Devolve contagens e os trechos de quadros sem recorte."""
+    j = _jobs.get(rid)
+    if not j:
+        return {"success": False, "error": "não aberto", "motivo": "trabalho fechado no Python (app reiniciou): reabrir"}
+    i, n = j.info, j.info["n"]
+    w, h = i["w"], i["h"]
+    sem_p, refazer_p, refinar_q, seguir_q = [], 0, [], []
+    for q in range(n):
+        if not i["ver"][q]:
+            sem_p.append(q)
+            continue
+        if os.path.isfile(j.arq("p", q)):
+            continue
+        sem_p.append(q)
+        a8 = cv2.imread(j.arq("a", q), cv2.IMREAD_GRAYSCALE) if os.path.isfile(j.arq("a", q)) else None
+        if a8 is not None:
+            if reparar:
+                _png_previa(j.arq("p", q), cv2.resize(a8, (max(2, w // 2), max(2, h // 2)), interpolation=cv2.INTER_AREA))
+                j.nova_versao(q)
+                refazer_p += 1
+        elif os.path.isfile(j.arq("m", q)):
+            refinar_q.append(q)
+        else:
+            seguir_q.append(q)
+    if reparar:
+        with j.trava_ver:
+            for q in seguir_q:
+                i["ver"][q] = 0
+        if refinar_q:
+            _enfileirar(rid, "refinar")
+        if (seguir_q or any(not v for v in i["ver"]) or i["pend"]) and i["bases"]:
+            congelar(rid)
+        j._salvar()
+    faltam = [q for q in sem_p if not (reparar and os.path.isfile(j.arq("p", q)))]
+    trechos, ini = [], None
+    for k, q in enumerate(faltam):
+        if ini is None:
+            ini = q
+        if k + 1 == len(faltam) or faltam[k + 1] != q + 1:
+            trechos.append([ini, q])
+            ini = None
+    motivo = ("sem quadro-base (pinte ou Selecionar assunto)" if not i["bases"] else
+              "lendo o vídeo" if not i.get("extraido") else
+              "erro: " + j.estado["erro"] if j.estado["erro"] else
+              "seguindo" if j.estado["rodando"] or any(x[0] == rid for x in _fila) else
+              "falta Freeze" if faltam else "ok")
+    return {"success": True, "n": n, "prontos": n - len(faltam), "faltam": len(faltam), "trechos": trechos[:20],
+            "previa_refeita": refazer_p, "refinar": len(refinar_q), "seguir_de_novo": len(seguir_q),
+            "bases": sorted(int(k) for k in i["bases"]), "pend": i["pend"], "motivo": motivo,
+            "rodando": j.estado["rodando"], "fila": sum(1 for x in _fila if x[0] == rid), "qual": i["qual"]}
+
+
 def _interromper_seguimento(j, rid):
     """Pintou com o seguimento rodando: ele para no quadro em que está (o que faltou continua pendente) e volta depois
     do quadro-base novo — a resposta do traço não espera o vídeo inteiro."""

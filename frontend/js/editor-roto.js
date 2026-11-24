@@ -38,7 +38,8 @@ VE_FX.roto = {
         if (!st || !st.url_p) { VE._rotoFalta = true; return a; }
         veRotoParams(st, v);
         const i = veRotoQuadro(st, env.c, env.T);
-        if (i < 0 || !st.ver[i]) return a;   // fora do trecho ou ainda sem recorte: opaco (como antes do efeito)
+        if (i < 0) return a;   // fora do trecho: opaco (a saúde avisa)
+        if (!st.ver[i]) { veRotoCurarLogo(st.rid); VE._rotoFalta = true; return a; }   // sem recorte: conserta sozinho
         let img = veRotoImg(st, i);
         if (VE.playing) for (let k = 1; k <= 10; k++) if (st.ver[i + k]) veRotoImg(st, i + k);   // tocando: busca à frente
         if (!img) {   // ainda carregando: usa a do quadro vizinho já carregada (não pisca sem recorte)
@@ -138,7 +139,9 @@ function veRotoImg(st, i, soPronta, tipo = 'p') {
             e.falhou = true;
             VERO.falhas = VERO.falhas || new Map();
             const n = (VERO.falhas.get(chave) || 0) + 1; VERO.falhas.set(chave, n);
-            if (tipo === 'p' && n <= 6) setTimeout(() => { if (VERO.img.get(chave) === e) { VERO.img.delete(chave); veRotoRedesenhar(); } }, 800);
+            // 3ª falha: endereço velho (Python reiniciou) ou arquivo sumido → reabre o trabalho e repara
+            if (tipo === 'p' && n === 3) veRotoCurar(st.rid, true);
+            if (tipo === 'p' && n <= 12) setTimeout(() => { if (VERO.img.get(chave) === e) { VERO.img.delete(chave); veRotoRedesenhar(); } }, Math.min(5000, 800 * n));
         };
         im.src = `${tipo === 'c' ? st.url_c : st.url_p}${tipo}_${String(i).padStart(5, '0')}.png?v=${st.ver[i]}`;
         VERO.img.set(chave, e);
@@ -168,7 +171,9 @@ function veRotoVigiar() {
         if (tocando !== !!VERO.pausado) { VERO.pausado = tocando; api.ve_roto_pausar?.(tocando); }
         for (const st of Object.values(VERO.st)) {
             if (!st.vigiar && !(VERO.tela && !VERO.tela.el.hidden && VERO.tela.rid === st.rid)) continue;
-            const r = await api.ve_roto_estado(st.rid); if (!r || !r.success) continue;
+            const r = await api.ve_roto_estado(st.rid);
+            if (r && r.error === 'não aberto') { veRotoCurar(st.rid); continue; }   // Python reiniciou: reabre
+            if (!r || !r.success) continue;
             const mud = r.ver.some((v, i) => v !== st.ver[i]);
             Object.assign(st, { ver: r.ver, rodando: r.rodando, fila: r.fila, fase: r.fase, feito: r.feito, total: r.total, msg: r.msg, erro: r.erro, s_quadro: r.s_quadro, extraido: r.extraido, pend: r.pend, qual: r.qual });
             st.vigiar = r.rodando || r.fila > 0;
@@ -183,6 +188,47 @@ function veRotoVigiar() {
         }
     }, 400);
     Object.values(VERO.st).forEach(st => { st.vigiar = true; });
+}
+
+// ── saúde: acha o motivo de quadro sem máscara e conserta sozinho (reabre o trabalho, refaz prévia, Freeze) ──
+const veRotoClipeDe = rid => VE.clips.find(c => { const f = veRotoFx(c); return f && f.v.rd && f.v.rd.rid === rid; }) || null;
+async function veRotoCurar(rid, reabrir = false) {
+    VERO.curando = VERO.curando || {};
+    if (VERO.curando[rid] || VE.exportRunning) return null;
+    const c = veRotoClipeDe(rid), api = window.pywebview && window.pywebview.api; if (!c || !api || !api.ve_roto_saude) return null;
+    VERO.curando[rid] = true;
+    try {
+        let r = await api.ve_roto_saude(rid, true);
+        if (!r || !r.success || reabrir) {   // Python perdeu o trabalho: reabre (endereço novo da prévia) e repara
+            delete VERO.st[rid];
+            [...VERO.img.keys()].forEach(k => { if (k.startsWith(rid + '|')) VERO.img.delete(k); });
+            if (!await veRotoAbrirJob(veRotoFx(c).v.rd, c)) return r;
+            r = await api.ve_roto_saude(rid, true);
+        }
+        const st = VERO.st[rid]; if (st) { st.vigiar = true; st.saude = r; veRotoVigiar(); }
+        if (r && r.previa_refeita) veRotoRedesenhar();
+        return r;
+    } finally { setTimeout(() => { delete VERO.curando[rid]; }, 4000); }
+}
+// chamado pelo desenho do quadro sem máscara: no máximo 1 conserto a cada 10 s por recorte, fora do play
+function veRotoCurarLogo(rid) {
+    VERO.curaT = VERO.curaT || {};
+    const st = VERO.st[rid]; if (!st || st.rodando || st.fila || VE.playing || !Object.keys(st.bases || {}).length) return;
+    if (Date.now() - (VERO.curaT[rid] || 0) < 10000) return;
+    VERO.curaT[rid] = Date.now(); veRotoCurar(rid);
+}
+// relatório por clipe (para a Kani e para o botão): parte visível do clipe fora do trecho recortado entra como aviso
+async function veRotoSaude(c, reparar = true) {
+    const f = veRotoFx(c); if (!f || !f.v.rd) return { ok: false, motivo: 'clipe sem Pincel Roto' };
+    const rd = f.v.rd, api = window.pywebview.api;
+    if (!VERO.st[rd.rid]) await veRotoAbrirJob(rd, c);
+    let r = await api.ve_roto_saude(rd.rid, !!reparar);
+    if ((!r || !r.success) && reparar) { delete VERO.curando?.[rd.rid]; r = await veRotoCurar(rd.rid, true); }
+    if (r && r.previa_refeita) veRotoRedesenhar();
+    const fora = [Math.max(0, rd.a - c.s), Math.max(0, c.e - rd.b)];
+    if (r) r.fora_do_trecho_s = +(fora[0] + fora[1]).toFixed(2);
+    if (r && r.fora_do_trecho_s > 0.05) r.motivo = (r.motivo === 'ok' ? '' : r.motivo + '; ') + 'clipe esticado além do trecho recortado (abra o Pincel Roto de novo)';
+    return Object.assign({ ok: !!(r && r.success && !r.faltam && !(r.fora_do_trecho_s > 0.05)), clipe: c.nome || '' }, r || {});
 }
 
 // ── exportação: o clipe com recorte vira o vídeo transparente do trecho (chamado pelo veTxPngs) ──
@@ -332,6 +378,10 @@ async function veRotoTelaAbrir(c) {
 function veRotoTelaFechar() {
     const T = VERO.tela; if (!T || T.el.hidden) return;
     T.play = null; T.el.hidden = true; cancelAnimationFrame(T.raf);
+    // voltou à timeline com quadro-base sem Freeze: segue sozinho (senão o preview fica sem recorte)
+    const st = VERO.st[T.rid];
+    if (st && (st.pend || []).length && Object.keys(st.bases || {}).length && !st.rodando && !st.fila)
+        window.pywebview.api.ve_roto_congelar(st.rid).then(() => { st.vigiar = true; veRotoVigiar(); });
     veRefresh();
 }
 function veRotoTelaBotoes() {
@@ -589,5 +639,23 @@ const VEROTO_API = {
     esperar(c) { c = c || VE.clips[VE.sel]; const f = veRotoFx(c); return f && f.v.rd ? veRotoEsperar(f.v.rd.rid) : null; },
     estado(c) { c = c || VE.clips[VE.sel]; const f = veRotoFx(c), st = f && f.v.rd && VERO.st[f.v.rd.rid]; return st ? { n: st.n, prontos: st.ver.filter(Boolean).length, rodando: !!(st.rodando || st.fila), erro: st.erro || '', bases: Object.keys(st.bases || {}).map(Number), pend: st.pend || [], qual: st.qual || '', msg: st.msg || '' } : null; },
     quadro: (c, T) => { c = c || VE.clips[VE.sel]; const f = veRotoFx(c), st = f && VERO.st[f.v.rd.rid]; return st ? veRotoQuadro(st, c, T) : -1; },
+    saude: (c, reparar = true) => veRotoSaude(c || VE.clips[VE.sel], reparar),
+    // tudo de uma vez: abre, Selecionar assunto no quadro do meio (ou no indicado), Freeze, espera e devolve a saúde
+    async auto(c, quadro) {
+        c = c || VE.clips[VE.sel];
+        if (!await veRotoTelaAbrir(c)) return { ok: false, motivo: 'não abriu' };
+        const f = veRotoFx(c), rid = f.v.rd.rid;
+        for (let k = 0; k < 600 && !(VERO.st[rid] && VERO.st[rid].extraido); k++) await new Promise(ok => setTimeout(ok, 300));
+        const st = VERO.st[rid]; if (!st || !st.extraido) return { ok: false, motivo: 'não leu os quadros' };
+        const i = quadro != null ? quadro : Math.floor(st.n / 2);
+        if (!Object.keys(st.bases || {}).length) veRotoMudarTracos(c, i, l => [{ l: 1, auto: 1, r: 0, p: [] }, ...l.filter(t => !t.auto)]);
+        await new Promise(ok => setTimeout(ok, 600));
+        await veRotoEsperar(rid);
+        await window.pywebview.api.ve_roto_congelar(rid);
+        await new Promise(ok => setTimeout(ok, 500));
+        await veRotoEsperar(rid);
+        veRotoTelaFechar();
+        return veRotoSaude(c);
+    },
 };
 window.VEROTO_API = VEROTO_API;
