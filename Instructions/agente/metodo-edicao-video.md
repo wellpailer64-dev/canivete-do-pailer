@@ -72,7 +72,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 
 ### Zoom e camadas
 - Zoom dinâmico só em camada de ajuste, nunca escala animada no clipe (2026-11-01).
-- Zoom é de ênfase, não um por corte: escolhido pelo que está sendo dito (número, pergunta, ponto forte, chamada), entra suave, sustenta e volta suave. Nada de pular de zoom mínimo para máximo e voltar a cada corte; fora da ênfase o quadro fica parado (2026-11-06).
+- Zoom é de ênfase, não um por corte: escolhido pelo que está sendo dito (número, pergunta, ponto forte, chamada), entra suave, sustenta e volta suave. Nada de pular de zoom mínimo para máximo e voltar a cada corte; fora da ênfase o quadro fica parado (2026-11-06). Exceção, montagem musical sem fala (teaser, abertura, cobertura): punch-in **em degrau** no mesmo take, escala nova a cada corte na semicolcheia, sem animar entre eles, é técnica do Pailer (Teaser ExpoCatadores, 2026-11-24).
 - Cor em outra camada de ajuste, abaixo de logo, tarjas e legendas (2026-11-01).
 - Cor medida, não chutada (2026-11-06): cada fonte passa por `tools/agente/cor_auto.py` (escopos: branco p99,5 ≤ ~0,95 sem estouro, preto 0,02–0,06 sem esmagar, neutro sem puxar cor, pele na linha de pele; pele vermelha/saturada corrigida no HSL secundário só na faixa dela), partindo da grade do cliente. O `reel_fala.py` já faz isso: uma camada de cor por trecho de fonte (`"cor_auto": false` desliga).
 - Trilha começa onde a música começa de verdade (2026-11-06): intro lenta, sem ritmo ou melodia não abre vídeo dinâmico. `tools/agente/musica_ponto.py` mede energia/ataques por compasso, classifica calmo/médio/agitado, acha a entrada do ritmo e o drop; o vídeo abre na batida desse ponto (calmo→agitado = virada). `reel_fala.py` usa por padrão (`"musica_inicio": "auto"`; número = segundo fixo; 0 = do começo); precisa sobrar música para o vídeo todo, senão recua. Se o vídeo tiver momento calmo e momento de impacto, casar a virada/drop com o corte da fala principal.
@@ -90,6 +90,12 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 - Sem pisca: B-roll vai até a troca de cena ou sobra ao menos 1,5 s de rosto. Sem buraco preto (2026-10-22).
 - B-roll casa com o que é dito naquele instante. Só plano estável e bem composto; não repetir imagem.
 - Drone: cortar a correção de ângulo e começar no trecho estável (2026-10-24).
+- **Escolha do take: o momento, visto no bruto inteiro (estudo do Teaser ExpoCatadores, 2026-11-24).** Nunca pegar o começo do arquivo ou o primeiro trecho estável. Antes de escolher, ver o bruto inteiro em tira: `py -3.13 tools/agente/escolher_take.py take BRUTO.mov` (risca borrado, câmera procurando, rosto cortado e estouro; mostra um candidato limpo a cada 2 s). Nitidez e tremor só eliminam; quem decide é o conteúdo, no olho:
+  - auge do gesto ou da reação (aceno, abraço, sorriso, olhar que sobe), não o meio da fala nem o quadro morno entre duas ações;
+  - contexto: gente junto e a marca do evento no quadro (painel, logo, frase); plano mais aberto que aguente recorte depois, em vez de close gigante de microfone (ele escolheu rosto com metade do tamanho do resto do bruto);
+  - mini-história quando o bruto tiver: ação → resultado → reação em 3 cortes curtos;
+  - evitar costas, olhar para baixo (celular), câmera procurando, entrevistador tapando.
+  Em depoimento vale o mesmo princípio: dentro da fala, o trecho com expressão viva e olhar para a câmera/entrevistador. Detalhe: `Instructions/agente/estudo-teaser-expocatadores.md`.
 - Tomada boa e curta: esticar no máximo até 75% de velocidade (2026-10-14).
 - Contagem/desfile de pessoas (aprovados, alunos, clientes): cada pessoa entra UMA vez. Pasta de bruto costuma ter 2 takes seguidos da mesma pessoa (horários colados no nome do arquivo); ouvir não mostra quem é. Conferir por rosto: `tools/agente/pessoas_repetidas.py projeto.vknv` (o conferir_edicao já roda quando há números na tela). Ao escolher takes, agrupar antes os arquivos de horário próximo e ficar com 1 por pessoa (Carlinhos 6/7, 2026-11-19).
 
@@ -97,7 +103,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 - Corte seco é o padrão. Em apoios, transição em cerca de 1 a cada 3; nunca dissolve longo em reel (2026-09-30).
 - Preferir transições, movimentos de camada e animações de texto prontas do editor quando resolverem a necessidade de forma simples; opções e aplicação em `Instructions/agente/animacoes-nativas-video.md` (2026-11-12).
 - Mudança brusca de ambiente: flare, leak ou fade curto (2026-10-14).
-- Corte e transição caem na batida quando for possível, sem mover corte de fala.
+- Corte e transição caem na batida quando for possível, sem mover corte de fala. Em montagem musical, a grade é a semicolcheia e o ponto é o ataque real do som, não a contagem: `escolher_take.py grade musica.mp3 --inicio S` (detalhe em `ritmo-cortes-audio.md` › Montagem musical).
 - Versões do mesmo assunto não podem começar igual (2026-10-01).
 
 ### Legenda e texto

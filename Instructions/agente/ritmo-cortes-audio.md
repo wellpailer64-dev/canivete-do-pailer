@@ -67,6 +67,20 @@ Medido comparando a minha entrega com a timeline que ele ajustou (Carlinhos, Qua
 
 - Objetos ilustrativos (regra universal): quando a fala cita algo concreto (preço → cifrão, prazo → relógio), pôr o objeto ao lado da pessoa, em posição harmônica e sem cobrir rosto/texto, com som que condiz (moeda, tique-taque) e animação nativa simples (pop/quicar). Melhor momento: os primeiros segundos (prender o scroll); no resto do vídeo só mais 1–2 vezes, se houver oportunidade. Sutil, nunca exagerado. Imagem: ChatGPT, gerador local (KNV.gerar / Functions/gerador_imagem) ou banco gratuito de ícones/PNG sem fundo, sempre na IDV do cliente (cores, estilo). Planejar já no roteiro de edição.
 
+## Montagem musical premium (teaser, abertura, cobertura de evento)
+Medido no Teaser ExpoCatadores do Pailer (2026-11-24; estudo completo em `estudo-teaser-expocatadores.md`). Princípios, não receita:
+- **Corte no ataque, na grade fina.** 92% dos cortes dele caem a até 2 quadros de uma semicolcheia e em cima de um ataque real (3,2x mais forte que um ponto qualquer). Só 23% caem na batida cheia. Ferramenta: `py -3.13 tools/agente/escolher_take.py grade musica.mp3 --inicio S --de A --ate B` lista os pontos com a força do ataque; usar os fortes.
+- **Duração pelo formato**: teaser 0,2–0,7 s por plano (mediana 0,43); chamada falada 0,9–1,9 s; entrevista e discurso 1,6–2,5 s.
+- **Arco com contraste**: abertura com a marca → acelera → tensão/causa com ritmo mais lento (P&B, câmera lenta) → respiro de marca → clímax → celebração → fecho na marca, com a última imagem na última batida da música (a música acaba com o vídeo).
+- **O clímax respira**: no auge, planos mais longos (0,7–1,3 s) que no resto; não é o trecho mais picado.
+- **Respiro da música = plano segurado**: onde a energia da faixa cai (fim de frase musical), segurar um plano de 2 batidas, desacelerar ou entrar a marca; depois voltar a picar. Se a faixa for constante, a curva vem da montagem.
+- **Energia sem trocar de assunto**: punch-in em degrau no mesmo take (escala nova por corte), um plano aberto recortado em dois (esquerda/direita), pulos curtos dentro do mesmo bruto, elementos gráficos que sobem em degraus na batida.
+- **Velocidade por trechos**: acelerar o deslocamento sem interesse (pan, gente andando, 2–6x) e desacelerar no destino (rosto, gesto, 0,3–0,65x).
+- **Mini-história**: ação → resultado → reação em três cortes curtos do mesmo bruto.
+- **Escolha do take**: o momento (auge do gesto, reação, contexto com gente e marca) visto no bruto inteiro; métrica técnica só elimina. Regra em `metodo-edicao-video.md` › Escolha do take.
+
+Cobertura falada do mesmo evento (chamadas, entrevista, discurso): abrir com 1–2 s de B-roll do evento sob a primeira frase; apresentador em plano médio com o painel do evento atrás; quando a fala cita alguém, mostrar essa pessoa; na entrevista, plano a dois na pergunta e close na resposta; no discurso, cortar para a plateia ouvindo sob a fala; fechar com B-roll do evento sob a voz (L-cut) e a marca.
+
 ## Lacunas: critérios para implementação
 
 - **Speed ramp:** alteração contínua e suavizada da velocidade, conversão correta entre tempo da fonte e da timeline, duração, som, sincronismo, salvamento, desfazer/refazer, prévia e exportação equivalentes. Testar diferentes taxas de origem e trechos com/sem áudio; não declarar concluído só com clipes segmentados.

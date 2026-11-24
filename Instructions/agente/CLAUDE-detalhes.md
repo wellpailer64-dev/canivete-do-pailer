@@ -580,3 +580,6 @@ o app do usuário para aplicar esta correção. Guia: `Instructions/modo-agente.
 - **Vigia** (`Functions/vigia_webview.py`): `gpu-process` ≥ 2500 MB e crescendo é recriado sozinho (só ele); `_laco_saude` detecta página sem resposta (~45 s, CPU parada) e recarrega (máx. 3 vezes/10 min). `KANIVETE_VIGIA_SAUDE=0` desliga.
 - **2 agentes no app:** `mcp_kanivete.py` usa trava de arquivo entre processos (`%TEMP%/kanivete_mcp/app_<porta>.lock`) por chamada.
 - **2 agentes no navegador:** `kb.py` manda a sessão (`KANICODE_REGISTRO`); `kanibrowser.definir_sessao` dá a cada agente a sua aba da Kani. Vale após reiniciar o KaniCode.
+
+## Escolha de take e grade musical (escolher_take.py)
+Estudo do Teaser ExpoCatadores (2026-11-24, `Instructions/agente/estudo-teaser-expocatadores.md`): nenhuma métrica de imagem acerta o trecho que o Pailer escolhe (45% x 44% ao acaso); a ferramenta só filtra defeito e mostra o bruto inteiro. `take BRUTO` (tira + JSON com candidatos e faixas de defeito; altura medida no 1º quadro por causa da rotação do iPhone) e `grade MUSICA --inicio S` (pontos de semicolcheia com força do ataque, `--tudo` lista a grade inteira). Regras: `metodo-edicao-video.md` › Escolha do take; `ritmo-cortes-audio.md` › Montagem musical.
