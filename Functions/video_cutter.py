@@ -4325,7 +4325,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         try:
             r = export_placa.exportar(args_placa, aberto, pasta_saida, prog, stop_event, proc_holder)
         except Exception as e:
-            r = {"success": False, "error": f"placa: {e}"}
+            import traceback as _tb
+            r = {"success": False, "error": f"placa: {e}", "trace": _tb.format_exc()}
         if (r is not None and not r.get("success") and not r.get("cancelled")
                 and any(k in (r.get("error") or "") for k in ("MEMORY", "allocate"))):
             # memória da placa: tenta de novo na placa, em blocos, antes de cair no processador
@@ -4339,6 +4340,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # "Processador · motivo": o Encoder mostra por que a montagem não foi na placa (antes era preciso investigar)
         if r is not None:
             _ultimo_motivo_placa[0] = r.get("error") or ""
+            try:   # o motivo completo fica em arquivo (antes só a etiqueta curta no Encoder; não dava para investigar)
+                import traceback as _tb
+                with open(os.path.join(_midia_dir(), "placa_motivo_ultimo.txt"), "w", encoding="utf-8") as _f:
+                    _f.write(time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + _ultimo_motivo_placa[0] + "\n" + (r.get("trace") or ""))
+            except Exception:
+                pass
             prog(0, "Processador · a placa não conseguiu (" + (("memória da placa cheia" if "MEMORY" in _ultimo_motivo_placa[0]
                                                                or "allocate" in _ultimo_motivo_placa[0] else "erro na placa")) + ")")
         else:
