@@ -17,6 +17,7 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Primeira noção da conversa: `WT resumo --conversa X --n 40`. A Kani já errou quem falou, data e o que estava pendente (2026-11-02): é só orientação; antes de agir, conferir no texto completo, cujo caminho vem na saída.
 - Ler mensagens: `WA ler --conversa X --n 20 --transcrever`. Procurar conversa: `WA conversas --busca termo`.
 - Baixar: `WA arquivo --conversa X --nome parte --pasta P`; `WA midia --conversa X --tipo video --duracao 1:10 --saida a.mp4`; `--tipo foto`.
+- Todos os links da conversa (meus e dele, sem repetir, com quem/quando/texto): `WA links --conversa X [--busca drive] [--data AAAA-MM-DD] [--json]`. Lê a conversa inteira (~5 min); "último link" = o mais recente da lista.
 - Enviar só com ok do Pailer: `WA enviar --conversa X --texto "..."`.
 - Mandar vídeo, Reels, exportação ou arquivo: `WA enviar --conversa X --arquivo v.mp4 --texto legenda`. Vídeo acima de 16 MB vai como arquivo, sem compressão; `--comprimir` só se pedirem. Ver como iria sem postar: `--sim` (só simula). PDF e documento vão sem `--documento`: essa opção é para foto e vídeo sem compressão. Nunca testar em grupo de cliente.
 - Saída do envio de arquivo: 0 enviado, 1 não enviado, 3 incerto. Com 3, olhar a conversa antes de reenviar.
