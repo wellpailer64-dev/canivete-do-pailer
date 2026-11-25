@@ -4059,7 +4059,9 @@ function veDrawMonitor() {
     if (!pr && typeof vePrForaDoTrecho === 'function') vePrForaDoTrecho();
     const prPerto = pr && VE.playing && pr.b - VE.playhead < 0.7 && !vePrSegEm(pr.b + 1e-4);
     if (pr && !prPerto && vePrDesenhar(pr, ctx, cv, pv, cw, ch)) { veParkExtras(0, false, true); return; }
-    const cached = pr ? null : veCacheGet(cw, ch, pv);
+    // PROXY desligado e parado: nada do quadro guardado (era feito com as prévias e, guardado preto, ficava preto:
+    // REEL 7, 2026-11-25 — o atalho de baixo, "if (cachedSrc) usarCache()", ignorava o semProxy)
+    const cached = pr || semProxy ? null : veCacheGet(cw, ch, pv);
     const cachedSrc = cached && (cached.bmp || cached.cv);
     const usarCache = () => {
         if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
