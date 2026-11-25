@@ -554,7 +554,10 @@ function veMoTem(c) {
         const f = (c.fx || []).find(x => x.id === q.id), d = f && VE_FX[f.t];
         return !!(d && d.animaFF && d.animaFF.includes(q.prop));
     };
-    if (c.k && Object.keys(c.k).some(k => veMoChave(k) && veKfOn(c, k) && !soFF(k))) return true;
+    // chave órfã (efeito/máscara já apagado) não anima nada: desenhar o clipe quadro a quadro só atrasava o export e
+    // podia falhar no seek (REEL 9 P3: fx.fxfim.amt sem o efeito, 2026-11-25)
+    const viva = k => { const q = veMoChave(k); return q && (q.tipo === 'fx' ? (c.fx || []).some(x => x.id === q.id) : q.tipo === 'mk' ? (c.mk || []).some(x => x.id === q.id) : !!c.fm); };
+    if (c.k && Object.keys(c.k).some(k => viva(k) && veKfOn(c, k) && !soFF(k))) return true;
     // efeito só de desenho; numa camada de ajuste, os que o ffmpeg faz (ajusteFF) seguem pela exportação normal
     return (c.fx || []).some(f => f.on !== false && VE_FX[f.t] && VE_FX[f.t].soDesenho && !veMoFFClipe(c, VE_FX[f.t]));
 }

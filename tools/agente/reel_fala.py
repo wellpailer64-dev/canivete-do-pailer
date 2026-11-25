@@ -470,7 +470,7 @@ def _escala(k):
                         "-of", "json", ARQ(k)], capture_output=True, text=True).stdout
     s = (json.loads(r or "{}").get("streams") or [{}])[0]
     w, h = s.get("width") or W, s.get("height") or H
-    rot = int((s.get("tags") or {}).get("rotate", 0) or next((d.get("rotation", 0) for d in s.get("side_data_list") or []), 0) or 0)
+    rot = int((s.get("tags") or {}).get("rotate", 0) or next((d["rotation"] for d in s.get("side_data_list") or [] if d.get("rotation")), 0) or 0)
     if rot % 180:
         w, h = h, w
     return round(100 * max(W / w, H / h), 2)
@@ -559,7 +559,7 @@ def nivelar_voz(falas, mapa):
             continue
         ganho = max(-3.0, min(CFG.get("voz_ganho_max", 9.0), alvo - nv))
         c["g"] = round(GANHO["voz"] + ganho, 1)
-        if ganho > 1:
+        if c["g"] > 0:
             c["afx"] = [{"id": f"limvoz{n}", "t": "limiter", "on": True, "v": {"ceil": -1, "boost": 0, "look": 3, "rel": 80, "link": 1}}]
         print(f"  voz {c['st']:6.2f}s: {nv:6.1f} dB -> ganho {ganho:+.1f}")
 
@@ -637,7 +637,11 @@ def versao(v):
             s0, s1 = round(s0, 3), round(s1, 3)
             # trechos vizinhos da mesma fonte: cada um abria a sua folga e os 0,15 s entre eles tocavam duas vezes
             # ("moto motor", Casa Morumbi 2026-11-13: 17 emendas). O corte segue de onde o anterior parou.
-            if ult and ult[0] == kk and ult[1] <= s0 < ult[2] < s1 - 0.1:
+            # Também quando o seguinte começa ANTES do início do anterior ou cabe inteiro dentro dele (resto de palavra,
+            # vale ajustado para trás): "em em parceria", REEL 9 Sônia 2026-11-25, 4 repetições numa pílula.
+            if ult and ult[0] == kk and s0 < ult[2] - 0.005 and s1 > ult[1]:
+                if s1 <= ult[2] + 0.1:
+                    continue          # já tocou inteiro no corte anterior
                 s0 = ult[2]
             ult = (kk, s0, s1)
             sc = ESC[kk]   # cobre o quadro em qualquer resolução; escala fixa, sem animação
@@ -652,10 +656,10 @@ def versao(v):
                 clips.append({"tr": 0, "x": "a", "st": round(t, 3), "s": round(s0 + at, 3), "e": round(s1 + at, 3), "m": MLAP[LAP(kk)], "g": GANHO["voz"],
                               **({"lk": lk} if ARQ(kk) else {})})
             voz_c = clips[-1]    # o clipe que leva a voz (lapela ou o próprio vídeo)
-            if (kk, s0) in FADE_INI:
-                voz_c["atin"] = {"t": "cp", "d": FADE}
-            if (kk, s1) in FADE_FIM:
-                voz_c["atout"] = {"t": "cp", "d": FADE}
+            # toda emenda de fala leva fade curto nas duas pontas, com ou sem vale: corte seco na onda soa duro
+            # (Pailer, REEL 9 Sônia 2026-11-25, "cortes secos, duros, percebe-se pelas waveforms")
+            voz_c["atin"] = {"t": "cp", "d": FADE}
+            voz_c["atout"] = {"t": "cp", "d": FADE}
             # a transcrição estica a palavra por cima da pausa que o corte tirou: a legenda fica dentro do clipe (não atravessa corte)
             for l_ in legendas(kk, a, b, s0 - t):
                 fim_c = round(t + s1 - s0 - 0.02, 3)
@@ -714,8 +718,13 @@ def versao(v):
                     print(f"  aviso: imagem {fonte} curta ({dm:.1f}s) para cobrir {d:.1f}s em {ini:.1f}s")
             clips.append({"tr": 1, "x": "v", "st": round(ini, 3), "s": round(s, 3), "e": round(s + min(d, dm - s), 3), "m": MID[fonte], "p": {**PADRAO, "sc": ESC[fonte]}})
     fonte_f, s_f = CFG["finalizacao"]
-    clips.append({"tr": 0, "x": "v", "st": fim_fala, "s": s_f, "e": round(s_f + D_FIM, 3), "m": MID[fonte_f], "p": {**PADRAO, "sc": round(ESC[fonte_f] * 1.08, 2)},
-                  "fx": [{"id": "fxfim", "t": "blur", "on": True, "v": {"amt": 34}}], "k": {"fx.fxfim.amt": [{"t": 0, "v": 0, "i": "ease"}, {"t": 0.5, "v": 34}]}})
+    # "finalizacao_extra": [[fonte, segundo], ...]: o fundo da assinatura troca de b-roll em partes iguais (2026-11-25, Pílulas Sônia)
+    pecas_f = [(fonte_f, s_f)] + [tuple(x) for x in CFG.get("finalizacao_extra", [])]
+    dp_f = D_FIM / len(pecas_f)
+    for i_f, (ff, sf_) in enumerate(pecas_f):
+        clips.append({"tr": 0, "x": "v", "st": round(fim_fala + i_f * dp_f, 3), "s": sf_, "e": round(sf_ + dp_f + (0.0 if i_f == len(pecas_f) - 1 else 0.0), 3), "m": MID[ff], "p": {**PADRAO, "sc": round(ESC[ff] * 1.08, 2)},
+                      "fx": [{"id": "fxfim", "t": "blur", "on": True, "v": {"amt": CFG.get("finalizacao_blur", 34)}}],
+                      **({"k": {"fx.fxfim.amt": [{"t": 0, "v": 0, "i": "ease"}, {"t": 0.5, "v": CFG.get("finalizacao_blur", 34)}]}} if i_f == 0 else {})})
     if ID:
         identidade(clips, fim_fala, quando, v)
     else:
@@ -891,7 +900,11 @@ def versao(v):
     seq = {"id": v["id"], "name": v["nome"], "clips": clips, "trilhas": {"v": [{} for _ in range(n_v)], "a": [{}, {}, {}]}, "texto": {"palavras": []}, "legendas": legs,
            "inPt": None, "outPt": None, "markers": [], "guias": [], "playhead": 0, "view": {"pps": 12, "x": 0}, "w": W, "h": H, "legEstilo": LEG}
     print(f"{v['nome']}: fala {fim_fala:.1f} s, total {fim:.1f} s, {sum(1 for c in clips if c['tr'] == 0)} cortes, {len(legs)} legendas")
-    return seq, {"blocos": blocos, "fim_fala": fim_fala, "chave": chave_, "trans": CFG.get("transicoes_blocos", not ID)}
+    # sobreposições nativas (veOvtAdd) na entrada de cada b-roll e a cada troca do fundo da finalização
+    tipos = CFG.get("ovt_tipos", [])
+    ent = sorted([c["st"] for c in clips if c["tr"] == 1 and c.get("x") == "v"] + [round(fim_fala + i * dp_f, 3) for i in range(1, len(pecas_f))])
+    ovt = [[tipos[j % len(tipos)], t] for j, t in enumerate(ent)] if tipos else []
+    return seq, {"blocos": blocos, "fim_fala": fim_fala, "chave": chave_, "trans": CFG.get("transicoes_blocos", not ID), "ovt": ovt}
 
 
 def abrir(porta, plano):
@@ -910,6 +923,7 @@ def abrir(porta, plano):
           for (const sid of ids) { const q = VE.sequences.find(s => s.id === sid), pp = pl[sid]; if (!pp) continue; veSeqAplicar(q);
             await veAgente('Transições: ' + q.name, () => {
               for (const c of VE.clips) for (const f of (c.fx || [])) { const d = {}; ((VE_FX[f.t] || {}).params || []).forEach(p => d[p.k] = p.def); f.v = { ...d, ...f.v }; }
+              for (const [tp, t] of (pp.ovt || [])) veOvtAdd(tp, t, { d: 0.5 });
               if (pp.trans === false) return;
               for (const t of pp.blocos) veOvtAdd('zoomin', t, { d: 0.5, tr: 4 });
               if (pp.chave != null) veOvtAdd('flash', pp.chave, { d: 0.35, tr: 4 });
