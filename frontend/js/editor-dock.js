@@ -152,13 +152,22 @@ function vedParse(d) {
         return n.t === 's' && (n.d === 'row' || n.d === 'col') && Array.isArray(n.c) && Array.isArray(n.z) &&
             n.c.length === n.z.length && n.c.every(ok);
     };
-    const root = ok(d.root) ? vedNorm(d.root) : null;
+    let root = ok(d.root) ? vedNorm(d.root) : null;
     if (!root) return null;
     let floats = Array.isArray(d.floats) ? d.floats : [];
     // formato antigo: um painel por janela {id: bounds}
     if (d.float && typeof d.float === 'object') floats = floats.concat(Object.entries(d.float).map(([id, b]) => ({ root: { t: 'g', p: [id], a: id }, b })));
     floats = floats.filter(f => f && f.b && [f.b.x, f.b.y, f.b.w, f.b.h].every(Number.isFinite) && ok(f.root))
         .map(f => ({ root: vedNorm(f.root), b: f.b })).filter(f => f.root);
+    // Timeline é obrigatória: layout/workspace salvo sem ela abria o projeto "vazio" (sem timeline nem como recolocar).
+    // Volta embaixo, como no padrão, com as Ferramentas e os Medidores que moram junto dela (2026-11-25).
+    if (ids.includes('timeline') && !vistos.has('timeline')) {
+        const linha = ['ferramentas', 'timeline', 'medidores'].filter(id => ids.includes(id) && !vistos.has(id));
+        const z = linha.map(id => id === 'timeline' ? 1 - 0.06 * (linha.length - 1) : 0.03);
+        root = { t: 's', d: 'col', z: [0.6, 0.4], c: [root, { t: 's', d: 'row', z, c: linha.map(id => ({ t: 'g', p: [id], a: id })) }] };
+        linha.forEach(id => vistos.add(id));
+        if (!vistos.has('projeto')) d.known = (Array.isArray(d.known) ? d.known : ids).filter(id => id !== 'projeto');   // Projeto volta como aba
+    }
     // painel que surgiu numa versão nova do app (não existia quando o layout foi salvo): entra como aba
     const known = Array.isArray(d.known) ? d.known : ids;
     const novos = ids.filter(id => !known.includes(id) && !vistos.has(id));
@@ -430,6 +439,7 @@ function vedShow(id) {
 function vedClose(id) {
     const l = vedLocate(id);
     if (!l) return;
+    if (id === 'timeline' || id === 'monitor') { veToast('A Timeline e o Programa não fecham: arraste para outro lugar se quiser'); return; }
     if (l.h === vedMain() && vedPanelsOf(vedMain().root).length <= 1) { veToast('Precisa ficar pelo menos um painel no editor'); return; }
     l.g.p = l.g.p.filter(x => x !== id);
     delete VED.home[id];

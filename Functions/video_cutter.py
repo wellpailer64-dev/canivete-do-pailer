@@ -208,7 +208,8 @@ def _cache_cfg():
         dias, max_gb = int(c.get("dias") or 30), float(c.get("maxGB") or 20)
     except (TypeError, ValueError):
         dias, max_gb = 30, 20.0
-    return {"dir": str(c.get("dir") or "").strip(), "lado": lado if lado in (540, 720, 1080) else 1080,
+    from Functions import render_cache
+    return {"dir": render_cache.normalizar_base(str(c.get("dir") or "").strip()), "lado": lado if lado in (540, 720, 1080) else 1080,
             "dias": dias, "max_gb": max_gb, "junto": bool(c.get("proxyJunto"))}
 
 
@@ -1361,6 +1362,21 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
         rc, err = _run_progress(cmd, dur, on_pct, stop_event, baixa=True)
         if rc == 0 or (stop_event is not None and stop_event.is_set()):
             break
+    parado = stop_event is not None and stop_event.is_set()
+    if not parado and not (rc == 0 and os.path.exists(out)):
+        # 2026-11-25: a prévia falhou uma vez sem mensagem ("?") e o projeto abriu vazio; na 2ª abertura deu certo.
+        # Uma nova tentativa só no processador resolve a falha passageira; e o erro passa a dizer o que houve.
+        motivo = (err or "").strip().splitlines()[-1:] or [f"ffmpeg saiu com código {rc}" if rc else "arquivo da prévia não foi criado"]
+        try:
+            with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "previa_falhas.log"), "a", encoding="utf-8") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} | {path} | rc={rc} | {motivo[0]}\n")
+        except OSError:
+            pass
+        _apagar_item(out) if os.path.exists(out) else None
+        rc, err2 = _run_progress(_cpu(), dur, on_pct, stop_event, baixa=True)
+        err = err2 if rc != 0 else ""
+        if rc != 0 and not (err or "").strip():
+            err = f"ffmpeg saiu com código {rc} (detalhe em logs/previa_falhas.log)"
     ok = rc == 0 and os.path.exists(out)
     thumbs = []
     if ok and th_saida:
