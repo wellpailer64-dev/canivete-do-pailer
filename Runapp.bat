@@ -18,15 +18,19 @@ if not defined PY (
     exit /b 1
 )
 
-rem Sem janela de CMD: abre por pythonw (a saida vai para logsunapp.log). Para ver o console: set KANIVETE_CONSOLE=1
-if not defined KANIVETE_CONSOLE (
-    set "PYW=%PY:py =pyw %"
-    if "%PY%"=="python" set "PYW=pythonw"
-    if "%PY%"=="py" set "PYW=pyw"
-    start "" %PYW% "main.py" %*
-    exit /b 0
+rem Sem janela de CMD: abre por pythonw (a saida vai para logsunapp.log). Para ver o console: set KANIVETE_CONSOLE=1
+if defined KANIVETE_CONSOLE goto console
+rem pythonw.exe do MESMO Python que tem as bibliotecas (caminho completo). Fora de bloco if: dentro dele %PYW% era lido vazio.
+set "PYW="
+for /f "usebackq delims=" %%P in (`%PY% -c "import sys,os;print(os.path.join(os.path.dirname(sys.executable),'pythonw.exe'))"`) do set "PYW=%%P"
+if not exist "%PYW%" (
+    echo pythonw.exe nao encontrado para o Python do app.
+    exit /b 1
 )
+start "" "%PYW%" "main.py" %*
+exit /b 0
 
+:console
 %PY% "main.py" %*
 
 if not %errorlevel%==0 (
