@@ -1,5 +1,10 @@
 # KANIVETE (antes Canivete do Pailer) — notas para o Claude
 
+## Abas de projeto do Vídeo Kanivete (2026-11-25)
+- `frontend/js/editor-abas-projeto.js`: só a aba ativa carrega players e cache; as demais mantêm JSON independente e desfazer/refazer. Render, preparação da fila, abertura e salvamento bloqueiam trocas concorrentes. A saída avisa sobre abas alteradas; não há restauração automática da sessão.
+- Agentes: `veApLista()`, `await veApAtivar(id)`, `await veApAtivarPorNome(nome)`; abrir arquivo já aberto reutiliza a aba. Guia: `guia-edicao.md`, seção 0.1.
+- `main.py:ve_projeto_suspender` cancela preparações; eventos de vídeo carregam caminho e geração para impedir respostas antigas de afetar a nova aba. Regressão: `py -3.13 testes/teste_abas_projeto.py`, app de teste vazio na porta 9333; dois vídeos e áudio reais, desfazer, falha de abertura e bloqueios.
+
 ## Nome e extensões
 - Nome visível: **KANIVETE** (janela, splash, marca, textos, release). Identificadores internos continuam
   `CaniveteDoPailer` (exe, zip do release, `%APPDATA%\CaniveteDoPailer`, mutex, `CANIVETE_*`): o updater instalado nos

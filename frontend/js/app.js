@@ -529,6 +529,7 @@ function appConfirm({ titulo, texto, botoes }) {
 let _saindo = false;
 async function appSair() {
     if (_saindo) return;
+    if (typeof VEAP !== 'undefined' && (VEAP.abrindo || VEAP.trocando || VEAP.fechando || VE._salvandoProjeto)) return;
     _saindo = true;
     try {
         if (typeof VE !== 'undefined' && VE.ready) {
@@ -552,6 +553,7 @@ async function appSair() {
                 if (r === 'salvar' && !(await veSaveProject())) return;
             }
         }
+        if (typeof veApConfirmarFecharTudo === 'function' && !(await veApConfirmarFecharTudo())) return;
         window.pywebview.api.sair_app();
     } finally { _saindo = false; }
 }
@@ -570,6 +572,7 @@ async function fecharAba(tool, ev, rapido) {
     const { nome } = _menuInfo(tool);
     const rodando = _abaRodando(tool);
     if (tool === 'video-cutter' && typeof VE !== 'undefined' && VE.ready) {
+        if (typeof veApBloqueado === 'function' && veApBloqueado()) return;
         if (VE.exportRunning) {
             await appConfirm({ titulo: 'Exportação em andamento', texto: 'Aguarde a exportação terminar (ou cancele-a) antes de fechar o editor.', botoes: [{ rotulo: 'Ok', valor: 1, tipo: 'primario' }] });
             return;
@@ -586,6 +589,7 @@ async function fecharAba(tool, ev, rapido) {
             const r = await appConfirm({ titulo: 'Fechar o Vídeo Kanivete?', texto: 'O projeto aberto será fechado.', botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Fechar', valor: 1, tipo: 'primario' }] });
             if (!r) return;
         }
+        if (typeof veApConfirmarFecharTudo === 'function' && !(await veApConfirmarFecharTudo())) return;
         veCloseProject();
     } else if (!rapido) {
         const r = await appConfirm({

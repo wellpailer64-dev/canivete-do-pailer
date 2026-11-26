@@ -268,6 +268,20 @@ def audio_cutter_export(file_path, cuts, output_format="mp3", tracks=None, main_
 # ========================================
 _ve_prepare_stop = None
 _ve_export_stop = None
+_ve_midias_stop = set()
+_ve_midias_trava = threading.Lock()
+_ve_projeto_geracao = 0
+
+
+def ve_projeto_suspender():
+    global _ve_projeto_geracao
+    if _ve_prepare_stop is not None:
+        _ve_prepare_stop.set()
+    with _ve_midias_trava:
+        _ve_projeto_geracao += 1
+        for stop in _ve_midias_stop:
+            stop.set()
+    return {"success": True, "geracao": _ve_projeto_geracao}
 
 
 def _ve_emit(fn, data):
@@ -286,12 +300,14 @@ def video_cutter_prepare(file_path):
         _ve_prepare_stop.set()
     stop = threading.Event()
     _ve_prepare_stop = stop
+    geracao = _ve_projeto_geracao
 
     def run():
         try:
-            preparar(file_path, lambda ev: None if stop.is_set() else _ve_emit("veOnPrepare", ev), stop)
+            preparar(file_path, lambda ev: None if stop.is_set() else _ve_emit("veOnPrepare", {**ev, "path": file_path, "geracao": geracao}), stop)
         except Exception as e:
-            _ve_emit("veOnPrepare", {"stage": "error", "error": str(e)})
+            if not stop.is_set():
+                _ve_emit("veOnPrepare", {"stage": "error", "error": str(e), "path": file_path, "geracao": geracao})
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
@@ -304,14 +320,23 @@ def ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False, trechos
     fundo = prévia leve de um vídeo só do painel, com o app sem nada mais urgente (prioridade 2: uma conversão
     por vez e sempre com vaga livre para o que for para a timeline)."""
     from Functions.video_cutter import preparar_midia
+    stop = threading.Event()
+    with _ve_midias_trava:
+        _ve_midias_stop.add(stop)
+        geracao = _ve_projeto_geracao
 
     def run():
         try:
-            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}),
+            preparar_midia(path, lambda ev: None if stop.is_set() else _ve_emit("veOnMidia", {**ev, "id": mid, "path": path, "geracao": geracao}),
+                           stop_event=stop,
                            prioridade=0 if urgente else 2 if fundo else 1, leve=bool(leve) and not urgente and not fundo,
                            trechos=trechos)
         except Exception as e:
-            _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e)})
+            if not stop.is_set():
+                _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e), "path": path, "geracao": geracao})
+        finally:
+            with _ve_midias_trava:
+                _ve_midias_stop.discard(stop)
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
@@ -3400,6 +3425,9 @@ class ApiBridge:
 
     def video_cutter_prepare(self, file_path):
         return video_cutter_prepare(file_path)
+
+    def ve_projeto_suspender(self):
+        return ve_projeto_suspender()
 
     def video_cutter_export(self, file_path, segments, output_format="mp4", qualidade="medium",
                             resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,

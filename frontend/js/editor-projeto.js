@@ -1389,7 +1389,9 @@ async function veMidiaParaAudio(m) {
 
 // Eventos da preparação de um vídeo do projeto (Functions/video_cutter.py: preparar_midia)
 function veOnMidia(ev) {
+    if (ev.geracao != null && VE._projetoGeracao != null && ev.geracao !== VE._projetoGeracao) return;
     const m = VE.media[ev.id];
+    if (ev.path && (!m || ev.path !== m.path)) return;
     if (typeof veAtvEvento === 'function') veAtvEvento(ev);   // bolinha de atividade do cabeçalho (editor-atividade.js)
     // a vaga libera quando o vídeo já foi lido (info): as conversões pesadas têm fila própria no Python
     const livre = ev.stage === 'info' || ev.stage === 'video' || ev.stage === 'done' || ev.stage === 'error';

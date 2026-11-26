@@ -11,6 +11,12 @@
 - Não salvar nem fechar o app sem pedido. Em ajustes, preservar a timeline aberta e seguir o método; timeline nova só quando o trabalho pedir.
 - Testes de código: app de teste na porta 9333, conforme as instruções aplicáveis à sessão.
 
+## 0.1 ABAS DE PROJETO NO EDITOR
+- `veApLista()` lista `{id,nome,caminho,ativa,naoSalvo}`; `await veApAtivar(id)` ou `await veApAtivarPorNome('nome exato')` troca de projeto. Nome parcial só funciona se for único; aguarde `VE.ready && !VEAP.trocando && !VE._pendingProject` antes de editar.
+- `await veOpenProject(caminho)` reaproveita a aba se o arquivo já estiver aberto; outro arquivo fica em nova aba. `await veNovoProjeto()` cria uma aba vazia; `await veApFechar(id)` pergunta pelas alterações da aba escolhida.
+- Abas inativas guardam JSON e histórico de desfazer, sem players/cache de mídia; a troca cancela preparações de vídeo e pré-render. Abertura e render/preparação da fila bloqueiam trocas concorrentes. Projetos não salvos continuam exigindo salvamento antes de sair: as abas não são uma sessão persistida.
+- Código: `editor-abas-projeto.js`; regressão com dois MP4 e áudio reais: `py -3.13 testes/teste_abas_projeto.py` (instância de teste vazia na 9333, saídas em `D:/Kanivete/Testes/abas_projeto`).
+
 ## 1 LER MÍDIA (barato em tokens) — Functions/agente_midia.py
 - `py -3.13 -m Functions.agente_midia analisar "<proj.vknv>" --nao-usados-em "<timeline>"` → 1 comando:
   folhas de contato (10 vídeos/img) + cena por CLIP local (rótulos em CENAS) + fala (vídeos ≤180 s) + suspeitas
