@@ -899,7 +899,12 @@ const IE_CONTAGOTAS = {
     move(p, ev, doc) {
         if (!IE.ponteiro) return;
         const c = ieAmostrarCor(doc, p, IE.op.contagotas.todas);
-        if (c) { IE.cor[ev.altKey && IE.ferr === 'contagotas' ? 1 : 0] = c; ieUiCores?.(); }
+        if (c) { IE.cor[IE.ferrTemp === 'contagotas' ? 0 : ev.altKey ? 1 : (IE.corAlvo || 0)] = c; ieUiCores?.(); IE._gotaCor = c; }
+    },
+    // ao soltar: a cor pega vai também para a forma básica ou o texto selecionado (uma entrada no histórico só)
+    up(p, ev) {
+        const c = IE._gotaCor; IE._gotaCor = null;
+        if (c && IE.ferr === 'contagotas' && IE.ferrTemp !== 'contagotas' && !(ev && ev.altKey) && typeof ieAmostraNasCamadas === 'function') ieAmostraNasCamadas(c);
     },
 };
 
