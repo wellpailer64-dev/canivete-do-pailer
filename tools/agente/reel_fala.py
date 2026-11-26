@@ -264,7 +264,7 @@ def aparar(k, ini, fim, cabeca=True, cauda=True):
 
 def pausa_na_palavra(k, w0, w1):
     """A transcrição estica a última palavra por cima de fala que ela não pegou ("hein?" de 8,70 a 9,50 s com um "aí"
-    no fim, Depoimentos Nov 2026-11-12). Pausa de >= 0,12 s dentro da palavra, com voz forte depois = a palavra acabou ali.
+    no fim, Depoimentos Nov 2026-11-12). Pausa de >= 0,20 s dentro da palavra, com voz forte depois = a palavra acabou ali.
     Devolve o instante de corte (início da pausa + folga) ou None."""
     e, lim = EN[k], LIM[k]
     a, b = int((w0 + 0.12) * 100), min(int(w1 * 100), len(e))
@@ -273,7 +273,9 @@ def pausa_na_palavra(k, w0, w1):
         if e[i] < lim * 1.6:
             run += 1
             continue
-        if run >= 12 and e[i:b].max() > lim * 4:
+        # >= 0,20 s: o fechamento de boca de consoante (p, t, k, "pr") dá 0,10-0,15 s de silêncio DENTRO da palavra e o
+        # corte comia o resto ("Ca|pricho" virou "Ca", Trocador Capricho 2026-11-26)
+        if run >= 20 and e[i:b].max() > lim * 4:
             return round((i - run) / 100 + FOLGA_FIM, 3)
         run = 0
     return None
