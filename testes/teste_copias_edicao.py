@@ -1,6 +1,6 @@
 """Cópias de edição (Functions/otimizar.py): quadro-chave a cada ~0,25 s e refazer as antigas pelo editor.
 
-Tudo em D:/kanivete_testes/copias_edicao (nunca nos arquivos de um projeto real): gera um "original" 4K e uma cópia
+Tudo em D:/Kanivete/Testes/copias_edicao (nunca nos arquivos de um projeto real): gera um "original" 4K e uma cópia
 Full HD no formato antigo (quadro-chave a cada ~4 s), monta um projeto que usa a cópia, abre o app de teste (porta
 9395), confere a pergunta "Cópias de edição mais rápidas", mede o pulo da agulha, refaz, confere a cópia nova
 (gop curto, URL nova, player recarregado) e mede de novo.
@@ -14,7 +14,7 @@ sys.path.insert(0, RAIZ)
 from Functions import otimizar
 from Functions.video_cutter import ffmpeg_path
 
-BASE = "D:/kanivete_testes/"
+BASE = "D:/Kanivete/Testes/"
 D = BASE + "copias_edicao/"
 PORTA = 9395
 erros = 0

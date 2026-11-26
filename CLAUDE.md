@@ -4,6 +4,12 @@ Regras abaixo valem sempre. Detalhe de cada ferramenta: `Instructions/agente/CLA
 e `Instructions/MAPA.md`. Achar algo: `py -3.13 tools/mapa_geral.py --busca termo`; criou ferramenta, comando ou teste: rodar
 `py -3.13 tools/mapa_geral.py` e acrescentar uma seção no CLAUDE-detalhes.
 
+## Pasta mestra no disco D
+Tudo do Kanivete mora em `D:\Kanivete\` e nada novo vai solto na raiz do D: `Cache\` (Canivete Cache, Media Cache, Render Cache),
+`Testes\` (appdata, tmp, scripts de teste), `Biblioteca\`, `Build\`, `Rust\`, `Plugins\`, `Ferramentas\`, `Downloads\`, `Músicas\`...
+Código: base de cache solta na raiz de um disco vira `<disco>\Kanivete\Cache` (`render_cache.normalizar_base`); pasta de dados
+do app = `midia.raiz_dados()`. Pasta nova que o app/ferramenta crie: dentro de `D:\Kanivete\<Nome>`, nunca em `D:\<nome>`.
+
 ## Nome
 Visível: **KANIVETE**. Internos seguem `CaniveteDoPailer` (exe, zip, `%APPDATA%`, mutex, `CANIVETE_*`): o updater dos amigos procura esses nomes.
 Ferramentas: Vídeo (Vd), Photo (Pk), Vetor (Vk), Sound (Sk), Lux (Lk), Encoder (Ke), Slider (Sd), Ata (At), KaniBoard (Kb). Destaque por `var(--primary)`/`veAcc()`, nunca `#D4814A` fixo.
@@ -22,13 +28,14 @@ Comece em `Instructions/agente/fluxo-peca-cliente.md`; fichas em `Instructions/a
 
 ## Testar
 - Modo agente: `py -3.13 main.py --agente` (CDP na porta identificada por `tools/porta_agente.py`). Quando o Pailer pedir trabalho no app aberto, prefira API, CLI e atalhos; preserve o projeto e o trabalho em andamento. Fechar o app dele exige o ok dele; testes usam o app de teste.
-- App de teste, sempre no disco D: `APPDATA=D:\kanivete_testes\appdata TEMP=D:\kanivete_testes\tmp TMP=D:\kanivete_testes\tmp LOCALAPPDATA=D:\kanivete_testes\localappdata python main.py --agente=9333`; testes `testes/*.py` com o mesmo ambiente. Scripts avulsos em `D:\kanivete_testes\scripts`.
+- App de teste, sempre no disco D: `APPDATA=D:\Kanivete\Testes\appdata TEMP=D:\Kanivete\Testes\tmp TMP=D:\Kanivete\Testes\tmp LOCALAPPDATA=D:\Kanivete\Testes\localappdata python main.py --agente=9333`; testes `testes/*.py` com o mesmo ambiente. Scripts avulsos em `D:\Kanivete\Testes\scripts`.
 - Vários agentes ao mesmo tempo: ANTES de abrir, pegue vaga (MCP `kanivete_vaga` pegar com dono = sua aba, ou `py -3.13 D:\Kanivete\Plugins\kanicode\kanivete_vaga.py pegar --dono X`): devolve porta 9333-9340, pastas e comando. Use só a sua porta; nunca feche app de vaga alheia; ao terminar feche e `liberar`.
 - Antes de release: reprodução/áudio → `testes/teste_play.py`; exportação, camadas, efeitos, cor → `testes/teste_export.py`; Photo → `teste_imagem.py`; Vetor → `teste_vetor.py`; ponte → `teste_ponte.py`.
 - Bug novo de exportação: caso novo em `CASOS` que reprova sem a correção.
 
 ## Edição de vídeo: método obrigatório
-Começar por `Instructions/agente/metodo-edicao-video.md` e pelo cérebro, área `video`, títulos "Edição de Vídeo ·". Só dizer pronto com `tools/agente/conferir_edicao.py` sem REPROVADO. Um app só: nunca abrir outro KANIVETE; fechar o de teste ao terminar.
+Legenda: NUNCA começa em minúscula (1ª do vídeo e depois de . ? ! sempre maiúscula); minúscula só em continuação de fala. `reel_fala.py` já aplica e `conferir_edicao.py` reprova; em SRT/legenda de outra origem rode `tools/agente/legenda_caixa.py`.
+Começar por `Instructions/agente/metodo-edicao-video.md` e pelo cérebro, área `video`, títulos "Edição de Vídeo ·". Só dizer pronto com `tools/agente/conferir_edicao.py` sem REPROVADO. Correção ou ajuste do Pailer em edição = lição no mesmo turno (seção "Gatilho de aprendizado" do método; termos em `glossario-editor.md`). Um app só: nunca abrir outro KANIVETE; fechar o de teste ao terminar.
 
 ## Antes de começar, ler o guia
 Edição de vídeo: método acima; API e histórico em `guia-edicao.md`, teoria em `tecnicas-de-montagem.md`; motion `mapa-habilidades-motion.md` (ao terminar, `veCompAgruparCenas()`); motion em HTML `motion-html.md`;

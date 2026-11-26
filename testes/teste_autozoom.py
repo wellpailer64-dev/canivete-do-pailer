@@ -23,7 +23,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from Functions.midia import ffmpeg  # noqa: E402
 from Functions import autozoom  # noqa: E402
 
-BASE = "D:/kanivete_testes/autozoom/"
+BASE = "D:/Kanivete/Testes/autozoom/"
 erros = []
 
 
@@ -77,7 +77,7 @@ def png(url):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--video", default="D:/kanivete_testes/roto/trecho.mp4")
+    ap.add_argument("--video", default="D:/Kanivete/Testes/roto/trecho.mp4")
     ap.add_argument("--dur", type=float, default=15.0)
     ap.add_argument("--porta", type=int, default=9338)
     ap.add_argument("--sem-abrir", action="store_true")

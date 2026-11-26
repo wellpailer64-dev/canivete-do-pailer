@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from Functions.midia import ffmpeg
 from Functions.sound_kanivete import _ffprobe_dur
 
-PASTA = Path('D:/kanivete_testes/sound_inout')
+PASTA = Path('D:/Kanivete/Testes/sound_inout')
 
 
 class SoundInOutTest(unittest.TestCase):
@@ -68,7 +68,7 @@ class SoundInOutTest(unittest.TestCase):
                 fila = pg.evaluate('''() => {
                     const anterior=window.keSomEnviar; let item;
                     window.keSomEnviar=x=>(item=x,'teste');
-                    try { skParaKe('D:/kanivete_testes/sound_inout/fila.wav',{f:'wav',k:'192',l:'',fx:'',stems:true,caps:false}); }
+                    try { skParaKe('D:/Kanivete/Testes/sound_inout/fila.wav',{f:'wav',k:'192',l:'',fx:'',stems:true,caps:false}); }
                     finally { window.keSomEnviar=anterior; }
                     return item;
                 }''')

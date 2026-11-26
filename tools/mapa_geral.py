@@ -84,10 +84,10 @@ CABECALHO = """# MAPA DO KANIVETE
 | Preferências | `%APPDATA%/CaniveteDoPailer` (`ie_prefs`: painéis, espaços de trabalho, estilos) |
 | Caches (prévias de vídeo, render, PSD importados, imagens geradas) | `%LOCALAPPDATA%/CaniveteDoPailer/` (render e mídia: limpeza automática 20 GB / 30 dias) |
 | Logs | `logs/` ao lado do exe (`erros.log` com teto de 2 MB) |
-| Testes e saídas de teste | `testes/*.py` (código) → saídas sempre em `D:/kanivete_testes` (nunca no C) |
+| Testes e saídas de teste | `testes/*.py` (código) → saídas sempre em `D:/Kanivete/Testes` (nunca no C) |
 | Ferramentas de desenvolvimento | `tools/` (seção 8), Worker local em `tools/worker/` |
 | Guias por assunto | `Instructions/` (seção 9); regras de trabalho em `CLAUDE.md` |
-| Biblioteca de design (marcas, modelos, recursos) | `D:/kanivete_biblioteca` |
+| Biblioteca de design (marcas, modelos, recursos) | `D:/Kanivete/Biblioteca` |
 
 ## 3. Caminhos entre ferramentas (pontes)
 | De → Para | Como | Onde |
@@ -108,8 +108,8 @@ CABECALHO = """# MAPA DO KANIVETE
 Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 
 ## 4. Testar e operar sem abrir o app à mão
-- App de teste: `APPDATA=D:\\kanivete_testes\\appdata TEMP=D:\\kanivete_testes\\tmp TMP=D:\\kanivete_testes\\tmp
-  LOCALAPPDATA=D:\\kanivete_testes\\localappdata py -3.13 main.py --agente=9333` → Chrome DevTools em 127.0.0.1:9333
+- App de teste: `APPDATA=D:\\Kanivete\\Testes\\appdata TEMP=D:\\Kanivete\\Testes\\tmp TMP=D:\\Kanivete\\Testes\\tmp
+  LOCALAPPDATA=D:\\Kanivete\\Testes\\localappdata py -3.13 main.py --agente=9333` → Chrome DevTools em 127.0.0.1:9333
   (Playwright `connect_over_cdp`), rodar JS na página real com a API de verdade.
 - Aplicar mudança sem reiniciar: `py -3.13 tools/recarregar.py [--py] [--ferramenta id]` (só `main.py` pede reinício).
 - Editar código: `py -3.13 tools/patch.py arquivo.patch` (um `@@ arquivo` por bloco).

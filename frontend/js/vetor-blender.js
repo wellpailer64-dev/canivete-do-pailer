@@ -92,7 +92,7 @@ async function vbRenderizar(a = {}) {
         try { const r = await api.vk_blender_instalar(); if (!r || !r.success) throw new Error((r && r.error) || 'não instalou'); } finally { vkCarregando(false); }
     }
     const alvos = (a.ids ? a.ids.map(vkObj) : vkTxAlvos(a)).filter(o => o && o.tres_d); if (!alvos.length) throw new Error('render_blender: escolha objetos 3D (girar_3d/extrudar_3d)');
-    const pasta = (a.pasta || (await api.vk_blender_estado()).cache || 'D:/kanivete_testes/blender').replace(/[\\/]+$/, ''), out = [];
+    const pasta = (a.pasta || (await api.vk_blender_estado()).cache || 'D:/Kanivete/Testes/blender').replace(/[\\/]+$/, ''), out = [];
     for (const g of alvos) {
         const base = `${pasta}/${vkSlug(g.nome || 'objeto3d')}_${g.id}`, { cena, quadro } = await vbCena(g, a, base);
         cena.saida = base + '.png';

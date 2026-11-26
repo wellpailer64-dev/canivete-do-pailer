@@ -4,7 +4,7 @@ Ele conversa com um modelo local no Ollama e gera:
   - contratos para o Worker do Photo Kanivete; ou
   - HTML/CSS para KNV.cena, em flyers/carrosseis simples.
 
-Por padrao ele NAO executa nada: salva os artefatos em D:/kanivete_testes/arquiteto_local.
+Por padrao ele NAO executa nada: salva os artefatos em D:/Kanivete/Testes/arquiteto_local.
 Use --executar para chamar tools/worker/worker.py ou tools/knv.py depois de gerar.
 
 Uso rapido:
@@ -28,7 +28,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 AQUI = os.path.dirname(os.path.abspath(__file__))
-SAIDA_PADRAO = r"D:\kanivete_testes\arquiteto_local"
+SAIDA_PADRAO = r"D:\Kanivete\Testes\arquiteto_local"
 MODELOS_ARQUITETO = [
     "qwen3:14b",
     "hf.co/unsloth/Qwen3-14B-GGUF:IQ3_XXS",

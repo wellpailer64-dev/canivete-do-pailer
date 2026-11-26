@@ -7,12 +7,12 @@ import sys
 import unittest
 
 RAIZ = Path(__file__).resolve().parents[1]
-PASTA = Path('D:/kanivete_testes/lc_hsl')
+PASTA = Path('D:/Kanivete/Testes/lc_hsl')
 PASTA.mkdir(parents=True, exist_ok=True)
 for nome in ('TEMP', 'TMP', 'APPDATA', 'LOCALAPPDATA'):
     pasta = PASTA / nome.lower(); pasta.mkdir(exist_ok=True); os.environ[nome] = str(pasta)
 sys.path.insert(0, str(RAIZ))
-os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', 'D:/kanivete_testes/playwright')
+os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', 'D:/Kanivete/Testes/playwright')
 from playwright.sync_api import sync_playwright
 from PIL import Image
 import numpy as np

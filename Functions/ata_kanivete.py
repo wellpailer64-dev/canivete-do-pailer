@@ -1,7 +1,7 @@
 """
 ata_kanivete.py — Ata Kanivete (At, verde; Beta): grava reunião do Google Meet e escreve a ATA.
 
-Caminho (teste de 2026-10-17 em D:/kanivete_testes/ata):
+Caminho (teste de 2026-10-17 em D:/Kanivete/Testes/ata):
   1. Meet: um Chrome à parte (perfil próprio em <dados>/Ata Kanivete/navegador; login uma vez) aberto com a porta de
      depuração. O app injeta frontend/ata/captura.js antes da página carregar (Page.addScriptToEvaluateOnNewDocument):
      ela grava o microfone que o Meet pediu ("eu") e os áudios que chegam ("outros") em Opus 24 kb/s (~10 MB/h por

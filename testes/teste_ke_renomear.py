@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from Functions.midia import ffmpeg
 from Functions import sound_kanivete, ke_arquivos
 
-PASTA = Path('D:/kanivete_testes/ke_renomear')
+PASTA = Path('D:/Kanivete/Testes/ke_renomear')
 
 
 class RenomearFilaTest(unittest.TestCase):

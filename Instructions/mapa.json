@@ -11,6 +11,7 @@
     "editor-3d-placas.js",
     "editor-3d-tela.js",
     "editor-3d.js",
+    "editor-abas-projeto.js",
     "editor-afx-pr.js",
     "editor-atividade.js",
     "editor-atributos.js",
@@ -96,6 +97,7 @@
    "api": [
     "audio_cutter_prepare",
     "audio_cutter_export",
+    "ve_projeto_suspender",
     "ve_texto_modelos",
     "ve_leg_premium_kani",
     "ve_leg_premium_enfase",
@@ -171,6 +173,7 @@
     "ve_remix",
     "ve_roto_abrir",
     "ve_roto_estado",
+    "ve_roto_saude",
     "ve_roto_base",
     "ve_vst3_lista",
     "ve_ofx_lista",
@@ -1052,6 +1055,10 @@
   },
   "video_cutter_prepare": {
    "args": "file_path",
+   "modulos": []
+  },
+  "ve_projeto_suspender": {
+   "args": "",
    "modulos": []
   },
   "video_cutter_export": {
@@ -2058,6 +2065,12 @@
   },
   "ve_roto_estado": {
    "args": "rid",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_saude": {
+   "args": "rid, reparar=True",
    "modulos": [
     "pincel_roto"
    ]
@@ -3483,6 +3496,7 @@
   "Instructions/agente/estudo-teaser-expocatadores.md": "Estudo: Teaser ExpoCatadores (edição do Pailer, aprovada pela equipe)",
   "Instructions/agente/ferramentas-repetitivas.md": "Ferramentas prontas: gatilho → comando",
   "Instructions/agente/fluxo-peca-cliente.md": "Peça de cliente: do card à aprovação",
+  "Instructions/agente/glossario-editor.md": "Glossário do editor (termos de mercado, uso interno)",
   "Instructions/agente/guia-edicao.md": "Guia de edição :: Vídeo Kanivete — para agentes de IA",
   "Instructions/agente/kani-maos.md": "Mãos da Kani — a Kani operando os apps ao vivo",
   "Instructions/agente/kani-motor.md": "Motor da Kani: bancada de modelos e escolha (2026-10-10)",
@@ -3500,6 +3514,7 @@
   "Instructions/agente/mogrt.md": "MOGRT no Vídeo Kanivete (Motion Graphics Template do Premiere)",
   "Instructions/agente/motion-glossario-e-processo.md": "Motion: glossário de mercado + processo em etapas",
   "Instructions/agente/motion-html.md": "Motion em HTML → timeline nativa do Vídeo Kanivete",
+  "Instructions/agente/motions-avancados-catalogo.md": "Motions avançados: catálogo com nome e gatilho",
   "Instructions/agente/nucleo-hardware.md": "Núcleo de hardware: o app se ajustar a cada PC (2026-10-10)",
   "Instructions/agente/pincel-roto.md": "Pincel Roto e Refinar borda (Roto Brush do After Effects no Editor Kanivete)",
   "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
@@ -3668,6 +3683,7 @@
  "testes": {
   "teste_3d_modelos": "Teste dos modelos 3D baixados de banco na Cena 3D do Editor (app em --agente=9333):",
   "teste_3d_placas": "Camadas em profundidade na Cena 3D (editor-3d-placas.js + editor-3d-mexer.js), app em --agente=9333:",
+  "teste_abas_projeto": "Abas de projeto no app de teste 9333, com vídeo e áudio reais; saídas no D",
   "teste_atributos": "Remover atributos e ajuste em grupo (editor-atributos.js) — abre um app próprio (porta 9334, dados em",
   "teste_autozoom": "Autozoom (editor-autozoom.js + Functions/autozoom.py) no app de verdade: entrevista de 15 s, transcrição, gerar",
   "teste_barra": "Barra de tarefas contextual: alça move e lembra, Selecionar assunto / Remover fundo, × esconde só até o próximo clique",
@@ -3686,7 +3702,7 @@
   "teste_editar": "Editar › Atenuar, Colar especial (dentro/fora) e Localizar e substituir texto do Photo Kanivete (app em --agente=9333)",
   "teste_estab": "Estabilizador (editor-estab.js + Functions/estabilizador.py) no app de verdade: abre um trecho tremido real, aplica o",
   "teste_export": "teste_export.py — Confere a exportação do editor contra a prévia, quadro a quadro, e reprova se divergir",
-  "teste_fila": "Fila de render do Editor (editor-fila.js) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila),",
+  "teste_fila": "Fila de render do Editor (editor-fila.js) — abre um app próprio (porta 9334, dados em D:/Kanivete/Testes/fila),",
   "teste_filtros": "Aplica cada filtro do menu Filtro (valores padrão) numa foto e mede; confere que mudou a imagem e não deu erro",
   "teste_fisica_timeline": "Física da timeline (2026-10-22): centenas de edições aleatórias em várias trilhas (cortes, arrastes, aparos com o",
   "teste_fonte": "Criar fonte própria no Vetor Kanivete (Texto › Criar fonte) — app em --agente=9333",
@@ -3703,8 +3719,8 @@
   "teste_imagem_dia_video": "Testa tools/agente/imagem_dia_video.py com assets mínimos gerados na hora (card fictício no disco D:)",
   "teste_instancia_unica": "Abertura segura com agente, app sem CDP e perfil de teste. Não abre nem fecha aplicativos",
   "teste_jcut": "J-cut após o corte de respiros, no app de teste",
-  "teste_kani": "Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,",
-  "teste_kani_maos": "Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da",
+  "teste_kani": "Kani (assistente) — abre um app próprio (porta 9334, dados em D:/Kanivete/Testes/fila) e confere: bolinha na Home,",
+  "teste_kani_maos": "Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/Kanivete/Testes), pede um flyer ao agente da",
   "teste_kani_respostas": "Kani — bateria de respostas (alucinação, fatos do app, contas, memória da conversa, tela, rotas e tempo da 1ª palavra)",
   "teste_ke_aba": "Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:",
   "teste_ke_media": "Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:",
@@ -3739,6 +3755,7 @@
   "teste_remix": "Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46",
   "teste_respiros": "Cortar respiros (editor-respiros.js + Functions/respiros.py) e onda em alta resolução (ve_peaks_faixa) no app de verdade",
   "teste_roto": "Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado",
+  "teste_roto_saude": "Pincel Roto enxuto (3 s em 720p): VEROTO_API.auto (Selecionar assunto + Freeze num comando) e o autorreparo da",
   "teste_scripts_globais": "Nomes globais repetidos entre os scripts da página (frontend/index.html)",
   "teste_seq_escala": "Configurações da sequência › \"Adaptar o conteúdo ao novo tamanho\": trocar o quadro (Full HD → 4K → Full HD, e de",
   "teste_sfx": "Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta",

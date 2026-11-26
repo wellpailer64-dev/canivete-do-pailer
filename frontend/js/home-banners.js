@@ -2,7 +2,7 @@
 // Início: banners deslizantes no topo (um por ferramenta, troca a cada 5 s) e, embaixo, o trilho com o ícone, o nome e a
 // info de cada uma. A troca segue a barrinha do item ativo (animationend), então pausar a barrinha pausa o carrossel:
 // mouse em cima do banner ou do trilho pausa; passar o mouse num item mostra o banner dele; clicar abre a ferramenta.
-// Artes em img/home/banner-<id>.webp (Z-Image local; script em D:/kanivete_testes/scripts/gerar_banners.py).
+// Artes em img/home/banner-<id>.webp (Z-Image local; script em D:/Kanivete/Testes/scripts/gerar_banners.py).
 // =========================================================
 const HB_ITENS = [
     { id: 'vd', sig: 'Vd', nome: 'Vídeo Kanivete', info: 'Edição, camadas, motion e 3D', abrir: () => switchTool('video-cutter'),

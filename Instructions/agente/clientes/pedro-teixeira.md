@@ -8,7 +8,7 @@ Assunto: varejo, vendas, representação comercial, carreira. Perfil `@pedrootei
 - `01 - PAUTAS/2026/08 - AGOSTO/01 - CARROSSEL 1/images` (escada, cartas, estrada, tijolos).
 - `.../03 - CARROSSEL 3/` (varejo de material de construção, cenas 3D com amarelo e preto).
 - `.../06 - CARROSSEL 5/06 - CARROSSEL 5.iknv`: aberto no Photo Kanivete, é o melhor ponto de partida (camadas reais).
-Folha das três lado a lado: `D:/kanivete_testes/pedro_ds/ref/c1.jpg`, `c3.jpg` e `c5.jpg`.
+Folha das três lado a lado: `D:/Kanivete/Testes/pedro_ds/ref/c1.jpg`, `c3.jpg` e `c5.jpg`.
 
 ## Marca
 - Formato: carrossel 1080 × 1440 por página.
@@ -30,9 +30,9 @@ Folha das três lado a lado: `D:/kanivete_testes/pedro_ds/ref/c1.jpg`, `c3.jpg` 
 9. Acabamento limpo, sem grão. Sombra macia nos objetos, que pousam num chão e não flutuam.
 
 ## Imagem
-Veja `Instructions/agente/repertorio-visual.md`. Preferir cena de estúdio inteira (chão cinza, parede com forma amarela/preta, 2–4 objetos agrupados, luz lateral) e cenas reais de loja com pessoas; objeto recortado sozinho em fundo liso fica com cara de adesivo. Folhas de todos os carrosséis: `D:/kanivete_testes/pedro_ds/ref/` (c1 a c5, jul).
+Veja `Instructions/agente/repertorio-visual.md`. Preferir cena de estúdio inteira (chão cinza, parede com forma amarela/preta, 2–4 objetos agrupados, luz lateral) e cenas reais de loja com pessoas; objeto recortado sozinho em fundo liso fica com cara de adesivo. Folhas de todos os carrosséis: `D:/Kanivete/Testes/pedro_ds/ref/` (c1 a c5, jul).
 
 ## Erros já corrigidos (não repetir)
 - 2026-11-03: só texto e foto, com cara de landing page. Inter 800 caixa alta em tudo. Preto em 4 de 8 slides.
-  Pedro pequeno no canto da capa. Último slide genérico com "Salve para rever". Rodadas em `D:/kanivete_testes/pedro_ds`.
+  Pedro pequeno no canto da capa. Último slide genérico com "Salve para rever". Rodadas em `D:/Kanivete/Testes/pedro_ds`.
 - 2026-10: capa cinza com recorte claro e objeto pequeno no meio. Preferir foto cheia ou herói que vaza.

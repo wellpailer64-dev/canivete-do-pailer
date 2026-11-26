@@ -20,16 +20,16 @@ Cuidado: cor de tela muito saturada (verde-limão) sai apagada em CMYK — escol
 
 | # | Etapa | Situação | Onde está |
 |---|---|---|---|
-| 1 | Escola de mockup (5 PSDs dissecados camada a camada) | **Feita** | `Instructions/agente/mockup-profissional.md` §1–4; `D:/kanivete_biblioteca/mockups/estudo/` |
+| 1 | Escola de mockup (5 PSDs dissecados camada a camada) | **Feita** | `Instructions/agente/mockup-profissional.md` §1–4; `D:/Kanivete/Biblioteca/mockups/estudo/` |
 | 2 | Produto 3D com rótulo e foto de estúdio | **Feita** (virou a **Lux Kanivete**) | `CLAUDE.md` › Lux; `cena-3d-editor.md` (fim); `mockup-profissional.md` §5 |
 | 2b | Vídeo 3D (render quadro a quadro) | **Feita** (Cycles prévia ~3 s/quadro, final ~5,6 s) | idem |
 | 2c | Presets de cena (flutuando, fileira "um diferente no meio de iguais", macro da tampa, herói inclinado) | Adiada (fazer junto da etapa 7) | — |
-| 3 | A marca: nome, palavra-sistema, slogan, frases | **Feita**: **sereno** (orvalho + calma), "Pode suar. Fica sereno.", "[momento] sereno" | `D:/kanivete_biblioteca/marcas/sereno/marca.md` |
+| 3 | A marca: nome, palavra-sistema, slogan, frases | **Feita**: **sereno** (orvalho + calma), "Pode suar. Fica sereno.", "[momento] sereno" | `D:/Kanivete/Biblioteca/marcas/sereno/marca.md` |
 | 4 | Logotipo no Vetor com construção profissional (grade, ajuste óptico, versões, área de proteção) | **Feita (v3)**: Jost 500 + "o" em gota Bézier G2, miolo por deslocamento, pente limpo; v1/v2 recusadas | `tools/logotipo.py`, `tools/contorno.py`, `direcao-logotipo.md`; `marcas/sereno/logo/`, `direcoes_logo.png` |
 | 5 | Paleta (pensada para CMYK) e tipografia | **Feita**: noite/manhã/orvalho/sálvia/lavanda/pêssego + terracota (texto de destaque); Fraunces + Jost | `marcas/sereno/marca.json` |
-| 6 | Rótulos (pote e bastão) com a marca | **Feita**: 4 aromas (alecrim, lavanda, coco, noite), HTML → PNG transparente | `D:/kanivete_testes/sereno/rotulos.py`; `marcas/sereno/rotulos/` |
-| 7 | Fotos de produto na Lux (herói, flutuando, fileira, macro) + mockups | **Feita** (sem macro/sacola): herói, flutuando, trio de aromas, fileira "um diferente", versões feed; Blender direto pela spec (~30–45 s cada) | `D:/kanivete_testes/sereno/fotos.py`; `marcas/sereno/fotos/` |
-| 8 | Cenas de campanha com frases (sensação da marca) | **Feita**: 4 posts feed (Calor sereno, Treino sereno, Pode suar, Entre iguais) — pessoas geradas no Z-Image + renders | `D:/kanivete_testes/sereno/campanha.py`; `marcas/sereno/campanha/` (.iknv + .jpg) |
+| 6 | Rótulos (pote e bastão) com a marca | **Feita**: 4 aromas (alecrim, lavanda, coco, noite), HTML → PNG transparente | `D:/Kanivete/Testes/sereno/rotulos.py`; `marcas/sereno/rotulos/` |
+| 7 | Fotos de produto na Lux (herói, flutuando, fileira, macro) + mockups | **Feita** (sem macro/sacola): herói, flutuando, trio de aromas, fileira "um diferente", versões feed; Blender direto pela spec (~30–45 s cada) | `D:/Kanivete/Testes/sereno/fotos.py`; `marcas/sereno/fotos/` |
+| 8 | Cenas de campanha com frases (sensação da marca) | **Feita**: 4 posts feed (Calor sereno, Treino sereno, Pode suar, Entre iguais) — pessoas geradas no Z-Image + renders | `D:/Kanivete/Testes/sereno/campanha.py`; `marcas/sereno/campanha/` (.iknv + .jpg) |
 | 9 | Vídeo 3D de 5 s da marca | A fazer | Lux › Render › Vídeo final |
 | 10 | Montagem final no Vetor (pranchetas uma abaixo da outra) | **Feita**: manual de 11 páginas (+ embalagem, produto, campanha) | `marcas/sereno/kit.aknv`, `sereno_manual.pdf` |
 
@@ -39,7 +39,7 @@ Cuidado: cor de tela muito saturada (verde-limão) sai apagada em CMYK — escol
 - **Mockup em pilha editável** (passes do 3D → camadas do Photo): `tools/mockup3d.py`.
 - **Vetor**: logo, pranchetas, criar fonte, PDF/X, ida e volta com o Illustrator.
 - **Photo**: KNV.cena (diagramar em HTML/CSS → camadas), mockups, gerador de imagem (Z-Image/klein).
-- Artes de teste já feitas (rótulo provisório "fresquíssimo"): `D:/kanivete_testes/estudio/rotulo_pote.png`, `rotulo_bastao.png`.
+- Artes de teste já feitas (rótulo provisório "fresquíssimo"): `D:/Kanivete/Testes/estudio/rotulo_pote.png`, `rotulo_bastao.png`.
 
 ## Pendências técnicas anotadas no caminho (não bloqueiam a missão)
 - Lux: projeto "invisível" só dela (hoje a cena mora no projeto do Editor por trás); modelos .glb no render; ranhuras da

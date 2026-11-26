@@ -86,7 +86,7 @@ def _rostos_item(caminho, s, e):
 
 def _cache_rostos(caminho, s, e):
     import hashlib
-    pasta = os.path.join(os.environ.get("TEMP") or "D:/kanivete_testes/tmp", "pessoas_repetidas")
+    pasta = os.path.join(os.environ.get("TEMP") or "D:/Kanivete/Testes/tmp", "pessoas_repetidas")
     os.makedirs(pasta, exist_ok=True)
     st = os.stat(caminho)
     k = hashlib.md5(f"{caminho}|{st.st_size}|{st.st_mtime}|{s:.3f}|{e:.3f}".encode()).hexdigest()
@@ -119,7 +119,7 @@ def _folha(pares, projeto):
     if cols[1] is not None and cols[1].shape[0] < cols[0].shape[0]:
         cols[1] = np.vstack([cols[1], np.zeros((cols[0].shape[0] - cols[1].shape[0], cols[1].shape[1], 3), np.uint8)])
     img = np.hstack([c for c in cols if c is not None])
-    arq = os.path.join(os.environ.get("TEMP") or "D:/kanivete_testes/tmp", "pessoas_repetidas", "folha.jpg")
+    arq = os.path.join(os.environ.get("TEMP") or "D:/Kanivete/Testes/tmp", "pessoas_repetidas", "folha.jpg")
     cv2.imencode(".jpg", img)[1].tofile(arq)
     return arq
 

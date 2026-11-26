@@ -40,5 +40,5 @@ está em **como a imagem é construída**.
 Escreva o roteiro: para cada slide, a frase curta, o TIPO de imagem (1 a 5 acima), três ideias e a escolhida, e o prompt da
 cena inteira. Se mais de dois slides seguidos usarem o mesmo tipo, troque um. Só então gere e monte.
 
-Fontes: pautas de 2026-07 e 2026-08 do Pedro (folhas em `D:/kanivete_testes/pedro_ds/ref/c1..c5.jpg`, `jul.jpg`).
+Fontes: pautas de 2026-07 e 2026-08 do Pedro (folhas em `D:/Kanivete/Testes/pedro_ds/ref/c1..c5.jpg`, `jul.jpg`).
 Acrescente aqui cada solução nova que o Pailer aprovar.

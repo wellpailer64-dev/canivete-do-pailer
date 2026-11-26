@@ -1,6 +1,6 @@
 """Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),
 Pathfinder, deslocar/contornar traço, separações e sobreimpressão, fechamento, PDF/X-4 e PDF/X-1a relidos e conferidos, PNG, salvar/reabrir .aknv, abrir PDF/SVG/PPTX e
-desfazer. Sai com 1 se algo reprovar. Amostras em D:/kanivete_testes/vetor/amostras (geradas se faltarem).
+desfazer. Sai com 1 se algo reprovar. Amostras em D:/Kanivete/Testes/vetor/amostras (geradas se faltarem).
 
     python testes/teste_vetor.py [--porta 9333] [--print saida.png]
 """
@@ -10,13 +10,13 @@ sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-AM = r"D:\kanivete_testes\vetor\amostras"
-SAI = r"D:\kanivete_testes\vetor\saida"
+AM = r"D:\Kanivete\Testes\vetor\amostras"
+SAI = r"D:\Kanivete\Testes\vetor\saida"
 ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); ap.add_argument("--print", default=os.path.join(SAI, "tela.png"))
 a = ap.parse_args()
 os.makedirs(SAI, exist_ok=True)
 if not os.path.isfile(os.path.join(AM, "apresentacao.pptx")):
-    subprocess.run([sys.executable, os.path.join(r"D:\kanivete_testes\scripts", "gerar_amostras_vetor.py")], check=False)
+    subprocess.run([sys.executable, os.path.join(r"D:\Kanivete\Testes\scripts", "gerar_amostras_vetor.py")], check=False)
 
 falhas = []
 def ok(cond, msg):
@@ -345,10 +345,10 @@ with sync_playwright() as p:
     r = C("vetorizar", {"ids": [li["id"]], "cores": 4, "modo": "recortado", "ignorar_branco": True, "agrupar": True})
     subs = pg.evaluate("id => { const m = {}; vkObj(id).itens.forEach(o => { const k = vkCorTexto(o.preench); m[k] = (m[k] || 0) + o.subs.length; }); return Object.values(m); }", r["ids"][0])
     ok(r["cores"] == 3 and sorted(subs) == [1, 2, 6], f"vetorizar logo JPG: 3 cores, anel com furo, LOGO com os furos dos O ({subs})")
-    subprocess.run([sys.executable, r"D:\kanivete_testes\vetor\cores\gerar_livros.py"], check=False, capture_output=True)
+    subprocess.run([sys.executable, r"D:\Kanivete\Testes\vetor\cores\gerar_livros.py"], check=False, capture_output=True)
     pu = C("bibliotecas_cor")["pasta_usuario"]; os.makedirs(pu, exist_ok=True)
     import shutil
-    for f_ in ("TESTE Solid Coated.acb", "marca.ase"): shutil.copy(os.path.join(r"D:\kanivete_testes\vetor\cores", f_), pu)
+    for f_ in ("TESTE Solid Coated.acb", "marca.ase"): shutil.copy(os.path.join(r"D:\Kanivete\Testes\vetor\cores", f_), pu)
     libs = [b_["nome"] for b_ in C("bibliotecas_cor")["bibliotecas"]]
     ok("TESTE Solid Coated" in libs and "marca" in libs, f"bibliotecas de cor achadas na pasta do usuário ({libs})")
     q = C("retangulo", {"x": 40, "y": 5, "larg": 15, "alt": 10, "nome": "pantone"})
@@ -464,7 +464,7 @@ with sync_playwright() as p:
     ok(r_["paginas"] == 2 and lidos_ == ["https://exemplo.com/ana", "https://exemplo.com/bruno"] and pg.evaluate("vkTodos().find(x => x.o.nome === 'nome').o.conteudo") == "Nome",
        f"mala direta: uma página por linha, QR de cada um lido no PDF, documento volta ao original ({r_['paginas']} páginas, {lidos_})")
     C("novo", {"nome": "Ampliar", "larg": 100, "alt": 100})
-    fi_ = C("imagem", {"arquivo": "D:/kanivete_testes/flyer_webmart/f4.png", "x": 5, "y": 5, "larg": 80})
+    fi_ = C("imagem", {"arquivo": "D:/Kanivete/Testes/flyer_webmart/f4.png", "x": 5, "y": 5, "larg": 80})
     cx0_ = C("info", {"ids": [fi_["id"]]})[0]["caixa_mm"]
     r_ = C("ampliar_imagem", {"ids": [fi_["id"]], "escala": 2})
     cx1_ = C("info", {"ids": [fi_["id"]]})[0]["caixa_mm"]

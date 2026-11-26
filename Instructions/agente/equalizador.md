@@ -14,5 +14,5 @@ Filtro e EQ › Equalizador paramétrico; Controles de efeito › "Editar no pai
 - O EQ antigo de 3 faixas ("Equalizador simples") ganhou a prévia com filtros reais (`vePeqSecoesEq` = equalizer do
   ffmpeg com largura em oitavas); antes era uma média aproximada (prévia 170% × arquivo 221%; agora 221 × 232).
 - Medido 2026-10-18: coeficientes JS × Python diferença 0; prévia (rack e clipe) × som seco pelo biquad do ffmpeg =
-  0,005%; rack prévia/exportação 118/114%. Teste: `D:/kanivete_testes/scripts/peq_teste.py`, `mixer_rack.py`.
+  0,005%; rack prévia/exportação 118/114%. Teste: `D:/Kanivete/Testes/scripts/peq_teste.py`, `mixer_rack.py`.
 - Pendências: bandas dinâmicas, mid/side, solo de banda (escutar só a faixa), curva no Controles de efeito.

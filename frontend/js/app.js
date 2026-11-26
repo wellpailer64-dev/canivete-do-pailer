@@ -363,10 +363,22 @@ document.addEventListener('keydown', e => {
 function homeBgSync() {
     const v = _el('home-bg');
     if (!v) return;
+    // Falha do decodificador pode deixar a janela inteira preta: libera o vídeo e mantém a interface.
+    if (!v._aoErroFundo) {
+        v._aoErroFundo = () => {
+            v._fundoFalhou = true;
+            v.pause();
+            v.classList.remove('pronto');
+            v.removeAttribute('src');
+            v.load();
+        };
+        v.addEventListener('error', v._aoErroFundo);
+    }
+    if (v.error && !v._fundoFalhou) v._aoErroFundo();
     const ativa = document.querySelector('.tool-page.active');
     const lobby = _el('ve-start'), naLobby = !!lobby && !lobby.hidden && ativa?.id === 'page-video-cutter';   // lobby do editor usa o mesmo fundo
     const usarFundo = ativa && !ativa.classList.contains('ve-page');   // os lobbys têm o fundo deles (lobby.js): este não toca por baixo
-    const tocar = usarFundo && !document.hidden
+    const tocar = usarFundo && !v._fundoFalhou && v.hasAttribute('src') && !document.hidden
         && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (tocar) v.play().catch(() => {}); else v.pause();
     // vídeo do card de entrada do editor: só toca com o lobby à vista
@@ -529,6 +541,7 @@ function appConfirm({ titulo, texto, botoes }) {
 let _saindo = false;
 async function appSair() {
     if (_saindo) return;
+    if (typeof VEAP !== 'undefined' && (VEAP.abrindo || VEAP.trocando || VEAP.fechando || VE._salvandoProjeto)) return;
     _saindo = true;
     try {
         if (typeof VE !== 'undefined' && VE.ready) {
@@ -552,6 +565,7 @@ async function appSair() {
                 if (r === 'salvar' && !(await veSaveProject())) return;
             }
         }
+        if (typeof veApConfirmarFecharTudo === 'function' && !(await veApConfirmarFecharTudo())) return;
         window.pywebview.api.sair_app();
     } finally { _saindo = false; }
 }
@@ -570,6 +584,7 @@ async function fecharAba(tool, ev, rapido) {
     const { nome } = _menuInfo(tool);
     const rodando = _abaRodando(tool);
     if (tool === 'video-cutter' && typeof VE !== 'undefined' && VE.ready) {
+        if (typeof veApBloqueado === 'function' && veApBloqueado()) return;
         if (VE.exportRunning) {
             await appConfirm({ titulo: 'Exportação em andamento', texto: 'Aguarde a exportação terminar (ou cancele-a) antes de fechar o editor.', botoes: [{ rotulo: 'Ok', valor: 1, tipo: 'primario' }] });
             return;
@@ -586,6 +601,7 @@ async function fecharAba(tool, ev, rapido) {
             const r = await appConfirm({ titulo: 'Fechar o Vídeo Kanivete?', texto: 'O projeto aberto será fechado.', botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Fechar', valor: 1, tipo: 'primario' }] });
             if (!r) return;
         }
+        if (typeof veApConfirmarFecharTudo === 'function' && !(await veApConfirmarFecharTudo())) return;
         veCloseProject();
     } else if (!rapido) {
         const r = await appConfirm({
@@ -891,7 +907,7 @@ function navSom(tipo, vol = 1) {
     } catch (e) { /* sem áudio: segue em silêncio */ }
 }
 
-// App das baterias de teste (APPDATA em kanivete_testes ou CANIVETE_TESTE=1, ve_agente_porta().teste): no lugar do
+// App das baterias de teste (APPDATA em Kanivete/Testes ou CANIVETE_TESTE=1, ve_agente_porta().teste): no lugar do
 // som de concluído, só o toque curto do Ke — uma bateria com dezenas de exportações virava uma falação
 let _appTeste = null;
 async function _ehAppTeste() {

@@ -3,7 +3,7 @@ quadro a quadro com o HTML. Passa se a diferença ficar no piso da compressão (
 
     py -3.13 testes/teste_motion_html.py [teste1 teste2 ...] [--cpu]   (padrão: placa, a regra do Pailer)
 
-Limites: acima do piso na média ≤ 0,4 e no pior quadro ≤ 1,5 (0..255). Saídas em D:/kanivete_testes/motion_html_teste/.
+Limites: acima do piso na média ≤ 0,4 e no pior quadro ≤ 1,5 (0..255). Saídas em D:/Kanivete/Testes/motion_html_teste/.
 Rodar ao mexer em tools/motion_html*, nas formas/textos/máscaras do editor ou na camada desenhada da exportação.
 """
 import glob, json, os, subprocess, sys
@@ -11,14 +11,14 @@ import glob, json, os, subprocess, sys
 sys.stdout.reconfigure(encoding="utf-8")
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CENAS = os.path.join(RAIZ, "testes", "motion_html")
-SAIDA = "D:/kanivete_testes/motion_html_teste"
+SAIDA = "D:/Kanivete/Testes/motion_html_teste"
 MEDIA, PIOR = 0.4, 1.5
 
 
 def main():
     a = sys.argv[1:]
     nomes = [x for x in a if not x.startswith("--")] or sorted(os.path.splitext(os.path.basename(f))[0] for f in glob.glob(os.path.join(CENAS, "*.html")))
-    env = dict(os.environ, TEMP="D:/kanivete_testes/tmp", TMP="D:/kanivete_testes/tmp")
+    env = dict(os.environ, TEMP="D:/Kanivete/Testes/tmp", TMP="D:/Kanivete/Testes/tmp")
     ruins = []
     for n in nomes:
         pasta = os.path.join(SAIDA, n)

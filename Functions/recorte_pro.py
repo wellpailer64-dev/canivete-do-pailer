@@ -10,7 +10,7 @@ Sem serrilhado, sem resto de cor do fundo, sem borrar a borda:
 4. cor do primeiro plano por Blur-Fusion (Forte & Pitié 2021): tira a mistura do fundo dos pixels de borda e
    semitransparentes (o "Descontaminar cores" do Photoshop). No miolo (alfa 1) a cor não muda.
 
-Comparado no protótipo (D:/kanivete_testes/recorte) com o recorte antigo em cabelo crespo, flor, palmeira, café com
+Comparado no protótipo (D:/Kanivete/Testes/recorte) com o recorte antigo em cabelo crespo, flor, palmeira, café com
 vapor e foto real. ~30 s na CPU para 1024², mais na foto grande (o filtro roda na resolução cheia).
 """
 import base64
@@ -131,7 +131,7 @@ def cabe_matting():
 
 def recortar(rgb, tipo=None):
     """rgb (H×W×3 uint8) → (cores H×W×3 sem o fundo misturado, alfa H×W uint8).
-    tipo: "pessoa" | "objeto" | None (decide pelo rosto). Comparado em 2026-10-06 (D:/kanivete_testes/recorte2):
+    tipo: "pessoa" | "objeto" | None (decide pelo rosto). Comparado em 2026-10-06 (D:/Kanivete/Testes/recorte2):
     pessoa → matting sozinho (cabelo: buracos limpos, fios finos; o miolo sólido por um 2º modelo obrigava dois na
     placa e não mudava o resultado no zoom); objeto → BEN2 sozinho (sólido e limpo; o matting deixava vidro/óleo
     transparentes e o miolo antigo manchava o gargalo). GPU: pessoa ~6 s (1ª vez +16 s de carga), objeto ~1 s."""

@@ -1,4 +1,4 @@
-"""EXEMPLO (Alessandro/Minasparts, 2026-10-07; caminhos em D:/kanivete_testes/oficina) — copiar e ajustar CORTES/BROLL. Plano dos 3 cortes (Alessandro Barbosa, Minasparts): trechos por palavras, bordas pela energia da voz, legendas
+"""EXEMPLO (Alessandro/Minasparts, 2026-10-07; caminhos em D:/Kanivete/Testes/oficina) — copiar e ajustar CORTES/BROLL. Plano dos 3 cortes (Alessandro Barbosa, Minasparts): trechos por palavras, bordas pela energia da voz, legendas
 corrigidas, enquadramento em quem fala (falante.py), B-roll e fechamento. Saída: plano_final.json (aplicar no app)."""
 import json
 import re
@@ -8,10 +8,10 @@ import wave
 
 import numpy as np
 
-sys.path.insert(0, r"D:/kanivete_testes/oficina")
+sys.path.insert(0, r"D:/Kanivete/Testes/oficina")
 import falante  # noqa: E402
 
-D = "D:/kanivete_testes/oficina/"
+D = "D:/Kanivete/Testes/oficina/"
 VIDEO = open(D + "video.txt", encoding="utf-8").read().strip()
 PAL = json.load(open(D + "palavras.json", encoding="utf-8"))
 OFF = 40.0   # entrevista16k.wav começa em 40 s

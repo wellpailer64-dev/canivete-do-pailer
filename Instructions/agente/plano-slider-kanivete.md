@@ -15,7 +15,7 @@ PowerPoint moderno (Canva/Figma) para as palestras mensais de um cliente: manual
 - `switchTool` (`frontend/js/app.js` ~910) chama `luxAoTrocar`/`keAoTrocar`: acrescentar `sdAoTrocar`.
 - Lobby: `frontend/js/lobby.js` (`KL_LOBBYS`) + vídeo `video/lobby-slider-kanivete.webm` (tingir `home-bg.webm`,
   ffmpeg colorchannelmixer, 12 qps). Home: `frontend/js/home-banners.js` (`HB_ITENS`) + arte
-  `frontend/img/home/banner-slider-kanivete.webp` (Z-Image, `D:/kanivete_testes/scripts/gerar_banners.py`).
+  `frontend/img/home/banner-slider-kanivete.webp` (Z-Image, `D:/Kanivete/Testes/scripts/gerar_banners.py`).
 - Projeto `.dknv` (zip: documento.json + mídias): novo `Functions/slider_projeto.py` no molde de `lux_projeto.py`;
   registrar extensão/ícone em `Functions/projeto.py` `_TIPOS` + `tools/icones_arquivos.py`.
 - API do agente `window.SDK` no padrão `VKN.cmd` (registrar comandos; `SDK.cena(html)` reaproveitando a ideia do KNV.cena).

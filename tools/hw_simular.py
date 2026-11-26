@@ -10,9 +10,9 @@
 - Placa "integrada"/"nenhuma": esconde a NVIDIA do CUDA/NVENC (CUDA_VISIBLE_DEVICES=-1) e do Vulkan do llama.cpp/
   stable-diffusion (GGML_VK_VISIBLE_DEVICES). --sem-gpu-tela desliga também a placa da tela (WebView2), pior que uma integrada.
 - --sem-app: não abre o app; roda o próprio `-- comando` dentro da simulação (ex.: um bench de exportação em Python).
-- --limpo: pastas de dados novas (como app recém-instalado: sem preferências salvas), em D:/kanivete_testes/tmp.
+- --limpo: pastas de dados novas (como app recém-instalado: sem preferências salvas), em D:/Kanivete/Testes/tmp.
 - Com `-- comando`: roda o comando (ex.: um teste) com o app aberto e fecha tudo no fim; sem ele, espera Enter.
-Mede e imprime o pico de memória da árvore. Dados/temporários do app de teste em D:/kanivete_testes (nunca no C:).
+Mede e imprime o pico de memória da árvore. Dados/temporários do app de teste em D:/Kanivete/Testes (nunca no C:).
 """
 import ctypes
 import json
@@ -28,7 +28,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 from Functions import hardware  # noqa: E402
 
-BASE = "D:/kanivete_testes/"
+BASE = "D:/Kanivete/Testes/"
 k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 

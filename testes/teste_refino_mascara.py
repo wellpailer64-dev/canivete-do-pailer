@@ -6,10 +6,10 @@ from pathlib import Path
 from urllib.request import urlopen
 from playwright.sync_api import sync_playwright
 
-SAIDA=Path('D:/kanivete_testes/refino_mascara')
+SAIDA=Path('D:/Kanivete/Testes/refino_mascara')
 SAIDA.mkdir(parents=True,exist_ok=True)
 for chave,pasta in [('TEMP','tmp'),('TMP','tmp'),('APPDATA','appdata'),('LOCALAPPDATA','localappdata')]:
-    os.environ[chave]='D:/kanivete_testes/'+pasta
+    os.environ[chave]='D:/Kanivete/Testes/'+pasta
 with urlopen(f'http://127.0.0.1:{_porta_agente(9333)}/json/list',timeout=5) as r:
     url=next(p['url'] for p in json.load(r) if p.get('type')=='page' and 'index.html' in p.get('url',''))
 with sync_playwright() as p:

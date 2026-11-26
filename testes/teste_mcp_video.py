@@ -9,7 +9,7 @@ import sys
 import time
 
 RAIZ_KANICODE = "D:/Kanivete/Plugins/kanicode"
-ARQ = "D:/kanivete_testes/cultsp2/teste.vknv"
+ARQ = "D:/Kanivete/Testes/cultsp2/teste.vknv"
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, RAIZ_KANICODE)
 

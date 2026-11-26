@@ -6,7 +6,7 @@ mudar o main.js: ••• → Reload). Painel: Window › UXP Plugins › Kaniv
 
 ## Como conversar
 `py -3.13 tools/ponte_premiere.py <cmd> ['{json}']` ou `ponte_premiere.enviar(cmd, args)` em Python.
-Transporte pela PASTA `D:\kanivete_testes\ponte_premiere` (pedido_<id>.json → resposta_<id>.json): o UXP NEGA http
+Transporte pela PASTA `D:\Kanivete\Testes\ponte_premiere` (pedido_<id>.json → resposta_<id>.json): o UXP NEGA http
 local ("Permission denied … Manifest entry not found", mesmo com o domínio listado ou "all"). O servidor http do
 mesmo script ficou como alternativa, sem uso.
 Comandos: `info`, `efeitos_audio`, `ler_audio` (trilhas → clipes → cadeia com params), `aplicar_efeito {t,i,nome,valores}`,
@@ -14,7 +14,7 @@ Comandos: `info`, `efeitos_audio`, `ler_audio` (trilhas → clipes → cadeia co
 livre com `ppro` e `h` = ajudantes; explorar a API sem recarregar o plugin).
 
 **Cuidado**: os comandos agem no projeto ATIVO do Premiere. O Pailer trabalha nele (ex.: MASTER NO CANIVETE_1.prproj):
-testes só numa cópia em `D:\kanivete_testes\premiere\mixer\` aberta com `abrir`, conferindo `info().caminho` antes.
+testes só numa cópia em `D:\Kanivete\Testes\premiere\mixer\` aberta com `abrir`, conferindo `info().caminho` antes.
 
 ## O que a API (UXP 26.5) faz e não faz
 - Clipe: aplicar/remover efeito de áudio (`AudioFilterFactory.createComponentByDisplayName(nome, clipe)` +
@@ -27,8 +27,8 @@ testes só numa cópia em `D:\kanivete_testes\premiere\mixer\` aberta com `abrir
   na versão comum; `ppro.BetaFeature` não existe no UXP.
 
 ## Efeitos de áudio
-Catálogo (53 nativos: matchName, parâmetros, padrões): `D:\kanivete_testes\premiere\mixer\catalogo_efeitos.json`
-(`D:\kanivete_testes\scripts\premiere_catalogo.py`). Os do Audition têm matchName GUID (ex. Single-band Compressor
+Catálogo (53 nativos: matchName, parâmetros, padrões): `D:\Kanivete\Testes\premiere\mixer\catalogo_efeitos.json`
+(`D:\Kanivete\Testes\scripts\premiere_catalogo.py`). Os do Audition têm matchName GUID (ex. Single-band Compressor
 `2da3e2bc-…`); os simples, "Internal Highpass", "Internal Bass"… Ambisonics só em surround. 14 de terceiros (VST).
 **Valores sempre normalizados 0..1** (UI do VST3): nos Params do .prproj e no `OpaqueData` (base64: XML `prop.map`
 com ParamList, ou binário). A unidade real (Hz, dB, ms) NÃO está no arquivo → precisa da curva de cada parâmetro.
@@ -37,7 +37,7 @@ Volume (Internal Volume) "Level": 0,1778 = 0 dB (1,0 = +15 dB).
 ## Efeitos de áudio do Premiere no Kanivete (feito 2026-10-09)
 - Dados: `frontend/dados/premiere_audio.json` (+ `.js` p/ o front), gerados por `tools/premiere_audio_dados.py` a partir de
   `tools/ponte_premiere/catalogo_efeitos.json`. Réguas medidas renderizando no Premiere (sinal de teste em
-  `D:\kanivete_testes\premiere\calib`, scripts `calib_*.py` em `D:\kanivete_testes\scripts`).
+  `D:\Kanivete\Testes\premiere\calib`, scripts `calib_*.py` em `D:\Kanivete\Testes\scripts`).
 - No clipe/trilha: `{t: "pr_<nome>", v: {p0..pn: 0..1}}` (valores como o Premiere) → ida e volta sem perda (medido: 1e-9).
 - Som (prévia `frontend/js/editor-afx-pr.js` = exportação `Functions/efeitos_pr.py`, mesma conta, 0,0 dB entre elas):
   Volume, Channel Volume, Amplify, Balance, Bass/Treble (prateleira 200 Hz / 4 kHz, Q pelo ganho), Highpass/Lowpass
@@ -84,6 +84,6 @@ acha cada clipe pelo início (±0,05 s).
 - `Functions/premiere_ajuste.marcar(prproj)` põe as marcas no .prproj FECHADO (procura a mídia pelo título; backup
   `.antes-ajuste`). `ponte_premiere.marcar_ajustes_no_aberto()`: salva, fecha, marca e reabre o projeto ativo — o
   "Enviar ao Premiere" chama sozinho quando o XML tem camada de ajuste (a confirmação avisa).
-- Testes em `D:\kanivete_testes\premiere\ajuste\` (`teste_ponta.py`: Kanivete → XML → projeto novo → marcar → ler o Lumetri).
+- Testes em `D:\Kanivete\Testes\premiere\ajuste\` (`teste_ponta.py`: Kanivete → XML → projeto novo → marcar → ler o Lumetri).
 - `ProjectConverter.exportAsFinalCutProXML(seq, caminhoComBarraInvertida)` (com "/" ele junta o caminho duas vezes) e
   mostra 1 aviso "Translation Report" que segura o plugin até clicar OK.

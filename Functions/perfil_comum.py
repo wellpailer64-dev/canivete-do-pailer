@@ -2,7 +2,7 @@
 perfil_comum.py — A cópia de trabalho do Claude (app de teste na 9333, aberta por tools/agente/abrir_teste.py) usa a
 MESMA pasta de prévias e alimenta os MESMOS recentes do app do Pailer (2026-11-07).
 
-Antes cada cópia tinha a sua casa (%APPDATA% e cache do D:\\kanivete_testes): as prévias feitas numa eram refeitas
+Antes cada cópia tinha a sua casa (%APPDATA% e cache do D:\\Kanivete\\Testes): as prévias feitas numa eram refeitas
 na outra e o projeto editado pelo Claude não aparecia nos recentes do Pailer.
 
 Ligado com CANIVETE_PERFIL_COMUM=1 (só o abrir_teste.py liga; os testes automáticos seguem isolados):
@@ -46,7 +46,7 @@ def registrar_recente(path):
     if not ligado() or not path or not str(path).lower().endswith((".vknv", ".vcnvt")):
         return
     path = os.path.abspath(path)
-    if os.path.normcase(path).startswith(os.path.normcase("D:\\kanivete_testes")):
+    if os.path.normcase(path).startswith(os.path.normcase("D:\\Kanivete\\Testes")):
         return   # rascunho do agente não entra nos recentes do Pailer
     arq = os.path.join(pasta_real(), ARQ_RECENTES)
     lista = [p for p in _ler(arq, []) if isinstance(p, dict) and os.path.normcase(p.get("path", "")) != os.path.normcase(path)]

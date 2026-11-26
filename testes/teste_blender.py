@@ -6,7 +6,7 @@ import json, os, sys
 sys.stdout.reconfigure(encoding="utf-8")
 from PIL import Image
 from playwright.sync_api import sync_playwright
-SAI = r"D:\kanivete_testes\blender\teste"; os.makedirs(SAI, exist_ok=True)
+SAI = r"D:\Kanivete\Testes\blender\teste"; os.makedirs(SAI, exist_ok=True)
 falhas = []
 def ok(c, m):
     print(("  ok  " if c else "  FALHOU  ") + m)

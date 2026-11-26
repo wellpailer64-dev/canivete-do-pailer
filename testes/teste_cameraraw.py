@@ -1,13 +1,13 @@
 """Filtro Camera Raw em janela própria (app em --agente=9333; não mexa no mouse durante). Arrasta uma barra com o
 mouse (resistência: anda metade do mouse), liga cada ajuste (Claridade, Textura, Névoa, Nitidez, Ruído, Granulação,
 Vinheta, HSL, rodas, curva) e confere que a prévia muda, mede o tempo, dá OK, testa objeto inteligente, valores antigos
-(filtro inteligente salvo antes) e automação. Prints em D:/kanivete_testes/scripts. Uso: python testes/teste_cameraraw.py [--recarregar]"""
+(filtro inteligente salvo antes) e automação. Prints em D:/Kanivete/Testes/scripts. Uso: python testes/teste_cameraraw.py [--recarregar]"""
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time, json
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
-FOTO = "D:/kanivete_testes/cena/foto.jpg"
+FOTO = "D:/Kanivete/Testes/cena/foto.jpg"
 falhas = []
 def conferir(ok, nome, extra=""):
     print(("  ok    " if ok else "  FALHOU ") + nome + (f" ({extra})" if extra else ""))
@@ -55,9 +55,9 @@ with sync_playwright() as p:
     pg.evaluate(f"""(() => {{ const v = IE._cr.v; Object.assign(v, {{temp: 15, clar: 35, tex: 25, vib: 30, vig: -35, grao: 20, nitQ: 60, hi: -40, sh: 30}}); v.rodas.s = [0.25, 0.1]; v.rodas.h = [-0.15, 0.2];
         document.querySelectorAll('.ie-cr-sec').forEach(s => s.classList.add('aberta')); IE._cr.calcular(); }})()""")
     time.sleep(0.5)
-    pg.screenshot(path="D:/kanivete_testes/scripts/cameraraw_janela.png")
+    pg.screenshot(path="D:/Kanivete/Testes/scripts/cameraraw_janela.png")
     pg.keyboard.press("y"); time.sleep(0.3)
-    pg.screenshot(path="D:/kanivete_testes/scripts/cameraraw_antes_depois.png")
+    pg.screenshot(path="D:/Kanivete/Testes/scripts/cameraraw_antes_depois.png")
     pg.keyboard.press("y")
     t = time.time(); pg.keyboard.press("Enter")
     pg.wait_for_function("!IE._cr", timeout=60000); time.sleep(0.2)
@@ -100,7 +100,7 @@ with sync_playwright() as p:
         for k in range(1, 16): pg.mouse.move(x0 - 6 * k, y); time.sleep(0.01)
         pg.mouse.up(); time.sleep(0.6)
         conferir(pg.evaluate("ieAtiva(IE.doc).ajVals.sat") < -5 and pg.evaluate(f"{assin}(IE.doc.comp)") != antes, "barra do Propriedades muda a imagem ao vivo", f"sat {pg.evaluate('ieAtiva(IE.doc).ajVals.sat')}")
-        pg.screenshot(path="D:/kanivete_testes/scripts/cameraraw_camada.png")
+        pg.screenshot(path="D:/Kanivete/Testes/scripts/cameraraw_camada.png")
         pg.click(".ie-cr-abrir"); pg.wait_for_function("IE._cr && IE._cr.ultimo()", timeout=30000)
         conferir(pg.evaluate("IE._cr.v.clar") == 60, "a janela abre com os valores da camada")
         pg.evaluate("IE._cr.v.clar = 10"); pg.keyboard.press("Enter"); pg.wait_for_function("!IE._cr"); time.sleep(0.3)

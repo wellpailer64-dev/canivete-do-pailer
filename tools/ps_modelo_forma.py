@@ -1,6 +1,6 @@
 """Gera no Photoshop um PSD com camadas de forma (retângulo, elipse e um demarcador com furo): molde de vmsk/SoCo."""
 import os, sys, win32com.client
-SAIDA = sys.argv[1] if len(sys.argv) > 1 else r"D:\kanivete_testes\psd_forma\modelo_forma.psd"
+SAIDA = sys.argv[1] if len(sys.argv) > 1 else r"D:\Kanivete\Testes\psd_forma\modelo_forma.psd"
 os.makedirs(os.path.dirname(SAIDA), exist_ok=True)
 ps = win32com.client.Dispatch("Photoshop.Application"); ps._FlagAsMethod("DoJavaScript")
 jsx = r'''

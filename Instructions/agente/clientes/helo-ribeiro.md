@@ -33,7 +33,7 @@ Microfone do celular erra nomes: Elon→Helo, Brooklyn→Brooklin, lisão→Liso
 - Parceria: o vídeo é com a Imobiliária Home Vision, que paga os leads; se vender, a divisão é 50×50.
 
 ## Peças feitas
-- 11/2026 CASA MORUMBI (3 reels no mesmo projeto: A visita com o Dan, B Helo apresenta com narração da lapela 04 sobre a 3555, C preço): `reel_fala.py` com `"identidade"` (valores da V1 do Portugal) e lapela vinculada. Roteiro `D:/kanivete_testes/casamorumbi/roteiro.json`. Preço certo falado só na câmera da 3545 (84-88 s).
+- 11/2026 CASA MORUMBI (3 reels no mesmo projeto: A visita com o Dan, B Helo apresenta com narração da lapela 04 sobre a 3555, C preço): `reel_fala.py` com `"identidade"` (valores da V1 do Portugal) e lapela vinculada. Roteiro `D:/Kanivete/Testes/casamorumbi/roteiro.json`. Preço certo falado só na câmera da 3545 (84-88 s).
 
 ## Captação
 Lapela só nas tomadas com fala; as de ambiente não têm lapela (não é erro). Sincronizar com `tools/agente/sincronizar_lapela.py`.

@@ -129,7 +129,7 @@ function veKeSom(tipo) {
     } catch (e) { /* sem áudio: fica só o aviso */ }
 }
 
-// ── Voz da Fran no fim (frontend/audio/ke/*.mp3: fala + cama sonora suave, -16 LUFS; geradas em D:/kanivete_testes/ke_voz):
+// ── Voz da Fran no fim (frontend/audio/ke/*.mp3: fala + cama sonora suave, -16 LUFS; geradas em D:/Kanivete/Testes/ke_voz):
 // pronto = render pronto sem Drive; drive = render pronto E enviado ao Drive; falhou = render com erro (cancelar não fala);
 // drivefalhou = o envio ao Drive deu erro. Variações sorteadas sem repetir a última. Sem arquivo/áudio: o som antigo.
 // App das baterias de teste (ve_agente_porta().teste): só o sinal curto ok/erro, sem falação. ──

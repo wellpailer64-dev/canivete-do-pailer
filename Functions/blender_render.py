@@ -143,7 +143,7 @@ def remover():
 
 
 # ── foto de estúdio (Functions/blender_estudio.py): embalagens com material de verdade, cenário, softboxes ──
-HDRI_PADRAO = "D:/kanivete_biblioteca/hdri/studio_small_09_2k.hdr"
+HDRI_PADRAO = "D:/Kanivete/Biblioteca/hdri/studio_small_09_2k.hdr"
 
 
 PROGRESSO = {"feito": 0, "total": 0}

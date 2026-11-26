@@ -372,6 +372,13 @@ def rosto(k, t, cache={}):
     return cache[(k, t)]
 
 
+def _ini(ws, i, t):
+    """Regra do português: maiúscula só no começo da fala ou depois de . ? ! (continuação de fala fica minúscula)."""
+    if i == 0 or ws[i - 1][2][-1:] in (".", "?", "!"):
+        return t[:1].upper() + t[1:]
+    return t
+
+
 def legendas(k, a, b, ofs):
     ws, toks, i = WS[k], [], a
     limpa = lambda x: re.sub(r"[.,?!;:]+$", "", x)
@@ -379,11 +386,11 @@ def legendas(k, a, b, ofs):
         for seq_, novo in JUNTAS:
             n = len(seq_)
             if i + n - 1 <= b and all(limpa(ws[i + j][2]).lower() == seq_[j] for j in range(n)):
-                toks.append((ws[i][0], ws[i + n - 1][1], novo, ws[i + n - 1][2][-1] in ".?!,")); i += n
+                toks.append((ws[i][0], ws[i + n - 1][1], _ini(ws, i, novo), ws[i + n - 1][2][-1] in ".?!,")); i += n
                 break
         else:
             x = limpa(ws[i][2])
-            toks.append((ws[i][0], ws[i][1], caixa(x), ws[i][2][-1] in ".?!,")); i += 1
+            toks.append((ws[i][0], ws[i][1], _ini(ws, i, caixa(x)), ws[i][2][-1] in ".?!,")); i += 1
     grupos, g, n = [], [], 0
     for t in toks:
         if g and (n + len(t[2]) > 22 or len(g) >= 5):
@@ -668,6 +675,8 @@ def versao(v):
                 l_["st"], l_["en"] = max(l_["st"], round(t, 3)), min(l_["en"], fim_c)
                 l_["pt"] = [[min(max(x, l_["st"]), l_["en"]), min(max(y, l_["st"]), l_["en"])] for x, y in l_["pt"]]
                 if l_["en"] - l_["st"] > 0.12:
+                    if not legs:    # a primeira legenda do vídeo nunca começa em minúscula
+                        l_["texto"] = l_["texto"][:1].upper() + l_["texto"][1:]
                     legs.append(l_)
             mapa.append((kk, a, b, s0, s1, t))
             t += s1 - s0; n += 1
@@ -739,12 +748,10 @@ def versao(v):
                         "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.12, "v": 100}]}})
     if CFG.get("cta") and not ID.get("assinatura"):    # chamada para ação na finalização, na etiqueta da cor da tarja, entrando logo depois do logo
         d_c = D_FIM - 0.35
-        tx = {"t": CFG["cta"], "fonte": LEG["fonte"], "fam": LEG["fonte"], "peso": 900, "tam": CFG.get("cta_tam", 64), "neg": True, "ita": False, "alin": "center", "esp": 0, "ent": 120,
+        tx = {"t": CFG["cta"], "fonte": LEG["fonte"], "fam": LEG["fonte"], "peso": 900, "tam": CFG.get("cta_tam", 64), "neg": True, "ita": False, "alin": "center", "esp": 0, "ent": 92,
               "cor": "#ffffff", "cOn": False, "cCor": "#000000", "cLarg": 6, "fOn": True, "fCor": CFG["cor_tarja"], "fOp": 100, "fPad": 28, "fRaio": 44,
               "sOn": True, "sCor": "#000000", "sOp": 55, "sDist": 5, "sBlur": 12, "sAng": 90}
-        clips.append({"tr": TR_TEXTO, "st": round(fim_fala + 0.35, 3), "s": 0, "e": round(d_c, 3), "m": M_TX, "nome": CFG["cta"], "tx": tx, "p": {**PADRAO, "y": CFG.get("cta_y", 1180)},
-                      "k": {"sc": [{"t": 0, "v": 40, "i": "ease"}, {"t": 0.2, "v": 106, "i": "ease"}, {"t": 0.32, "v": 100}],
-                            "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.08, "v": 100}]}})
+        clips.append({"tr": TR_TEXTO, "st": round(fim_fala + 0.35, 3), "s": 0, "e": round(d_c, 3), "m": M_TX, "nome": CFG["cta"], "tx": tx, "p": {**PADRAO, "y": CFG.get("cta_y", 1180)}, "txa": {"in": {"p": "revelar", "d": 0.5, "un": "n", "sob": 0.45}, "out": {"p": "fade", "d": 0.3, "un": "n", "sob": 0.8}}})
     # trilha; se for curta, volta 8 compassos numa batida, sob a fala
     bat = lambda x: min(BATIDAS, key=lambda b: abs(b - x))
     if MUS0 + fim > DUR_MUS - 1.5:
@@ -754,7 +761,8 @@ def versao(v):
         partes = [(0.0, MUS0, MUS0 + fim_fala)]
     for st_, s_, e_ in partes:
         clips.append({"tr": 1, "x": "a", "st": round(st_, 3), "s": round(s_, 3), "e": round(e_, 3), "m": M_MU, "g": GANHO["musica"]})
-    clips.append({"tr": 1, "x": "a", "st": fim_fala, "s": round(partes[-1][2], 3), "e": round(partes[-1][2] + D_FIM, 3), "m": M_MU, "g": GANHO["musica_fim"], "atout": {"t": "cp", "d": 1.4}})
+    clips.append({"tr": 1, "x": "a", "st": fim_fala, "s": round(partes[-1][2], 3), "e": round(partes[-1][2] + D_FIM, 3), "m": M_MU, "g": GANHO["musica_fim"], "atin": {"t": "cp", "d": 0.8}, "atout": {"t": "cp", "d": 1.4}})
+    clips[-2]["atout"] = {"t": "cp", "d": 0.8}   # REGRA: constant power na troca de volume da música
     def sem_sobrepor():    # apoio que sobra por cima do seguinte (frase curta no meio) acaba onde o outro começa: uma imagem por vez
         vs = sorted((c for c in clips if c["tr"] == 1 and c.get("x") == "v"), key=lambda c: c["st"])
         for x, y in zip(vs, vs[1:]):
@@ -770,6 +778,10 @@ def versao(v):
     clips[:] = [c for c in clips if c.get("e", 0) - c.get("s", 0) > 0.05 or c["tr"] not in (0, 1)]
     sem_sobrepor()
     apoios = sorted((c["st"], c["st"] + c["e"] - c["s"]) for c in clips if c["tr"] == 1 and c.get("x") == "v")
+    for n_t, c in enumerate(sorted((c for c in clips if c["tr"] == 1 and c.get("x") == "v"), key=lambda c: c["st"])):   # REGRA: ON↔B-roll com transição nativa
+        t_ = ("pushzoom", "slide", "pull", "dissolve")[n_t % 4]
+        c.setdefault("tin", {"t": t_, "d": 0.3, "speed": "fast", **({"dir": "l"} if t_ == "slide" else {})})
+        c.setdefault("tout", {"t": "dissolve", "d": 0.25, "speed": "fast"})
 
     def zoom(a, b, val, nome):
         clips.append({"tr": 2, "st": round(a, 3), "s": 0, "e": round(b - a, 3), "m": M_AJ, "cor": "pink", "nome": nome, "az": {"est": "manual"},
@@ -813,14 +825,14 @@ def versao(v):
         D = b - a
         mapa_m = next((m for m in mapa if m[5] <= (a + b) / 2 < m[5] + m[4] - m[3]), None)
         f = rosto(mapa_m[0], mapa_m[3] + (a + b) / 2 - mapa_m[5]) if mapa_m else None
-        z = float(zz)
+        z = min(float(zz), 112)
         if f and f[2] > 200:
             z = 100 + (z - 100) * 0.5
         cx, cy = (round(f[0] / 10.8, 1), round(f[1] / 19.2, 1)) if f else (50, 45)
         if estilo == "empurra":    # frase longa: empurrão lento que acompanha a fala
-            vz = {"z": z, "ent": round(min(D * 0.7, 3.5), 2), "sai": round(min(0.8, D * 0.25), 2), "suav": 25, "der": 0.5}
+            vz = {"z": z, "ent": round(min(D * 0.5, 1.6), 2), "sai": round(min(1.2, D * 0.3), 2), "suav": 85, "der": 0}   # sem tranco (Pailer 26/11)
         else:                      # suave: chega na palavra, respira e volta
-            vz = {"z": z, "ent": round(min(0.9, D * 0.4), 2), "sai": round(min(0.8, D * 0.35), 2), "suav": 35, "der": 1.5}
+            vz = {"z": z, "ent": round(min(1.2, D * 0.4), 2), "sai": round(min(1.0, D * 0.35), 2), "suav": 85, "der": 0}
         zoom(a, b, {**vz, "mola": 0, "cx": cx, "cy": cy, "mb": 0, "obt": 100}, "Zoom")
         usados.append((a, b))
     for x, y in apoios:
@@ -859,11 +871,9 @@ def versao(v):
         if PINCEL:
             txt = quebra(txt, FT)
         larg = max(FT.getlength(l) for l in txt.split("\n")) if FT else len(txt) * 28
-        tx = {"t": txt, "fonte": LEG["fonte"], "fam": LEG["fonte"], "peso": 900, "tam": T_TAM, "neg": True, "ita": False, "alin": "center", "esp": 0, "ent": 120, "cor": "#ffffff",
+        tx = {"t": txt, "fonte": LEG["fonte"], "fam": LEG["fonte"], "peso": 900, "tam": T_TAM, "neg": True, "ita": False, "alin": "center", "esp": 0, "ent": 92, "cor": "#ffffff",
               "cOn": False, "cCor": "#000000", "cLarg": 6, "fOn": not PINCEL, "fCor": CFG["cor_tarja"], "fOp": 100, "fPad": 26, "fRaio": 44, "sOn": True, "sCor": "#000000", "sOp": 55, "sDist": 5, "sBlur": 12, "sAng": 90}
-        clips.append({"tr": TR_TEXTO, "st": tt, "s": 0, "e": DT, "m": M_TX, "nome": txt.replace("\n", " "), "tx": tx, "p": {**PADRAO, "x": W / 2 if PINCEL else 578, "y": Y_TARJA},
-                      "k": {"sc": [{"t": 0, "v": 40, "i": "ease"}, {"t": 0.2, "v": 106, "i": "ease"}, {"t": 0.32, "v": 100, "i": "lin"}, {"t": DT - 0.14, "v": 100, "i": "ease"}, {"t": DT, "v": 72}],
-                            "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.08, "v": 100, "i": "lin"}, {"t": DT - 0.12, "v": 100, "i": "lin"}, {"t": DT, "v": 0}]}})
+        clips.append({"tr": TR_TEXTO, "st": tt, "s": 0, "e": DT, "m": M_TX, "nome": txt.replace("\n", " "), "tx": tx, "p": {**PADRAO, "x": W / 2 if PINCEL else 578, "y": Y_TARJA}, "txa": {"in": {"p": "revelar", "d": 0.5, "un": "n", "sob": 0.45}, "out": {"p": "fade", "d": 0.3, "un": "n", "sob": 0.8}}})   # animação nativa de texto (regra 26/11)
         if PINCEL:    # azul desfocado vindo da borda de baixo, na própria trilha, abaixo da do texto; sem brasão
             p_pn, w_pn, h_pn = sombra_borda()
             m_pn = add("image", os.path.basename(p_pn), path=p_pn)

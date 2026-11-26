@@ -6,7 +6,7 @@ dela, prévia × arquivo.
 
     py -3.13 testes/teste_roto.py [--video trecho.mp4] [--dur 15] [--porta 9336] [--sem-abrir] [--sem-placa]
 
-Precisa do modelo (baixado no 1º uso, 182 MB) e de um trecho com uma pessoa: o padrão é D:/kanivete_testes/roto/trecho.mp4
+Precisa do modelo (baixado no 1º uso, 182 MB) e de um trecho com uma pessoa: o padrão é D:/Kanivete/Testes/roto/trecho.mp4
 (entrevista 1920×1080; os pontos dos traços são para ele).
 """
 import argparse
@@ -26,7 +26,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from Functions.midia import ffmpeg  # noqa: E402
 
-BASE = "D:/kanivete_testes/roto/"
+BASE = "D:/Kanivete/Testes/roto/"
 erros = []
 
 

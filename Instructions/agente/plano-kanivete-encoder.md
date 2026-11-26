@@ -40,7 +40,7 @@ Referências: `Instructions/agente/teste-4k.md` (medições e gargalos), `Functi
 `_exportar_em_blocos`, `_reduzir_camada`), `frontend/js/editor.js` (`veExportPlan`), `frontend/js/editor-fila.js`.
 
 ## 5. Rodada 1 (2026-10-08) — medido no projeto real Portugal (Helo Ribeiro, 3 reels 1080×1920)
-Bancada em `D:\kanivete_testes\encoder\` (fora do repo): `capturar.py` (plano real de cada timeline pelo app 9333),
+Bancada em `D:\Kanivete\Testes\encoder\` (fora do repo): `capturar.py` (plano real de cada timeline pelo app 9333),
 `bench.py V1 [--blocos]`, `perfil.py` (tempo por bloco), `ablacao.py V1 83.1 94.8` (bloco com partes removidas),
 `micro.py` (fps de cadeias de filtro), `comparar.py ref novo` (quadros, som, VMAF/PSNR), `resultados.jsonl`.
 
@@ -77,7 +77,7 @@ O ganho veio dos filtros, não do paralelismo (a CPU já ficava ~80%):
 ## 7. Rodada 2 (2026-10-08) — placa de vídeo, medições e o que NÃO funcionou
 Projeto real: "Depoimento do encontrão" (Carlinhos), timeline Depoimentos V2, 98,8 s 1080×1920 59 fps, 31 cortes de
 celular 4K HEVC no V1 (viram camadas a 50%), 18 PNGs de texto/logo, 1 camada de ajuste (Luz e Cor: LUT + Clareza +
-Nitidez) cobrindo tudo. Bancada: `D:\kanivete_testes\encoder\` (`capturar_depo.py`, `trocar_fhd.py` → plano com os
+Nitidez) cobrindo tudo. Bancada: `D:\Kanivete\Testes\encoder\` (`capturar_depo.py`, `trocar_fhd.py` → plano com os
 _FullHD, `medir_r2.py` export INTEIRO velho(HEAD)×novo com partes removidas, `gpu\micro_ajuste.py`, `gpu\clareza.py`).
 - **Placa parada**: o ffmpeg baixado (BtbN latest, N-126905 de 2026-09-27) exige driver NVIDIA 610+ para o NVENC; o
   usuário tinha 591 → `_detectar_hw_encoder` falhava calado e tudo ia para a CPU. Agora `motivo_sem_gpu()` avisa no
@@ -156,7 +156,7 @@ concluir cada render; visual profissional, miniatura leve do quadro em render e 
 - Monitor: `encoder_monitor.estado()` — um nvidia-smi `-lms 1000` e a CPU numa thread de 1 s (cpu_percent(None) chamado
   de vários lugares dava 0), param 15 s depois da última pergunta.
 - Visual: configurações em controles segmentados compactos; "Renderizando agora" (miniatura, barra, tempo, ×, selo
-  Montado na placa / Turbo / Processador); 5 medidores. Teste: `D:/kanivete_testes/scripts/teste_ke_atalhos.py` + teste_fila.
+  Montado na placa / Turbo / Processador); 5 medidores. Teste: `D:/Kanivete/Testes/scripts/teste_ke_atalhos.py` + teste_fila.
 - Pendente: textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"...).
 
 ## 10. Diagnóstico do usuário (2026-10-08 noite) e painel Desempenho
@@ -173,7 +173,7 @@ concluir cada render; visual profissional, miniatura leve do quadro em render e 
 - Ctrl+M: "Overlay transitions 2/2" (preparo) parecia fila parada; Renderizar no meio duplicava a timeline. Agora o
   preparo conta (`VEFILA.preparando`) e Renderizar durante ele só agenda o início.
 - Painel Desempenho (`editor-desempenho.js`): CPU/RAM/placa/VRAM/encoder ao vivo, encaixável; vertical, horizontal ou
-  mínimo pelo formato do encaixe. Teste: D:/kanivete_testes/scripts/teste_desempenho.py.
+  mínimo pelo formato do encaixe. Teste: D:/Kanivete/Testes/scripts/teste_desempenho.py.
 
 ## 11. Rodada 4 (2026-10-10) — efeitos na placa e exportação em blocos (Respeite o seu voto)
 Projeto real: 2 min 41 s, 1920×1080 29,97, 117 camadas de vídeo (FX30 HEVC 10 bits, iPhone HLG com Dolby Vision),
@@ -198,7 +198,7 @@ Modo placa: **205 s (1,27×)**, CPU ~10%; diferença média para a exportação 
     A prévia e a CPU tratam como vídeo comum: `sidedata=delete DOVI_METADATA` + `setparams` primárias/curva 709 (`_marca_cor`).
   - A ida e volta RGB da CPU (swscale) erra até 14 níveis em material com muito detalhe; a placa 1,9 (a conta exata do BT.709).
 - Testes novos em `teste_export.py`: `chroma2` (key só, key + Luz e Cor, ajuste com Aberração + Desfoque e opacidade
-  animada) e `aberracao`. Bancada: `D:/kanivete_testes/keyplaca` (`bloco.py N` monta um bloco do Respeite por script).
+  animada) e `aberracao`. Bancada: `D:/Kanivete/Testes/keyplaca` (`bloco.py N` monta um bloco do Respeite por script).
 - Pendências: abrir o 1º bloco ainda leva ~10 s; Brilho/Contraste e efeitos de clipe combinados com o key ainda descem.
 
 ## Rodada 5 — documentário do Gil (20 min, 50 arquivos, 2026-10-11)
@@ -216,9 +216,9 @@ Referência: 26 min 06 s (0,79×), 200 blocos de ~6 s, placa. O que se achou e o
 - **Máxima** = cq 17 / crf 16 (era cq 20 / crf 18 ≈ 25 Mbps num 1080p59,94).
 - Selo "Montado na placa" do último render dizia "Processador" (a mensagem final é "Concluído!"): `it.foiPlaca`.
 - Origem, não export: entrevista do André era a cópia `C5774_OTMZD.mp4` (4K a 2,9 Mbps, mosaico no fundo); o original
-  `C5774.MP4` (45 Mbps) foi copiado para 03 ENTREVISTAS (`D:\kanivete_testes\tuhu_org\trocar_andre.py`). Luzes
+  `C5774.MP4` (45 Mbps) foi copiado para 03 ENTREVISTAS (`D:\Kanivete\Testes\tuhu_org\trocar_andre.py`). Luzes
   piscando medidas na origem (LED/fluorescente, câmera lenta).
-- Ferramentas: `D:\kanivete_testes\scripts\` comparar_export.py, zoom_todos.py, pretos.py, exp_trecho.py, bloco_var.py;
+- Ferramentas: `D:\Kanivete\Testes\scripts\` comparar_export.py, zoom_todos.py, pretos.py, exp_trecho.py, bloco_var.py;
   `CANIVETE_PLACA_DEBUG=1` guarda grafo, shaders e comando de cada bloco em `<cache>\placa_dbg\`.
 
 ## Rodada 6 — Brilho (glow) da camada de ajuste na placa (2026-10-12)
@@ -232,9 +232,9 @@ o Brilho estava no `_FX_HIBRIDO` → cada quadro dos 20 min descia para a CPU (g
 
 ## Rodada 7 — qualidade: escuro em blocos e claros estourados (documentário do Gil v7_1, 2026-10-12)
 Queixa do Pailer no `Montagem Pailer v7_1.mp4` (H.264 34 Mbps): "no escuro, pixelados de bitrate baixo; nos claros,
-muito estourado". Bancada em `D:/kanivete_testes/qualidade` (`rodar.py` repete um bloco do `CANIVETE_PLACA_DEBUG` com
+muito estourado". Bancada em `D:/Kanivete/Testes/qualidade` (`rodar.py` repete um bloco do `CANIVETE_PLACA_DEBUG` com
 outro grafo/encoder; `hp.py` gera os grafos 16 bits; `medir.py` erro por faixa de brilho; `fila_trecho.py`/`abrir_v7.py`
-em `D:/kanivete_testes/scripts` exportam um trecho pela API da fila no app de teste).
+em `D:/Kanivete/Testes/scripts` exportam um trecho pela API da fila no app de teste).
 - **Claros: era o Brilho (glow)**, não o export. Ele SOMAVA a luz (limite 21% = quase tudo acima dos médios brilha):
   entrevista do José Antônio, 0,01% de pixels estourados sem o Brilho → 3,9% com ele. Agora a mistura padrão é **Tela**
   (1 − (1−x)(1−g), uma vez por passada como a prévia: `vc.glow_passadas`): 0,01%, o brilho quente fica e a escada/placa
@@ -406,7 +406,7 @@ motion são desenhadas no tamanho da saída (`veMoNoTamanho`; o plano usa o tama
   (projeto em COLAB/Dago miranda/KANIVETE) com as estrelas em `bm: screen`.
 - Exportar por script (CDP chamando `video_cutter_export` direto) NÃO marca `VE.exportRunning`: o Render automático de
   prévias continua rodando junto e disputa CPU/RAM. Marcar antes (`VEPRA.pausado = true; vePrAutoParar(); VE.exportRunning = true`),
-  como em `D:/kanivete_testes/dago/app/exportar_parte.py` (com vigia: sem `ke_quadro.jpg` novo por N s = travou).
+  como em `D:/Kanivete/Testes/dago/app/exportar_parte.py` (com vigia: sem `ke_quadro.jpg` novo por N s = travou).
 - Exportar em partes (6 × ~33 s) + `concat -c copy` + música inteira: 206 s em 18 min pela placa (`exportar_v1.py`).
 
 ## Nautic Bay (2026-10-24): fração de pixel, Lanczos e alfa no passo extra
@@ -416,7 +416,7 @@ motion são desenhadas no tamanho da saída (`veMoNoTamanho`; o plano usa o tama
   posição é avaliada em Python (`_avaliador`). Medido no export: 5,0 → 4,3 → 3,6 … 0,3 → 0,1 → 0. Desligar:
   `CANIVETE_SUBPIXEL=0`. Só a placa; a CPU continua em pixel inteiro (pendente).
 - ARMADILHA: no passo extra do libplacebo a textura vem com alfa MULTIPLICADO — devolver `rgb / a`. Sem isso o fade
-  de entrada saía mais escuro (teste_export "curva", quadros 3–5; teste mínimo em D:/kanivete_testes/subpixel).
+  de entrada saía mais escuro (teste_export "curva", quadros 3–5; teste mínimo em D:/Kanivete/Testes/subpixel).
 - FEITO: redimensionamento em Lanczos/EWA Lanczos (`_ESC`) e CPU `flags=lanczos` (o padrão Mitchell reduzia o 4K com
   ~55% da nitidez). Obs.: o borrado grande do Nautic Bay era OUTRO erro — clipe de vídeo montado com escala sobre a
   largura errada (montador usava a largura antes de o app medir o vídeo: 4K com zoom 2×).

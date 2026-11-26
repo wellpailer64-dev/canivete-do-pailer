@@ -33,8 +33,17 @@ def base_padrao():
     return os.path.join(base, "CaniveteDoPailer")
 
 
+def normalizar_base(base):
+    """Pasta-base dos caches. Se a base for a RAIZ de um disco (ex.: "D:\\", o que as Preferências guardavam), os caches
+    vão para <disco>:/Kanivete/Cache: nada do Kanivete fica solto na raiz do disco (pasta mestra KANIVETE)."""
+    base = (base or "").strip()
+    if base and os.path.splitdrive(base)[1].strip(chr(92) + "/") == "":
+        return os.path.join(os.path.splitdrive(base)[0] + os.sep, "Kanivete", "Cache")
+    return base
+
+
 def _raiz(base):
-    base = (base or "").strip() or base_padrao()
+    base = normalizar_base(base) or base_padrao()
     return os.path.join(base, PASTA_RAIZ)
 
 
@@ -383,7 +392,7 @@ def info(base, chave=None):
         livre = shutil.disk_usage(alvo).free
     except OSError:
         livre = None
-    return {"success": True, "raiz": raiz, "base": (base or "").strip() or base_padrao(), "padrao": base_padrao(),
+    return {"success": True, "raiz": raiz, "base": normalizar_base(base) or base_padrao(), "padrao": base_padrao(),
             "total": total, "projeto": proj, "livre": livre}
 
 

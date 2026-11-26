@@ -3,7 +3,7 @@
 Origem: o usuário revisou o projeto "RESPEITE O SEU VOTO" importado pelo Editor Kanivete (2026-10-02, commit 3531df1).
 A montagem veio "praticamente intacta", mas há problemas. Ainda não foi feito nada deste plano.
 Base técnica (formato, mapeamento atual, limitações): `Instructions/importar-premiere.md`. Código: `Functions/premiere.py`.
-Teste: `python testes/teste_premiere.py "<cópia.prproj>"`. Cópia do projeto: `D:\kanivete_testes\premiere\`. **Nunca**
+Teste: `python testes/teste_premiere.py "<cópia.prproj>"`. Cópia do projeto: `D:\Kanivete\Testes\premiere\`. **Nunca**
 abrir para escrita o original em `D:\01 - ALL IN CLOUD - HD PAILER\11 - DOIS NEGUIM\RESPEITE O SEU VOTO\03 - PROJETO - RESPEITE O SEU VOTO\`.
 
 ## Já feito (2026-10-02, rodada rápida)
@@ -43,7 +43,7 @@ abrir para escrita o original em `D:\01 - ALL IN CLOUD - HD PAILER\11 - DOIS NEG
 ### 1. Clipes trocados e fora do tempo (diagnóstico antes de corrigir)
 Precisa de uma referência confiável. **Pedir ao usuário:** no Premiere, com a sequência "V1_Respeite o seu voto
 Horizontal" aberta, Arquivo > Exportar > Final Cut Pro XML (formato documentado, com clipe, mídia, entrada e saída
-exatos), salvo em `D:\kanivete_testes\premiere\`. Depois montar um script que compare, clipe a clipe, por trilha e tempo:
+exatos), salvo em `D:\Kanivete\Testes\premiere\`. Depois montar um script que compare, clipe a clipe, por trilha e tempo:
 mídia, `st`, `s`, `e` e velocidade. Ele mostra exatamente quais clipes trocam e quanto deslocam.
 Hipóteses a verificar:
 - **Troca:** a mídia vem de `Clip → Source → Media`. Se a mídia foi substituída no Premiere (Substituir filmagem) ou se há

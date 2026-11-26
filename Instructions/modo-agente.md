@@ -8,7 +8,7 @@ Permite que um agente de IA ou script de automação **veja e use o painel** do 
 `--agente` também respeita a instância única. A porta não responder não significa que o app fechou:
 o registro de PID vivo vale inclusive para `python main.py` e modo agente desligado. Se outra cópia
 não confirmar o pedido de abertura, a nova tentativa termina sem criar outra janela.
-Portas de teste (como 9333) exigem `APPDATA` dentro de `D:/kanivete_testes`; cada perfil isolado
+Portas de teste (como 9333) exigem `APPDATA` dentro de `D:/Kanivete/Testes`; cada perfil isolado
 tem seu próprio mutex. A mudança no código vale para novas aberturas por `main.py`/`Runapp.bat`;
 o executável já compilado precisa incorporar a mudança numa próxima compilação.
 Conferência sem abrir apps: `py -3.13 testes/teste_instancia_unica.py`.
@@ -17,6 +17,30 @@ Na CLI, uma única instância registrada na 9223 é reutilizada nessa porta. Se 
 Modo agente desligado informa o estado imediatamente, sem abrir outra cópia nem esperar três minutos.
 
 **O app do Pailer abre SEMPRE visível: use `py -3.13 D:/Kanivete/Plugins/kanicode/plugins/kanivete/kanivete.py abrir` e, para trazer à frente, `frente`.** Nunca `ShowWindow=0`: ele precisa ver o trabalho (2026-10-30, esta instrução escondeu o app dele). Por dentro: `Invoke-CimMethod -ClassName Win32_Process -MethodName Create`, com executável e projeto entre aspas e `Win32_ProcessStartup.ShowWindow=1`. O processo nasce pelo serviço WMI, independente da árvore de processos da tarefa. Não use `Start-Process` para deixar o app do usuário aberto: nesta sessão (2026-10-23), ele respondeu durante a tarefa e encerrou depois de cada resposta, sem registro novo de falha. A vinculação ao processo da tarefa é uma hipótese; confirmar a permanência também na interação seguinte. Não reiniciar sem autorização. Quando o Pailer pedir trabalho no app aberto, use API, CLI ou atalhos e identifique a instância com `tools/porta_agente.py`; preserve o projeto e não use o app dele para testes. Testes continuam na 9333.
+
+## Conexão, ocupação e recuperação (25/11/2026)
+
+Trabalho em um ou mais projetos usa a instância já aberta. Conflito de porta, variável de ambiente errada,
+modo agente desligado ou demora de uma operação exigem diagnóstico dessa instância. Não abra outra para
+contornar o erro. `tools/porta_agente.py` não escolhe a cópia mais recente quando há várias candidatas.
+Testes continuam isolados no D e fora da instância de trabalho.
+
+CLI compartilhada: `py -3.13 D:/Kanivete/Plugins/kanicode/plugins/kanivete/kanivete.py diagnostico [--porta P]`.
+Informa PID, porta e seu processo dono, janela, pulso da página e ocupação por agente/usuário/exportação.
+Havendo várias cópias, identifique o projeto antes de informar a porta. `estado` também mostra a ocupação.
+Escritas pela CLI (`js --agente codex`) e pelo MCP compartilham exclusão entre processos e registro do dono
+em `D:/Kanivete/Testes/controle_instancias`. Ocupado exige aguardar: prazo vencido nunca libera a escrita.
+Resultado incerto de uma escrita nunca autoriza repeti-la; confira o documento depois que terminar.
+
+`recuperar [--porta P]` é o caminho para crash ou travamento confirmado: verifica a identidade do executável,
+exige três novas sondagens sem recuperação, registra evidências, encerra o PID antigo e seus WebViews,
+espera todos saírem e só então relança o mesmo comando e confere o pulso da substituta.
+CDP indisponível sozinho não comprova travamento. Instância ocupada é preservada.
+Projetos dependem do autosave existente: depois de recuperar, confira os documentos restaurados.
+O comando não recupera alterações que ainda não estavam persistidas. Não encerre manualmente outros PIDs.
+
+O controle compartilhado vale para a CLI e os servidores MCP atualizados; scripts que conectam diretamente
+por CDP precisam aderir ao mesmo fluxo. Servidores MCP já iniciados precisam ser reiniciados para carregar a mudança.
 
 ## Identidade, avisos e borda (17/11/2026)
 
@@ -60,7 +84,7 @@ docs, porta_instancia, processo_da_porta: "msedgewebview2.exe"}]}` (main.py `_ag
 "ERRO: ..." a quem não é outra cópia do app. Relato que motivou: notebook i5 + Iris Xe/GTX 1650, 2026-10-16. Confira se o `pid` ainda existe
 (fechada à força, a entrada fica até a próxima abertura limpar).
 
-**Scripts não leem esse arquivo na mão nem fixam porta:** `tools/porta_agente.py` → `porta(9222)` (app do Pailer, faixa 9222-9231) ou `porta(9333)` (app de teste, fora da faixa). Lê o agente.json do APPDATA atual e o de `D:\kanivete_testes\appdata`, só cópias ligadas e com pid vivo, e nunca cruza os dois apps. Conferir: `py -3.13 tools/porta_agente.py 9333`.
+**Scripts não leem esse arquivo na mão nem fixam porta:** `tools/porta_agente.py` → `porta(9222)` (app do Pailer, faixa 9222-9231) ou `porta(9333)` (app de teste, fora da faixa). Lê o agente.json do APPDATA atual e o de `D:\Kanivete\Testes\appdata`, só cópias ligadas e com pid vivo, e nunca cruza os dois apps. Conferir: `py -3.13 tools/porta_agente.py 9333`.
 
 ### Registro e ações do agente (frontend/js/agente.js)
 - `veLogTexto(40)`: os últimos avisos (toasts), erros de JavaScript, `console.error` e resultados de exportação

@@ -4,7 +4,7 @@ Estilo novo de legenda automática no Vídeo: duas fontes que combinam, palavras
 animada palavra a palavra. Variação do "Destaque da palavra falada" (`editor-texto.js`, `e.dOn`), mas aqui a palavra
 **aparece** (vai se acumulando) em vez de ser **iluminada** dentro de uma frase que já está toda na tela.
 
-Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/`):
+Referências (folhas e tiras ampliadas em `D:/Kanivete/Testes/legenda_ref`, `v2/`):
 - A: `Video by flaviascheid [DP2DJsVjkOb].mp4` (1080×1920, 24 qps)
 - B: `Video by anoomaker [DZGccfISgBK].mp4` (1440×2560, 30 qps)
 
@@ -90,10 +90,10 @@ Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/
   confirmação, foto → câmera, erro → erro, pergunta → pergunta). O PICO do som (forma de onda `pk` do pack) cai na
   chegada da palavra; no máximo um som a cada 0,22 s; ganho −10 a −19 dB (SFX contido). Clipes marcados `lpSfx` numa
   trilha de áudio própria, refeitos ao montar/trocar dupla, animação, títulos ou papéis (os movidos à mão também).
-  Prints: `D:/kanivete_testes/scripts/lp_sfx.py`.
+  Prints: `D:/Kanivete/Testes/scripts/lp_sfx.py`.
 - **Faixa de legendas** (vale para os 3 modos): cabeçalho "Legendas"/"Captions" (i18n), olhinho = `VE.legEstilo.oculta`
   (sem monitor nem exportação, entra no desfazer), botão direito na faixa ou no cabeçalho = `veLegMenu` (ocultar, painel
-  Texto, apagar esta, apagar todas — a transcrição fica; os sons lpSfx saem junto). Teste: `D:/kanivete_testes/scripts/lp_menu.py`.
+  Texto, apagar esta, apagar todas — a transcrição fica; os sons lpSfx saem junto). Teste: `D:/Kanivete/Testes/scripts/lp_menu.py`.
 - **Entrada Automática** (padrão, `pr.anim = 'auto'`, `veLpAnimDe`): por legenda — o gancho (1º título) com desfoque e
   brilho, título com número ou "!" com pop, com "?" subindo, os outros alternando a da dupla com uma segunda; legendas
   simples discretas (subir/acender). A exportação recebe a entrada de cada legenda (`item.prm.anim`).
@@ -116,7 +116,7 @@ Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/
   fracos sobem no volume) — apertada, só muda destaque com nota >= 3 e folga 2,5, e quase não mudou nada: vale como
   opção, não como padrão. Bug corrigido: o `sub: true` que sobrava no padrão deixava o destaque Automático sempre em traço.
 - **Teste**: `py -3.13 testes/teste_export.py --casos premium,premium2,premium3,premium4,premium5,premium6,premium7,premium8,premium9 --folha` (prévia × exportação); prints do painel:
-  `D:/kanivete_testes/scripts/lp_ui.py`.
+  `D:/Kanivete/Testes/scripts/lp_ui.py`.
 
 ## Pendências
 - Desviar do rosto sozinho (YuNet do Painel Pessoas) — hoje a posição é Cima/Meio/Baixo + arrastar no monitor.

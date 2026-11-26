@@ -6,7 +6,7 @@ Monta o modelo de glifos (A O L - I), desenha cada letra com os comandos (furo d
 sobrepostos, hífen de traço), exporta o .otf SEM instalar e confere com o fontTools: mapa de caracteres, avanço =
 largura da prancheta, caixa do I nas unidades certas, sentido dos contornos do CFF (externo anti-horário, furo
 horário), sobreposição unida, traço contornado; depois usa a fonte num texto do Vetor e desenha com o PIL.
-Saída em D:/kanivete_testes/fonte. Sai com 1 se reprovar.
+Saída em D:/Kanivete/Testes/fonte. Sai com 1 se reprovar.
 """
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import os
@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-SAI = "D:/kanivete_testes/fonte"
+SAI = "D:/Kanivete/Testes/fonte"
 os.makedirs(SAI, exist_ok=True)
 OTF = SAI + "/TesteKanivete-Regular.otf"
 erros = []

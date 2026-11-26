@@ -9,7 +9,7 @@ confere lá: pranchetas (nome/posição), camadas na ordem, textos editáveis (t
 degradê, máscara, símbolos; compara o PNG do Illustrator com o do Vetor prancheta a prancheta.
 VOLTA: cria um .ai no Illustrator (3 pranchetas, uma EMBAIXO, camadas, texto de área com trechos, Pantone, máscara) e
 abre no Vetor: posição das pranchetas, ordem das camadas, texto de área inteiro (sem duplicata), cor especial e imagem.
-Saída em D:/kanivete_testes/compat. Sai com 1 se reprovar.
+Saída em D:/Kanivete/Testes/compat. Sai com 1 se reprovar.
 """
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import json
@@ -26,9 +26,9 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Functions import ponte_illustrator as PI   # noqa: E402
 
-SAI = "D:/kanivete_testes/compat/teste"
+SAI = "D:/Kanivete/Testes/compat/teste"
 os.makedirs(SAI, exist_ok=True)
-FOTO = "D:/kanivete_testes/humanos/corpo.png"
+FOTO = "D:/Kanivete/Testes/humanos/corpo.png"
 erros = []
 
 

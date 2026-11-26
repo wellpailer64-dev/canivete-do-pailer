@@ -31,10 +31,10 @@ mais demora, use `--pensar`.
 Use uma instancia separada do Canivete em modo agente:
 
 ```powershell
-$env:APPDATA="D:\kanivete_testes\appdata"
-$env:LOCALAPPDATA="D:\kanivete_testes\localappdata"
-$env:TEMP="D:\kanivete_testes\tmp"
-$env:TMP="D:\kanivete_testes\tmp"
+$env:APPDATA="D:\Kanivete\Testes\appdata"
+$env:LOCALAPPDATA="D:\Kanivete\Testes\localappdata"
+$env:TEMP="D:\Kanivete\Testes\tmp"
+$env:TMP="D:\Kanivete\Testes\tmp"
 py -3.13 main.py --agente=9333
 ```
 
@@ -75,12 +75,12 @@ Ele sobe um painel em `http://127.0.0.1:8765` (ou proxima porta livre) com:
 - progresso/log em tempo real;
 - botao para preparar briefing para Claude.
 
-O upload de referencia copia a imagem para `D:\kanivete_testes\arquiteto_local\uploads` e passa o caminho para o
+O upload de referencia copia a imagem para `D:\Kanivete\Testes\arquiteto_local\uploads` e passa o caminho para o
 arquiteto. Pasta de materiais ainda e por caminho digitado/colado.
 
 ## Criar flyer ou carrossel
 
-Gera HTML/CSS para `KNV.cena` em `D:\kanivete_testes\arquiteto_local`:
+Gera HTML/CSS para `KNV.cena` em `D:\Kanivete\Testes\arquiteto_local`:
 
 ```powershell
 py -3.13 tools\worker\arquiteto.py cena "flyer de festa neon com titulo PRIME FEST, data 12/10 e botao GARANTA SEU INGRESSO" --formato feed
@@ -101,7 +101,7 @@ py -3.13 tools\worker\arquiteto.py cena "carrossel de 3 slides..." --perfil fort
 Gerar e executar no Photo Kanivete:
 
 ```powershell
-py -3.13 tools\worker\arquiteto.py cena "carrossel de 3 slides sobre erros no Instagram" --formato retrato --slides 3 --exportar D:\kanivete_testes\arquiteto_local\export --executar
+py -3.13 tools\worker\arquiteto.py cena "carrossel de 3 slides sobre erros no Instagram" --formato retrato --slides 3 --exportar D:\Kanivete\Testes\arquiteto_local\export --executar
 ```
 
 Isso cria o `.html`, monta a peca pelo `tools/knv.py`, salva `.iknv`, roda o revisor e exporta se `--exportar` for passado.

@@ -207,13 +207,13 @@ projeto (`skLimitarX`) e o teclado traz a agulha para a vista (`skMostrarAgulha`
   `sk-<id>` põe a janela dele na área (`ve_vst3_slot_painel`), a caixa cresce para caber; ajustes novos por
   `ve_vst3_slot_novidades('sk-')` (o Vídeo pede sem prefixo e não vê os "sk-"). Fechar a caixa encerra o processo.
 - API `SKN_PLG.lista(atualizar)`, `.por(faixaId, nome)`, `.estado(faixaId)`. Teste:
-  `D:/kanivete_testes/scripts/teste_sk_plugins.py` (porta 9333).
+  `D:/Kanivete/Testes/scripts/teste_sk_plugins.py` (porta 9333).
 - Pendente: automação de parâmetro; plugin no Master. (A tela dos plugins da jhudstudio foi corrigida no carregador:
   `Instructions/agente/plugins.md`.)
 
 ## Pendências
 **REMIX DE MÚSICA (pedido do Pailer, 2026-10-09)** — esticar/encurtar uma trilha arrastando a ponta do clipe, como o
-"Remix" do Premiere (Editor e Sk). Base já provada: loop sem emenda do repique (D:\kanivete_testes\scripts\loop_ritmo.py:
+"Remix" do Premiere (Editor e Sk). Base já provada: loop sem emenda do repique (D:\Kanivete\Testes\scripts\loop_ritmo.py:
 envelope de ataques → período do tempo por autocorrelação; testar células de 1–4 compassos comparando o desenho dos
 ataques suavizado ~10 ms no começo × depois do fim; corte num ataque, crossfade 15 ms potência constante; conferir
 salto de amplitude na emenda < p99 do áudio). Falta: (1) motor `Functions/remix.py` p/ música inteira — pontos de
@@ -223,7 +223,7 @@ música, arrastar a ponta refaz o arquivo e mostra ondinha em cada emenda.
 **2026-10-11: motor feito** — `Functions/remix.py` (`remixar(arq, alvo, saida, cache)`): batidas/compassos pelo librosa,
 retrato por compasso (cromas + MFCC + energia), salto para frente (encurtar, 1 ou 2 saltos) ou laço para trás repetido
 (esticar), preservando começo e final; emenda no começo do compasso com crossfade de 40 ms. Medido em 2 músicas
-(D:/kanivete_testes/remix, `medir.py`): 60/90/300 s chegam a ±1 s do pedido, ritmo na emenda com desvio de 23 ms (1
+(D:/Kanivete/Testes/remix, `medir.py`): 60/90/300 s chegam a ±1 s do pedido, ritmo na emenda com desvio de 23 ms (1
 quadro de análise), volume na emenda −1…+3 dB (o laço longo da 2ª música: −7 dB). Análise ~15 s na 1ª vez, depois <1 s.
 O Pailer ouviu e aprovou ("ficou ótimo"). **UI feita (2026-10-11)**: ferramenta Remix no Editor (Shift+R, grupo da
 Velocidade; `frontend/js/editor-remix.js`): arrastar a ponta direita de uma música → `ve_remix` (`remix.remix_cache`,

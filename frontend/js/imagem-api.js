@@ -619,7 +619,7 @@ const KNV = {
         return { achados: out, avatares };
     },
 
-    // ── gabarito do Pailer (D:/kanivete_biblioteca/gabarito_pailer.json, 29 PSDs da agência medidos em 2026-10-08; feedback
+    // ── gabarito do Pailer (D:/Kanivete/Biblioteca/gabarito_pailer.json, 29 PSDs da agência medidos em 2026-10-08; feedback
     // do flyer Festa da Amizade: "poluído, amador, genérico"). Regras: margem (texto a < 12% do lado menor da borda;
     // ele usa 13,5%), hierarquia (maior texto < 1,5× o 2º, quando nenhuma imagem/logo é o herói), efeito (brilho externo,
     // chanfro ou degradê em texto: ele só usa Sombra e Sobreposição de cor), fontes (> 3 famílias), poluição (densidade de

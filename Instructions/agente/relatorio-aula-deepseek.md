@@ -1,9 +1,9 @@
 # Relatório da aula do DeepSeek-V4.1-Flash
 
-Exercícios do contrato da colab 115/116, feitos no KANIVETE com o app de teste na porta **9333** (a 9222 do Pailer nunca foi tocada). Saídas em `D:/kanivete_testes/aula_deepseek/`. Nada foi comitado.
+Exercícios do contrato da colab 115/116, feitos no KANIVETE com o app de teste na porta **9333** (a 9222 do Pailer nunca foi tocada). Saídas em `D:/Kanivete/Testes/aula_deepseek/`. Nada foi comitado.
 
 ## 1. DOCUMENTO — feito (com uma ressalva)
-- Arquivos: `D:/kanivete_testes/aula_deepseek/proposta.docx`, `proposta.pdf`, `proposta_pagina1.png`, `proposta_pagina2.png` (scripts `gerar_proposta.py`, `gerar_pdf.py`).
+- Arquivos: `D:/Kanivete/Testes/aula_deepseek/proposta.docx`, `proposta.pdf`, `proposta_pagina1.png`, `proposta_pagina2.png` (scripts `gerar_proposta.py`, `gerar_pdf.py`).
 - Como conferi: `PyMuPDF` abriu o PDF (2 páginas), renderizei as duas em PNG a 110 dpi e olhei. Corrigi duas vezes (travessão virando "?" no Helvetica base14; página quase meia vazia).
 - **Não consegui**: converter o `.docx` em PDF. Esta máquina não tem Word (`Word.Application` → erro 0x800401F3) nem LibreOffice. O PDF foi montado à parte com PyMuPDF, com o mesmo texto e layout próprio; a paginação do `.docx` **não foi vista**, só o conteúdo (38 parágrafos, 3 tabelas, quebra manual na página 2).
 - Guia que falta: `MANUAL_AGENTE.md` manda "Word/PDF avulso: Python (python-docx, pypdf)" — `pypdf` não converte docx. Faltou dizer o que fazer sem Word/LibreOffice.
@@ -17,7 +17,7 @@ Exercícios do contrato da colab 115/116, feitos no KANIVETE com o app de teste 
   - `--colunas` existe, `--columns` (nome em inglês) estoura com "unrecognized arguments".
 
 ## 3. ARTE — feito
-- Arquivos: `D:/kanivete_testes/aula_deepseek/flyer/flyer_padaria.png` (1080×1350), `flyer_padaria.iknv`, `flyer_padaria.html`, `depois_flyer.js`.
+- Arquivos: `D:/Kanivete/Testes/aula_deepseek/flyer/flyer_padaria.png` (1080×1350), `flyer_padaria.iknv`, `flyer_padaria.html`, `depois_flyer.js`.
 - Como conferi: `tools/knv.py --revisar` (terminou em **0 problema**) e olhei a prévia e o PNG exportado em tamanho real.
 - Corrigi quatro vezes: título atropelando a chamada, margem abaixo do gabarito, selo estourando o círculo, halo branco do recorte do pão (Borracha mágica em vários pontos) e sombra de contato.
 - **Ficou imperfeito**: resta um halo claro sutil na borda direita do pão (o FLUX deixou resíduo de fundo). O guia não diz como limpar isso além de "Borracha mágica" / "IA".
@@ -34,11 +34,11 @@ Exercícios do contrato da colab 115/116, feitos no KANIVETE com o app de teste 
 
 ## 5. KANICODE — feito (patch proposto, original não alterado)
 - O Auto-Colab começa em `kanicode.py` › `_auto_colab_iniciar` (linha ~1027), chamado por `fio_chamar(..., 'colab', {'acao':'iniciar_auto'})` (linha ~1194).
-- Patch: `D:/kanivete_testes/aula_deepseek/kanicode.patch` (altera `kanicode.py`, cria `tests/test_colab_aba_orfa.py`). Duas correções pequenas:
+- Patch: `D:/Kanivete/Testes/aula_deepseek/kanicode.patch` (altera `kanicode.py`, cria `tests/test_colab_aba_orfa.py`). Duas correções pequenas:
   1. Se a criação do Chamado falhar **depois** de abrir a aba (gravar fio ou estado), a aba nova ficava órfã; agora ela é fechada e o erro sobe.
   2. `fio_chamar` só capturava `ValueError/TypeError`; um `OSError` ao gravar estado derrubava o turno do Chamador em vez de devolver `ERRO:`. Passou a capturar `OSError`.
-- Como conferi: `git apply --check` na pasta do KaniCode → código 0 (aplica limpo, sem alterar nada); `py_compile` das duas versões; o teste novo **falha no original** (a exceção `OSError` escapa e a aba 2 fica) e **passa na cópia corrigida** em `D:/kanivete_testes/aula_deepseek/kc_teste/`.
-- `py -3.13 verificar.py --area board` na pasta do KaniCode: **OK, 16 arquivos, 5 módulos** (relatório em `D:/kanivete_testes/verificar_sydwzgv2/resultado.txt`).
+- Como conferi: `git apply --check` na pasta do KaniCode → código 0 (aplica limpo, sem alterar nada); `py_compile` das duas versões; o teste novo **falha no original** (a exceção `OSError` escapa e a aba 2 fica) e **passa na cópia corrigida** em `D:/Kanivete/Testes/aula_deepseek/kc_teste/`.
+- `py -3.13 verificar.py --area board` na pasta do KaniCode: **OK, 16 arquivos, 5 módulos** (relatório em `D:/Kanivete/Testes/verificar_sydwzgv2/resultado.txt`).
 
 ## Limites deste modelo que apareceram no treino
 - Não gravo no cérebro (só consulto) e não leio segredos — como o manual já diz.

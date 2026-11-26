@@ -4,7 +4,7 @@ Motor: VTracer (visioncortex, MIT) — curvas por cor com hierarquia empilhada o
 não faz: limpeza por IA antes de traçar (Real-ESRGAN "arte" 4× em imagem pequena ou JPEG: o logo do WhatsApp vira
 contorno limpo), fundo tirado por preenchimento a partir da borda (sem retângulo branco), N cores exatas (k-means em Lab
 antes) e o resultado já em formas soltas por cor (sem Expandir nem Desagrupar). Comparação com o motor antigo e medidas:
-Instructions/vetor-kanivete.md › "Traçado de imagem v2"; bancada em D:/kanivete_testes/trace.
+Instructions/vetor-kanivete.md › "Traçado de imagem v2"; bancada em D:/Kanivete/Testes/trace.
 """
 import io
 import os

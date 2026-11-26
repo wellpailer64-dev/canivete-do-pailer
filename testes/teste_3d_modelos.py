@@ -3,17 +3,17 @@
 outro PC (convertido no Blender) e .stl sem textura (Blender). Confere em cada um a textura xadrez vermelho/verde no
 quadro, depois aparência (cor única, imagem com projeção de caixa no STL), duplicar/renomear/zerar/esconder/apagar na
 tela 3D, arrastar arquivo (veDropFiles) e o arquivo da exportação (ProRes). Modelos de teste gerados pelo Blender:
-  blender -b --factory-startup -P D:/kanivete_testes/scripts/gerar_modelos3d.py   (pasta D:/kanivete_testes/modelos3d)
-  blender -b --factory-startup -P D:/kanivete_testes/scripts/gerar_lata3d.py      (lata com 2 partes, .obj sem o .mtl)
-Quadros em D:/kanivete_testes/editor3d/modelos_*.png."""
+  blender -b --factory-startup -P D:/Kanivete/Testes/scripts/gerar_modelos3d.py   (pasta D:/Kanivete/Testes/modelos3d)
+  blender -b --factory-startup -P D:/Kanivete/Testes/scripts/gerar_lata3d.py      (lata com 2 partes, .obj sem o .mtl)
+Quadros em D:/Kanivete/Testes/editor3d/modelos_*.png."""
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import base64, io, json, os, sys
 sys.stdout.reconfigure(encoding="utf-8")
 from PIL import Image
 from playwright.sync_api import sync_playwright
 
-M = r"D:/kanivete_testes/modelos3d"
-SAI = r"D:\kanivete_testes\editor3d"; os.makedirs(SAI, exist_ok=True)
+M = r"D:/Kanivete/Testes/modelos3d"
+SAI = r"D:\Kanivete\Testes\editor3d"; os.makedirs(SAI, exist_ok=True)
 falhas = []
 
 

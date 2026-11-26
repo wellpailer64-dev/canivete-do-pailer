@@ -74,7 +74,7 @@ Quem já tinha a Kani está com `modelos_ia/kani/Qwen3-8B-Q4_K_M.gguf` e sem Oll
 - No fim, `baixar()` espera a resposta em andamento, desliga o motor, apaga o anterior (`_apagar_antigos`) e avisa
   "A Kani foi atualizada". A próxima conversa já sobe com o novo.
 - Se o disco não tem espaço para os dois, o anterior é apagado antes. Se der erro, não tenta de novo até o app reabrir.
-- Conferido de ponta a ponta com o modelo anterior de verdade e o download por um servidor local: `D:/kanivete_testes/scripts/kani_troca.py`.
+- Conferido de ponta a ponta com o modelo anterior de verdade e o download por um servidor local: `D:/Kanivete/Testes/scripts/kani_troca.py`.
   O teste de interface fica em `testes/teste_kani.py`, no último item.
 - Próxima troca de modelo: ponha o atual em `GGUF_ANTIGOS` e troque `GGUF`/`GGUF_URL`/`TAM`. O resto se repete sozinho.
 
@@ -133,7 +133,7 @@ Antes de trocar: corrigir a caixinha no prompt/gaveta e medir no llama.cpp (o mo
   ```texto. Isso vale para o desenho, o Copiar e a voz. Uma regra só no prompt não resolveu (13/15, dentro do ruído).
   O id precisa existir porque uma legenda de verdade veio com `[[abrir:editor-video]]` inventado.
 - `qwen3.5:4b` oficial do Ollama: efeito sonoro 12/12, caixinha 15/15. Ele é quem atende o `gerador_sfx` para quem tem Ollama.
-- Medições: `D:/kanivete_testes/scripts/kani_caixinha.py` (modelo `llama` = llama-server na porta 8099).
+- Medições: `D:/Kanivete/Testes/scripts/kani_caixinha.py` (modelo `llama` = llama-server na porta 8099).
   Troca no PC do amigo (9B → 4B): `kani_troca.py` APROVADO. `testes/teste_kani.py` PASSOU (14/14, com a checagem da caixinha falsa).
 
 ### Qwen3.5 2B para o PC leve? Não (2026-10-10)

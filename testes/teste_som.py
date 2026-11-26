@@ -4,7 +4,7 @@
 
 Gera áudios de teste (ffmpeg), monta um podcast pela SKN (importar, cortar, fades, marcador), confere a forma de onda,
 a reprodução (agulha anda no tempo), mover/aparar com o mouse e desfazer, salvar/abrir .sknv, exportar com duração
-exata e no volume pedido (LUFS medido de novo no arquivo). Saída em D:/kanivete_testes/sound. Sai com 1 se reprovar.
+exata e no volume pedido (LUFS medido de novo no arquivo). Saída em D:/Kanivete/Testes/sound. Sai com 1 se reprovar.
 """
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import os
@@ -20,7 +20,7 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Functions.midia import ffmpeg  # noqa: E402
 
-D = "D:/kanivete_testes/sound/"
+D = "D:/Kanivete/Testes/sound/"
 os.makedirs(D, exist_ok=True)
 FF = ffmpeg()
 subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=220:duration=12,volume=0.6", D + "voz.wav"], check=True)
@@ -144,7 +144,7 @@ with sync_playwright() as p:
     pg.evaluate("(id) => SKN.fxFaixa(id, 'nenhum')", f0)
     _, i_0 = dur_lufs(pg.evaluate(f"async () => (await SKN.exportar('{D}fx_nada.wav', {{formato: 'wav'}})).caminho"))
     ok(abs(i_fx - i_0) > 0.5, "EQ e compressor da faixa mudam a exportação", f"{i_0} → {i_fx} LUFS")
-    c = pg.evaluate("async () => { await SKN.enviarEditor('D:/kanivete_testes/sound/para_editor.wav'); await new Promise(r => setTimeout(r, 4000)); return { ok: VE.ready, aud: (VE.clips || []).length + (VE.audios || VE.audioClips || []).length }; }")
+    c = pg.evaluate("async () => { await SKN.enviarEditor('D:/Kanivete/Testes/sound/para_editor.wav'); await new Promise(r => setTimeout(r, 4000)); return { ok: VE.ready, aud: (VE.clips || []).length + (VE.audios || VE.audioClips || []).length }; }")
     ok(c["ok"], "mixagem enviada ao Editor de vídeo (abre/entra na timeline)", str(c))
     pg.evaluate("switchTool('sound-kanivete')")
     # ── fase A: motor em trechos (precisão), medidores, micro-fade/crossfade na exportação, painéis ──

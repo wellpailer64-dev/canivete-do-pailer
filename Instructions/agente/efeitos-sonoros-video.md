@@ -27,6 +27,6 @@ Para agente, com o pack carregado: `VESB.dados.categorias` tem categorias, nomes
 ## Fontes e amostras extras
 
 - O catálogo instalado é a primeira busca; os nomes e categorias aqui foram conferidos no catálogo local. A existência no catálogo não comprova que o som combine com a peça.
-- Biblioteca local adicional: `D:/kanivete_biblioteca/sons/kenney_interface/kenney-interface-sounds-master/addons/kenney_interface_sounds/` contém 100 arquivos de interface e `LICENSE.txt`; licença CC0, origem [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds), cópia obtida do [espelho](https://github.com/Calinou/kenney-interface-sounds). Aguardam escuta e seleção; não estão instalados no Soundboard.
-- `D:/kanivete_biblioteca/sons/kenney_impact/` já contém o pacote [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), CC0. Conferir conteúdo e adequação antes de usar.
+- Biblioteca local adicional: `D:/Kanivete/Biblioteca/sons/kenney_interface/kenney-interface-sounds-master/addons/kenney_interface_sounds/` contém 100 arquivos de interface e `LICENSE.txt`; licença CC0, origem [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds), cópia obtida do [espelho](https://github.com/Calinou/kenney-interface-sounds). Aguardam escuta e seleção; não estão instalados no Soundboard.
+- `D:/Kanivete/Biblioteca/sons/kenney_impact/` já contém o pacote [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), CC0. Conferir conteúdo e adequação antes de usar.
 - Para novos sons, registrar origem e licença do arquivo específico. Ser gratuito para um vídeo não implica permissão de redistribuir o arquivo dentro do aplicativo. Não substituir o pack instalado manualmente: uma atualização pode sobrescrever a pasta.

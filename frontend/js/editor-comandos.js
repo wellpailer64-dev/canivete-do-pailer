@@ -32,7 +32,7 @@ const VE_CMDS = [
     { id: 'nova-timeline', grupo: 'arquivo', nome: 'Nova timeline', teclas: ['Ctrl+N'], sempre: true, fn: () => (VE.ready ? veCreateTimeline() : veCriarProjetoVazio({ quieto: false })) },
     { id: 'novo-ajuste', grupo: 'arquivo', nome: 'Nova camada de ajuste', teclas: [], fn: () => veAddAdjust(), pode: () => !(VE.info && VE.info.audio_only) },
     { id: 'abrir', grupo: 'arquivo', nome: 'Abrir projeto ou vídeo...', teclas: ['Ctrl+O'], sempre: true, sep: true, fn: () => veOpenFile() },
-    { id: 'fechar', grupo: 'arquivo', nome: 'Fechar projeto', teclas: ['Ctrl+Shift+W'], fn: () => { if (veConfirmDiscard()) veCloseProject(); } },
+    { id: 'fechar', grupo: 'arquivo', nome: 'Fechar projeto', teclas: ['Ctrl+Shift+W'], fn: () => veApFecharAtiva() },
     { id: 'salvar', grupo: 'arquivo', nome: 'Salvar', teclas: ['Ctrl+S'], sempre: true, sep: true, fn: () => veSaveProject(false) },
     { id: 'salvar-como', grupo: 'arquivo', nome: 'Salvar como...', teclas: ['Ctrl+Shift+S'], sempre: true, fn: () => veSaveProject(true) },
     { id: 'exportar-premiere', grupo: 'arquivo', nome: 'Exportar para o Premiere (XML)...', teclas: [], fn: () => veSaveProject(true, 'xml') },

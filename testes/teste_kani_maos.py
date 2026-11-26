@@ -1,4 +1,4 @@
-"""Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da
+"""Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/Kanivete/Testes), pede um flyer ao agente da
 Kani e confere que o Photo montou um documento novo com camadas, salvou o .iknv e a prévia, e que os nomes vieram certos.
 uso: py -3.13 testes/teste_kani_maos.py ["pedido"] [--porta 9338] [--manter]   (sai com 1 se reprovar)"""
 import argparse, json, os, subprocess, sys, time
@@ -10,8 +10,8 @@ ap = argparse.ArgumentParser(); ap.add_argument("pedido", nargs="?",
 ap.add_argument("--porta", default="9338"); ap.add_argument("--manter", action="store_true")
 a = ap.parse_args()
 
-env = dict(os.environ, APPDATA=r"D:\kanivete_testes\appdata", TEMP=r"D:\kanivete_testes\tmp", TMP=r"D:\kanivete_testes\tmp",
-           LOCALAPPDATA=r"D:\kanivete_testes\localappdata")
+env = dict(os.environ, APPDATA=r"D:\Kanivete\Testes\appdata", TEMP=r"D:\Kanivete\Testes\tmp", TMP=r"D:\Kanivete\Testes\tmp",
+           LOCALAPPDATA=r"D:\Kanivete\Testes\localappdata")
 app = subprocess.Popen([sys.executable, os.path.join(RAIZ, "main.py"), f"--agente={a.porta}"], cwd=RAIZ, env=env)
 falhas = []
 try:
@@ -62,7 +62,7 @@ try:
         if info["camadas"] < 3: falhas.append(f"poucas camadas ({info['camadas']})")
         print("  textos:", txt[:300])
         if "Studio Equilíbrio" in a.pedido and "Studio Equilíbrio" not in txt: falhas.append("nome 'Studio Equilíbrio' trocado")
-        pg.screenshot(path=r"D:\kanivete_testes\scripts\kani_maos_tela.png")
+        pg.screenshot(path=r"D:\Kanivete\Testes\scripts\kani_maos_tela.png")
         if a.manter: input("Enter para fechar o app de teste...")
 finally:
     subprocess.run(["taskkill", "/T", "/F", "/PID", str(app.pid)], capture_output=True)

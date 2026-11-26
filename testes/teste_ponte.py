@@ -4,7 +4,7 @@ import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa
 import json, os, sys
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
-D = r"D:\kanivete_testes\ponte"; os.makedirs(D, exist_ok=True)
+D = r"D:\Kanivete\Testes\ponte"; os.makedirs(D, exist_ok=True)
 for f in ("arte.iknv", "arte.vinculo.png", "obj.iknv"):
     try: os.remove(os.path.join(D, f))
     except OSError: pass

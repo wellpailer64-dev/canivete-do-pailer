@@ -81,10 +81,10 @@ Plano detalhado da próxima rodada, com o que o usuário viu: **AJUSTE PREMIERE*
 
 ## Testar
 `python testes/teste_premiere.py "<projeto.prproj>"`. Use sempre uma **cópia** do projeto do usuário, em
-`D:\kanivete_testes\premiere\`. O teste confere clipes convertidos + os que ficaram de fora = itens do Premiere,
+`D:\Kanivete\Testes\premiere\`. O teste confere clipes convertidos + os que ficaram de fora = itens do Premiere,
 a duração da timeline contra `MZ.OutPoint`, os quadros-chave dentro do clipe e a mídia encontrada.
 Para olhar a estrutura: descompacte (`gzip`) e procure o objeto pelo ObjectID/ObjectUID; os scripts usados na
-exploração estão em `D:\kanivete_testes\premiere\x\`.
+exploração estão em `D:\Kanivete\Testes\premiere\x\`.
 
 ## Exportar para o Premiere (XML do Final Cut Pro 7)
 Código: `Functions/premiere_xml.py` (`exportar`), `main.py` (`ve_project_save(..., formato='xml')`, `_ve_salvar_xml`),
@@ -104,6 +104,6 @@ Código: `Functions/premiere_xml.py` (`exportar`), `main.py` (`ve_project_save(.
 - Mixer de trilhas: o FCP7 XML não tem fader de trilha nem do Mix → volume da trilha + Mix vão SOMADOS no Audio Levels de
   cada clipe (som igual; aproximado no relatório); pan vai no Panner da `<track>` (atributos `PannerCurrentValue`... do
   próprio XML do Premiere — A CONFERIR com um XML exportado pelo Premiere); trilha calada pelo solo vai desligada.
-  Teste: `py -3.13 testes/teste_mixer.py` (cópia em `D:\kanivete_testes\premiere\mixer\mixer.prproj`).
+  Teste: `py -3.13 testes/teste_mixer.py` (cópia em `D:\Kanivete\Testes\premiere\mixer\mixer.prproj`).
 - Convenções adotadas (a CONFERIR no Premiere, que não está nesta máquina): in/out e `<when>` em quadros da mídia já com a
   velocidade; rotação no mesmo sentido; transição de entrada `start-black`, saída `end-black`.

@@ -97,7 +97,7 @@ with sync_playwright() as p:
     ok(pg.evaluate("IE.doc.dems[0].subs.length") == n0 + 1, "caneta de forma livre cria um subdemarcador")
     # 9) painel Demarcadores
     pg.evaluate("ieCmd('janela:demarcadores')"); time.sleep(0.4)
-    pg.screenshot(path="D:/kanivete_testes/scripts/caneta.png")
+    pg.screenshot(path="D:/Kanivete/Testes/scripts/caneta.png")
 
     # 10) recuperação: fundo degradê com ponto vermelho
     pg.evaluate("""(() => { KNV.novo('rec', 600, 400); const L = ieAtiva(IE.doc); const x = ieCtx(L.c);

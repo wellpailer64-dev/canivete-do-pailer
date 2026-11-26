@@ -7,7 +7,7 @@ Com placa NVIDIA: decodifica e reduz na placa (8K → 1080 sem passar o quadro g
 Cópia de EDIÇÃO (como os proxies do Premiere/DaVinci): quadro-chave a cada ~0,25 s e sem quadros B. Com o padrão do
 codificador (quadro-chave a cada 4–8 s), mostrar um quadro qualquer obrigava a decodificar centenas desde o último
 quadro-chave: no player do editor, pular para um ponto levava 180 ms e arrastar a agulha 75 ms por passo; com 0,25 s,
-18 e 17 ms (2026-10-10, D:/kanivete_testes/webcodecs/medir_gop.py). O arquivo fica ~40% maior; quadros B não
+18 e 17 ms (2026-10-10, D:/Kanivete/Testes/webcodecs/medir_gop.py). O arquivo fica ~40% maior; quadros B não
 economizaram espaço e deixaram o pulo mais lento (27 ms). Cópias antigas (gop_longo) são refeitas, não reaproveitadas.
 """
 import os

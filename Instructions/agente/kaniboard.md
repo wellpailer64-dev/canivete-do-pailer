@@ -41,7 +41,7 @@ Mudança → 0,7 s → `kb_salvar` (prévia no máximo a cada 6 s e sempre ao sa
 Desfazer = foto JSON dos itens (150 passos); criar + escrever uma nota = 1 passo.
 
 ## Testes
-App de teste 9333: `D:/kanivete_testes/scripts/kb_teste.py` (notas, Tab, desfazer, forma, seta grudada, caneta, borracha,
+App de teste 9333: `D:/Kanivete/Testes/scripts/kb_teste.py` (notas, Tab, desfazer, forma, seta grudada, caneta, borracha,
 seleção, copiar/colar, zoom, frame, texto, salvar, prévia, reabrir) e `kb_teste2.py` (modelo, imagem, barra de contexto,
 paleta, painel de frames, apresentação, renomear). Os quadros dos testes vão para `D:/Kanivete/KaniBoard` (mesma pasta do
 Pailer): apagar no fim. O erro "VEKE already declared" depois de `reload()` vem do agente.js, não do KaniBoard.

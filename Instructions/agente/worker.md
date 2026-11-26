@@ -7,7 +7,7 @@ reais do Photo Kanivete, corrige os próprios erros e devolve UMA linha JSON. O 
 py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; Ollama rodando
 → {"task_id": "...", "status": "success|partial|failed", "worker": "qwen3:8b", "escalou": false, "operations": 7, "retries": 2, "seconds": 33}
 ```
-`partial`/`failed` trazem `pendente` (até 5 itens). Registro completo: `D:\kanivete_testes\worker\logs\<task_id>.json`.
+`partial`/`failed` trazem `pendente` (até 5 itens). Registro completo: `D:\Kanivete\Testes\worker\logs\<task_id>.json`.
 
 ## Contrato (Task Contract)
 ```json
@@ -71,7 +71,7 @@ Mesmo `worker.py`; executor `executor_editor.js` (window.VEW) + `ferramentas_edi
   `sem_clipe:CLIPE`, `clipes:N`, `timeline:nome`, `legenda_contem:x`, `legenda_sem:x`, `som_em:t`, `sobreposicao:t`, `exportado`.
 - `projeto` = SEMPRE uma cópia (salvar grava por cima). O Claude decide tempos/cortes (plano em python, guia-edicao.md);
   o Worker aplica a lista. Bom para: rodada de ajustes do cliente, efeitos sonoros, correção de legenda, transições, export.
-- Primeiros jobs (2026-10-04, `D:/kanivete_testes/worker/editor/teste.vknv`): EDITOR_01 8 ops 26 s (2 erros corrigidos:
+- Primeiros jobs (2026-10-04, `D:/Kanivete/Testes/worker/editor/teste.vknv`): EDITOR_01 8 ops 26 s (2 erros corrigidos:
   direcao × lado) · EDITOR_02 corte+ripple, câmera lenta, efeito, escala, whoosh, export — 9 ops, 0 erros, 16,5 s.
 
 ## Vetor Kanivete — `"app": "vetor"`

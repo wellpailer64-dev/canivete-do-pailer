@@ -4,7 +4,7 @@ Cada voz do CATALOGO é DESENHADA pelo OmniVoice (instruct + semente, falando o 
 pelo reconhecimento de fala das legendas: se a transcrição não bater (≥ 85% das palavras), tenta a semente seguinte.
 Saída: <pasta>/vozes/ (banco.json + <id>.wav) e <pasta>/vozes-vN.zip.  Publicar:
   gh release create vozes-vN <pasta>/vozes-vN.zip --prerelease --title "Banco de vozes vN" --notes "..."
-Uso: py -3.13 tools/montar_banco_vozes.py D:/kanivete_testes/banco_vozes
+Uso: py -3.13 tools/montar_banco_vozes.py D:/Kanivete/Testes/banco_vozes
 """
 import json
 import os

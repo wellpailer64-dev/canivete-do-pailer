@@ -63,5 +63,5 @@ limites, cinza, compatibilidade de valores antigos, serialização/restauração
 Compara a prévia WebGL com o filtro real `_filtros_fx` do FFmpeg em três configurações de imagem sintética,
 incluindo regressão das rodas/curvas globais. Na validação desta entrega: sete testes aprovados,
 diferença máxima de 1 nível em 255 e médias de 0,477 / 0,460 / 0,371 nas três configurações.
-Saídas em `D:/kanivete_testes/lc_hsl`; a diferença máxima aceita é 3 níveis em 255, média inferior a 1.
+Saídas em `D:/Kanivete/Testes/lc_hsl`; a diferença máxima aceita é 3 níveis em 255, média inferior a 1.
 O teste não substitui a revisão estética em material real nem valida todo o pipeline HDR/codec.

@@ -8,14 +8,14 @@ contrato = {"task_id", "modo": "codigo" | "debug", "goal": "...", "arquivos": ["
             "testes": ["node:frontend/js/x.js"], "comando": "py:tools/olho.py" (debug: o que falhou), "log": "caminho"}
 → codigo: {"task_id", "status", "files_changed", "tests": "2/2", "diff": "+3 -1", "resumo": "...", "seconds"}
 → debug:  {"task_id", "status", "causa", "arquivo", "funcao", "correcao", "confianca", "seconds"}
-Registro completo: D:/kanivete_testes/worker/logs/<task_id>.json"""
+Registro completo: D:/Kanivete/Testes/worker/logs/<task_id>.json"""
 import json, os, re, subprocess, sys, time, urllib.request
 sys.stdout.reconfigure(encoding="utf-8")
 
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-LOGS = r"D:\kanivete_testes\worker\logs"
+LOGS = r"D:\Kanivete\Testes\worker\logs"
 PROIBIDOS = re.compile(r"(^|[\\/])(\.git|dist|build|node_modules)([\\/]|$)|_credenciais\.py$", re.I)
-AMB = {**os.environ, "TEMP": r"D:\kanivete_testes\tmp", "TMP": r"D:\kanivete_testes\tmp", "LOCALAPPDATA": r"D:\kanivete_testes\localappdata"}
+AMB = {**os.environ, "TEMP": r"D:\Kanivete\Testes\tmp", "TMP": r"D:\Kanivete\Testes\tmp", "LOCALAPPDATA": r"D:\Kanivete\Testes\localappdata"}
 # testes permitidos: "node:<arquivo.js>" (sintaxe), "py:<arquivo.py>" (compila), "teste:<nome>" (testes/teste_<nome>.py)
 def comando_de(t):
     tipo, _, alvo = t.partition(":")

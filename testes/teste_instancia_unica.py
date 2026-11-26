@@ -17,11 +17,12 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 import Functions
 from Functions import instancia_unica as unica
+from tools import porta_agente
 
 
 class InstanciaUnicaTest(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir='D:/kanivete_testes', prefix='instancia_')
+        self.temp = tempfile.TemporaryDirectory(dir='D:/Kanivete/Testes', prefix='instancia_')
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
         self.env = patch.dict(os.environ, {'APPDATA':str(self.base), 'CANIVETE_AGENTE_PORTA':''})
@@ -81,7 +82,7 @@ class InstanciaUnicaTest(unittest.TestCase):
         with patch.dict(os.environ,{'APPDATA':'D:/perfil_normal'}):self.assertEqual(unica._nome_mutex(),unica._MUTEX)
 
     def test_pasta_parecida_nao_e_isolamento(self):
-        with patch.dict(os.environ,{'APPDATA':'D:/kanivete_testes_falso/appdata'}):self.assertFalse(unica.dados_isolados())
+        with patch.dict(os.environ,{'APPDATA':'D:/Kanivete/Testes_falso/appdata'}):self.assertFalse(unica.dados_isolados())
 
     def test_registro_ativo_sem_porta_conta_como_app_aberto(self):
         self.registrar([{'pid':1234,'porta':None,'estado':'desligado'}])
@@ -137,6 +138,30 @@ class InstanciaUnicaTest(unittest.TestCase):
              patch.object(plugin,'_lancar') as lancar,patch.object(plugin.time,'sleep') as esperar:
             with self.assertRaisesRegex(SystemExit,'controle desligado'):plugin.abrir()
         lancar.assert_not_called();esperar.assert_not_called()
+
+    def test_resolver_nao_escolhe_copia_mais_recente_em_ambiguidade(self):
+        with patch.object(porta_agente, 'instancias', return_value=[{'porta':9223},{'porta':9224}]):
+            with self.assertRaisesRegex(RuntimeError, 'Mais de uma'):
+                porta_agente.porta(9222)
+            self.assertEqual(porta_agente.porta(9223), 9223)
+
+    def test_variavel_de_porta_conflitante_informa_causa(self):
+        with patch.dict(os.environ, {'CANIVETE_AGENTE_PORTA':'9222'}), \
+             patch.object(porta_agente, 'instancias', return_value=[{'porta':9223}]):
+            with self.assertRaisesRegex(RuntimeError, 'conflita'):
+                porta_agente.porta(9222)
+
+    def test_resolver_nunca_cruza_producao_e_teste(self):
+        with patch.object(porta_agente, 'instancias', return_value=[{'porta':9223}]):
+            self.assertEqual(porta_agente.porta(9333), 9333)
+
+    def test_cli_porta_errada_nao_abre_nem_troca_de_janela(self):
+        plugin = self.plugin()
+        with patch.object(plugin, '_instancias_do_app', return_value=[{'pid':2,'porta':9223}]), \
+             patch.object(plugin, '_lancar') as lancar, patch.object(plugin, 'frente') as frente:
+            with self.assertRaisesRegex(SystemExit, 'não corresponde'):
+                plugin.abrir(9222)
+        lancar.assert_not_called();frente.assert_not_called()
 
 
 if __name__=='__main__':

@@ -39,7 +39,7 @@ Tudo foi corrigido nesta entrada, na mesma ordem, com teste ao vivo no app de te
   por referência de objeto é o jeito barato e seguro; o `id` só é gerado depois, quando alguém lê a timeline.
 - **Conferência:** projeto novo no 9333, clipe "ANTIGO" em st=10, depois montagem de "NOVO_MONTADO" em st=0 (que entra
   antes na lista). Resultado: novo com `tr=1`, `st=0`; antigo intacto em st=10 e com o nome; ids únicos.
-  Script: `D:/kanivete_testes/opencode_mvp/tmp/opencode/teste_melhorias_video.py`.
+  Script: `D:/Kanivete/Testes/opencode_mvp/tmp/opencode/teste_melhorias_video.py`.
 - **Limites:** um item com erro não derruba os outros (comportamento antigo mantido); efeitos/transições continuam
   sendo aplicados por índice recalculado dentro do laço.
 
@@ -125,7 +125,7 @@ Tudo foi corrigido nesta entrada, na mesma ordem, com teste ao vivo no app de te
   Exportar por trecho reaproveita a faixa In→Out que a exportação já respeitava — não inventei um segundo caminho.
 - **Conferência:** efeito em 2 clipes com `history` crescendo 1; vão de 2 s fechado (`VAO_B` emenda em `VAO_A`);
   exportação 0–2 s em 480p → arquivo de **2,000 s** conferido com `ffprobe`
-  (`D:/kanivete_testes/opencode_mvp/teste_trecho.mp4`).
+  (`D:/Kanivete/Testes/opencode_mvp/teste_trecho.mp4`).
 - **Limites:** `de/ate` **deixam** os pontos marcados no projeto (não restauram o In/Out anterior); `remover_vaos` não
   mexe em legendas nem em trilhas travadas e não fecha vão antes do primeiro clipe (o buraco inicial não é "entre
   clipes").
@@ -160,7 +160,7 @@ Tudo foi corrigido nesta entrada, na mesma ordem, com teste ao vivo no app de te
 ```
 py -3.13 -m unittest discover -s tests -p "test_mcp*.py"          # em D:/Kanivete/Plugins/kanicode (50 testes)
 py -3.13 tools/agente/abrir_teste.py <projeto.vknv>               # app 9333
-py -3.13 D:/kanivete_testes/opencode_mvp/tmp/opencode/teste_melhorias_video.py
+py -3.13 D:/Kanivete/Testes/opencode_mvp/tmp/opencode/teste_melhorias_video.py
 py -3.13 tools/agente/abrir_teste.py --fechar
 ```
 O teste ao vivo chama o **JS gerado** por `_executar_video` direto na página (sem depender de reiniciar o servidor MCP).
@@ -209,17 +209,17 @@ Depois de mudar handler, reinicie o MCP para as sessões abertas verem o comando
 - **Reinício:** o servidor MCP já abertos seguem com o código antigo; a parte de `editor.js`/`agente.js` vale na hora.
 
 ## 2026-11-18 · Claude (Haiku 5.5), aba 137 · Pulso ponta a ponta no app de teste (9333)
-- **Teste:** `D:/kanivete_testes/scripts/pulso_ponta_a_ponta.py`. Abre `cultsp2/teste.vknv` (112 clipes) via `abrir_teste.py`,
+- **Teste:** `D:/Kanivete/Testes/scripts/pulso_ponta_a_ponta.py`. Abre `cultsp2/teste.vknv` (112 clipes) via `abrir_teste.py`,
   chama `veAgente('teste de pulso', ..., {agente:'claude'})` mudando o volume de um clipe e tira foto da tela.
 - **Resultado:** `VE_AG_ATIVOS` acende 1 clipe (o alterado, `st` 3,204 s); 0,25 s depois ainda há 1; 1,75 s depois, 0.
-  Captura `D:/kanivete_testes/scripts/pulso_tela.png`: contorno avermelhado no clipe do V2 em ~3,2 s; banner
+  Captura `D:/Kanivete/Testes/scripts/pulso_tela.png`: contorno avermelhado no clipe do V2 em ~3,2 s; banner
   "Claude: teste de pulso" no topo.
 - **Limite:** a cor do contorno foi conferida só pela imagem, não em pixel. Micro-ações e fila de tarefas longas no
   KaniCode continuam pendentes.
 - **Atenção:** `abrir_teste.py --ajuda` NÃO é ajuda: a flag vira nome de projeto e sobe o app de teste.
 
 ## 2026-11-18 · Claude (Haiku 5.5), aba 137 · Micro-ação de um clipe pelo caminho do MCP (app de teste 9333)
-- **Teste:** `D:/kanivete_testes/scripts/micro_ganho.py` e `micro_latencia.py`. Chamam `mcp_kanivete._executar_comando`
+- **Teste:** `D:/Kanivete/Testes/scripts/micro_ganho.py` e `micro_latencia.py`. Chamam `mcp_kanivete._executar_comando`
   com `video/ganho_clipe {indice: 4, db}` no projeto `cultsp2/teste.vknv`; o mesmo caminho que o MCP usa.
 - **Resultado:** `ok: true`, reversível, entra no histórico. Logo depois da chamada, 1 clipe aceso (`VE_AG_ATIVOS`) e
   o ganho gravado (-3 dB).

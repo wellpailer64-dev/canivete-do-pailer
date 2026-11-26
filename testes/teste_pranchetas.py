@@ -126,7 +126,7 @@ with sync_playwright() as p:
     ps = PR()
     ok(len(ps) == n + 2 and abs(ps[-1]["w"] - 60) < 1 and abs(ps[-1]["h"] - 40) < 1, "arrastar no vazio cria prancheta 60 × 40", str(ps[-1]))
     pg.evaluate("vkFerramenta('selecao')")
-    pg.screenshot(path="D:/kanivete_testes/scripts/pranchetas.png")
+    pg.screenshot(path="D:/Kanivete/Testes/scripts/pranchetas.png")
     # 6. Novo documento (modelos como no Illustrator): Identidade visual › Manual de marca 16:9 (12), pelo diálogo
     pg.evaluate("vkNovoDialogo('Identidade visual', 0)"); pg.wait_for_timeout(300)
     pg.click("#vkn-ok"); pg.wait_for_timeout(400)

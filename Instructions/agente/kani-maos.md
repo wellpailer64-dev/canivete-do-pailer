@@ -20,7 +20,7 @@ pequeno, botão). `topo` = foto no alto + painel (cenas: palco, mesa, ambiente �
 único recortado à direita (`data-inteiro`); `tipo` = só tipografia.
 
 ## Medições
-- Ficha: 10 pedidos, 9/10 certos, ~7 s cada (`D:/kanivete_testes/scripts/teste_kani_flyer.py`).
+- Ficha: 10 pedidos, 9/10 certos, ~7 s cada (`D:/Kanivete/Testes/scripts/teste_kani_flyer.py`).
 - Ponta a ponta: 76–130 s (a maior parte é gerar a foto).
 
 ## Teste

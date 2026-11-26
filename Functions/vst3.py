@@ -1,7 +1,7 @@
 """
 vst3.py — carregador PRÓPRIO de plugins de áudio VST3 do KANIVETE (Python puro + ctypes; sem compilador e sem
 biblioteca de terceiros). As interfaces seguem os cabeçalhos oficiais da Steinberg (vst3_pluginterfaces, licença MIT
-desde 2025; cópia de referência em D:/kanivete_testes/vst/sdk) — identificadores (IID) e ordem dos métodos de lá.
+desde 2025; cópia de referência em D:/Kanivete/Testes/vst/sdk) — identificadores (IID) e ordem dos métodos de lá.
 
 O plugin VST3 é uma DLL com objetos "COM": cada objeto é um ponteiro para uma tabela de funções. Aqui:
 - chamamos as funções do plugin pela posição na tabela (_chamar);

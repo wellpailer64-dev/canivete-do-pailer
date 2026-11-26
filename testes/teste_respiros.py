@@ -9,7 +9,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-BASE = "D:/kanivete_testes/respiros/"
+BASE = "D:/Kanivete/Testes/respiros/"
 erros = []
 
 

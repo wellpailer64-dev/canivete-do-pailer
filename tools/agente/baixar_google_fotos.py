@@ -51,7 +51,7 @@ def coletar(link):
         except SystemExit:
             pass
     time.sleep(2)
-    pasta = os.environ.get("TEMP", "D:/kanivete_testes/tmp")
+    pasta = os.environ.get("TEMP", "D:/Kanivete/Testes/tmp")
     arq = os.path.join(pasta, "gf_coletor.js")
     with open(arq, "w", encoding="utf-8") as f:
         f.write(COLETOR)

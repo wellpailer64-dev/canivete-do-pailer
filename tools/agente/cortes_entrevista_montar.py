@@ -1,11 +1,11 @@
-"""EXEMPLO (Alessandro/Minasparts, 2026-10-07; caminhos em D:/kanivete_testes/oficina) — copiar e ajustar CORTES/BROLL. Monta os 3 cortes no Editor do usuário (porta 9333) a partir de plano_final.json: timeline nova por corte, falas do
+"""EXEMPLO (Alessandro/Minasparts, 2026-10-07; caminhos em D:/Kanivete/Testes/oficina) — copiar e ajustar CORTES/BROLL. Monta os 3 cortes no Editor do usuário (porta 9333) a partir de plano_final.json: timeline nova por corte, falas do
 Alessandro com enquadramento 9:16 nele (aberto/fechado alternando), legenda na identidade da Oficina Produtiva, B-roll
 da feira cortado nas batidas da música e a imagem de fechamento."""
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import json
 from playwright.sync_api import sync_playwright
 
-D = "D:/kanivete_testes/oficina/"
+D = "D:/Kanivete/Testes/oficina/"
 PLANO = json.load(open(D + "plano_final.json", encoding="utf-8"))
 BAT = json.load(open(D + "batidas.json", encoding="utf-8"))
 BEAT = 60 / BAT["bpm"]                       # ~0,65 s

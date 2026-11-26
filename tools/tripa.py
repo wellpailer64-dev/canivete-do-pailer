@@ -8,7 +8,7 @@ tripa.py — a timeline inteira numa "tripa" de quadrinhos para o agente LER a m
 Cada linha = 1 minuto: régua com timecode e o ato (marcadores), 30 quadrinhos 64×36 do vídeo que está por cima
 naquele instante (escurecido onde a camada de "escuta"/ajuste age; T = texto na tela), risco vermelho em cada corte,
 faixas finas do que existe em cada camada (fala, cobertura, texto, ajuste, som) e, embaixo, o que é falado.
-Quadros: ffmpeg só do instante, minúsculo, em paralelo e com cache (D:/Canivete Media Cache/agente/tripa). Fala: só
+Quadros: ffmpeg só do instante, minúsculo, em paralelo e com cache (D:/Kanivete/Cache/Canivete Media Cache/agente/tripa). Fala: só
 transcrições que já existem (cache do agente_midia ou --transcricoes com <nome do arquivo>.json) — nada é transcrito.
 Saída: caminhos das PNGs (≈2 mil tokens cada para ler).
 """
@@ -92,7 +92,7 @@ def main():
     ap.add_argument("--json"); ap.add_argument("--porta", type=int, default=_porta_agente(9222))
     ap.add_argument("--passo", type=float, default=2.0); ap.add_argument("--linhas", type=int, default=8)
     ap.add_argument("--de", type=float, default=0); ap.add_argument("--ate", type=float, default=0)
-    ap.add_argument("--transcricoes", default=r"D:\kanivete_testes\edgar\transcricoes;D:\kanivete_testes\edgar\v4",
+    ap.add_argument("--transcricoes", default=r"D:\Kanivete\Testes\edgar\transcricoes;D:\Kanivete\Testes\edgar\v4",
                     help="pastas (separadas por ;) com <arquivo>.json ou tr_<arquivo>.json de transcrições já feitas")
     a = ap.parse_args()
     if a.json:

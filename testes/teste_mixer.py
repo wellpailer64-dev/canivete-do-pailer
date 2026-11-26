@@ -1,6 +1,6 @@
 """Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação.
 Uso: py -3.13 testes/teste_mixer.py ["<projeto.prproj>"]
-Sem projeto, usa D:/kanivete_testes/premiere/mixer/mixer.prproj (cópia do "teste audio treck mixer" do Pailer:
+Sem projeto, usa D:/Kanivete/Testes/premiere/mixer/mixer.prproj (cópia do "teste audio treck mixer" do Pailer:
 A1 −6 dB pan −100 · A2 +3 dB pan 50 solo · A3 mudo · Mix −2 dB). Sai com 1 se algo não bater."""
 import math
 import os
@@ -13,7 +13,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Functions import premiere, premiere_xml, video_cutter as vc
 
-PRPROJ = sys.argv[1] if len(sys.argv) > 1 else r"D:\kanivete_testes\premiere\mixer\mixer.prproj"
+PRPROJ = sys.argv[1] if len(sys.argv) > 1 else r"D:\Kanivete\Testes\premiere\mixer\mixer.prproj"
 falhas = []
 
 

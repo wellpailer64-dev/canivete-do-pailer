@@ -1,5 +1,10 @@
 # KANIVETE (antes Canivete do Pailer) — notas para o Claude
 
+## Abas de projeto do Vídeo Kanivete (2026-11-25)
+- `frontend/js/editor-abas-projeto.js`: só a aba ativa carrega players e cache; as demais mantêm JSON independente e desfazer/refazer. Render, preparação da fila, abertura e salvamento bloqueiam trocas concorrentes. A saída avisa sobre abas alteradas; não há restauração automática da sessão.
+- Agentes: `veApLista()`, `await veApAtivar(id)`, `await veApAtivarPorNome(nome)`; abrir arquivo já aberto reutiliza a aba. Guia: `guia-edicao.md`, seção 0.1.
+- `main.py:ve_projeto_suspender` cancela preparações; eventos de vídeo carregam caminho e geração para impedir respostas antigas de afetar a nova aba. Regressão: `py -3.13 testes/teste_abas_projeto.py`, app de teste vazio na porta 9333; dois vídeos e áudio reais, desfazer, falha de abertura e bloqueios.
+
 ## Nome e extensões
 - Nome visível: **KANIVETE** (janela, splash, marca, textos, release). Identificadores internos continuam
   `CaniveteDoPailer` (exe, zip do release, `%APPDATA%\CaniveteDoPailer`, mutex, `CANIVETE_*`): o updater instalado nos
@@ -12,7 +17,7 @@
   `video-cutter`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
 - Home (2026-10-16): banners deslizantes no topo, um por ferramenta, troca a cada 4 s (`frontend/js/home-banners.js`,
   `HB_ITENS` com título/subtítulo/corpo; artes `frontend/img/home/banner-<id>.webp` geradas no Z-Image local por
-  `D:/kanivete_testes/scripts/gerar_banners.py`); trilho embaixo com ícone, nome e info; "Peça à Kani" fixa embaixo no
+  `D:/Kanivete/Testes/scripts/gerar_banners.py`); trilho embaixo com ícone, nome e info; "Peça à Kani" fixa embaixo no
   centro; aviso de versão nova em cima do "Pergunte à Kani". Ferramenta nova com marca = item novo em `HB_ITENS` + arte.
 - Lobbys padronizados (2026-10-16, `frontend/js/lobby.js`): toda ferramenta com projeto abre num lobby no padrão do Vídeo
   (cartão com arte + logo + Novo/Abrir, seções de modelos/abertos/recentes, Recuperar) sobre o vídeo do Início sem cor
@@ -21,7 +26,7 @@
   Fundo de cada lobby = `video/lobby-<id>.webm`, o mesmo vídeo já tingido (ffmpeg `format=gbrp,colorchannelmixer=` cinza × cor
   da ferramenta, 12 qps; nada de mix-blend-mode por quadro). Camada do lobby 21: abaixo dos modais (.ie-modal 25) e menus
   (.ie-pop 30) — `testes/teste_lobby_camadas.py`.
-- Leveza com o app parado (2026-10-16, `D:/kanivete_testes/scripts/varredura.py` e `exp_cpu.py` medem por ferramenta):
+- Leveza com o app parado (2026-10-16, `D:/Kanivete/Testes/scripts/varredura.py` e `exp_cpu.py` medem por ferramenta):
   nada de `backdrop-filter` por cima de vídeo, nem animar `width`/`box-shadow` em loop (use transform/opacity); vídeos de
   fundo a 12 qps e pausados quando cobertos ou com o app minimizado; medidores 1×/s sem transição. Home 25% → ~6% de um núcleo.
 - Ícone de cada arquivo de projeto = o logo da ferramenta (`identidade/arquivos/<sigla>.ico`, gerado por
@@ -56,8 +61,8 @@ regenerar os dois mapas.
 - Testes: o Jr roda (`tools/worker/codigo.py` com `testes: ["teste:vetor"]`) e devolve só o que falhou.
 - Vetor: `VKN.curto = true` (respostas só com id/caminho), `VKN.revisar()` antes de abrir qualquer imagem, e páginas em
   HTML/CSS com `VKN.cena` / `py -3.13 tools/vk_cena.py pagina.html --marca marca.json --prancheta X [--nova 320x180] --png p.png --revisar`.
-  Marcas prontas (kit .aknv com símbolos + marca.json) em `D:\kanivete_biblioteca\marcas\`; modelos de página em
-  `D:\kanivete_biblioteca\modelos\manual\`. Imagem só no fim, em folha de contato reduzida.
+  Marcas prontas (kit .aknv com símbolos + marca.json) em `D:\Kanivete\Biblioteca\marcas\`; modelos de página em
+  `D:\Kanivete\Biblioteca\modelos\manual\`. Imagem só no fim, em folha de contato reduzida.
 
 ## Testar a interface: use o modo agente (não monte teste no navegador)
 O app expõe o painel real via Chrome DevTools Protocol, com a API pywebview de verdade:
@@ -71,10 +76,10 @@ Conecte por CDP (ex.: Playwright `connect_over_cdp`), rode JS na página (`veSee
 clique e tire print. Detalhes e segurança em `Instructions/modo-agente.md`.
 Fechar o app aberto do usuário (para trocar o exe ou relançar com `--agente`) exige o ok dele antes.
 App de teste (porta 9333) com preferências e temporários próprios, **no disco D** (o C enche e deixa o sistema lento;
-testes, cache, modelos e saídas nunca no C): `APPDATA=D:\kanivete_testes\appdata TEMP=D:\kanivete_testes\tmp
-TMP=D:\kanivete_testes\tmp LOCALAPPDATA=D:\kanivete_testes\localappdata python main.py --agente=9333`; rode os testes
+testes, cache, modelos e saídas nunca no C): `APPDATA=D:\Kanivete\Testes\appdata TEMP=D:\Kanivete\Testes\tmp
+TMP=D:\Kanivete\Testes\tmp LOCALAPPDATA=D:\Kanivete\Testes\localappdata python main.py --agente=9333`; rode os testes
 (`testes/*.py`) com o mesmo TEMP/TMP/LOCALAPPDATA (o cache de mídia vai para %LOCALAPPDATA%).
-Scripts e prints de teste avulsos em `D:\kanivete_testes\scripts`.
+Scripts e prints de teste avulsos em `D:\Kanivete\Testes\scripts`.
 
 Play do Pocket Editor: `python testes/teste_play.py "<projeto.vknv>" [--segundos 20] [--inicio 0]` (app em
 `--agente=9333`) mede agulha voltando, buscas, esperas, quadros perdidos e travadas; sai com 1 se passar dos limites.
@@ -106,11 +111,11 @@ Blender (`blender_render.cancelar_video`) e o ffmpeg da mixagem (`sound_kanivete
 metade (teste `testes/teste_ke_parar.py`). Falta: pastas arrastadas no Ke.
 Atalhos: Ctrl+M = pôr na fila + abrir; Ctrl+Shift+M = pôr na fila sem abrir (aviso, som, barrinha); NENHUM começa a
 renderizar: o início é sempre o ▶ Renderizar (pedido do Pailer); marcador anterior = Alt+Shift+M. Voz da Fran no fim
-(`veKeVoz`: pronto / drive / falhou / drivefalhou, `frontend/audio/ke/*.mp3`, fontes em `D:/kanivete_testes/ke_voz`); com
+(`veKeVoz`: pronto / drive / falhou / drivefalhou, `frontend/audio/ke/*.mp3`, fontes em `D:/Kanivete/Testes/ke_voz`); com
 Drive ela fala só no fim do envio. App de teste (APPDATA em kanivete_testes ou CANIVETE_TESTE=1): só sinal curto ok/erro. Janela: "Renderizando agora" com miniatura do quadro (o ffmpeg grava
 `ke_quadro.jpg` 1×/s: `video_cutter.saida_miniatura`), velocidade, selo placa/CPU e monitor ao vivo de CPU/RAM/placa
 (`Functions/encoder_monitor.py`, API `ve_encoder_estado`). Painel Desempenho no editor (o mesmo monitor, encaixável): `frontend/js/editor-desempenho.js`.
-Export otimizado (rodada 1, 2026-10-08: reels reais de 3,6× → 1,26× a duração; bancada em `D:/kanivete_testes/encoder`); medições e pendências em `Instructions/agente/plano-kanivete-encoder.md`.
+Export otimizado (rodada 1, 2026-10-08: reels reais de 3,6× → 1,26× a duração; bancada em `D:/Kanivete/Testes/encoder`); medições e pendências em `Instructions/agente/plano-kanivete-encoder.md`.
 **Modo placa** (rodada 3): a timeline montada inteira na GPU (Vulkan + libplacebo) — `Functions/export_placa.py`, chamado
 pelo `exportar_video` com a placa ligada; o que não suporta (`motivo()`) ou falha cai na CPU. Depoimentos de 98 s: 264 s → 96 s.
 Testar: `py -3.13 testes/teste_export.py --placa`. Armadilhas (disable_linear, settb, `ot`) no plano §8.
@@ -119,7 +124,7 @@ naquela camada (híbrido); sem caber na placa, exporta em blocos. iPhone HLG + D
 Respeite o seu voto: 892 s → 205 s. Blocos no teste: `CANIVETE_PLACA_BLOCOS=1 CANIVETE_BLOCO_SEG=1 ... --placa`.
 **Taxa da timeline CRAVADA** (`video_cutter.taxa_timeline`, `probe()["fps_timeline"]`): nunca a média de vídeo de celular.
 Rodada 7 (qualidade, 2026-10-12, plano "Rodada 7"): placa em 10/16 bits por dentro (escuro sem blocos), Brilho em Tela
-(claros sem estourar), H.265 10 bits pela placa, "sem áudio" na taxa da timeline. Bancada: `D:/kanivete_testes/qualidade`.
+(claros sem estourar), H.265 10 bits pela placa, "sem áudio" na taxa da timeline. Bancada: `D:/Kanivete/Testes/qualidade`.
 Rodada 8 (plano §8.1–8.5): fade de clipe, os 12 modos de mesclagem, desfoque animado, transições de sobreposição e
 Chroma Key com Luz e Cor/opacidade agora na placa (shaders do libplacebo; parâmetros por quadro em trechos retos ou textura).
 Ondulação na placa (2026-10-15, plano §8.6): shader por onda com margem transparente (`_onda_passos`) em vídeo, imagem/texto
@@ -157,7 +162,7 @@ ida e volta (`premiere.py _mixer_trilha`, `premiere_xml.py`). API `VEMIX_API`. T
 Rack de efeitos por trilha (5 espaços, na SOMA da trilha) e os 53 efeitos de áudio do Premiere (`editor-afx-pr.js`,
 `Functions/efeitos_pr.py`, valores 0..1 do Premiere = ida e volta sem perda; 20 com som calibrado no Premiere).
 **Ponte com o Premiere instalado (plugin UXP "Kanivete Ponte", `tools/ponte_premiere.py`): `Instructions/agente/ponte-premiere.md`**
-— testes SÓ na cópia em D:\kanivete_testes (o projeto ativo do Premiere é o do Pailer).
+— testes SÓ na cópia em D:\Kanivete\Testes (o projeto ativo do Premiere é o do Pailer).
 
 Timeline como a do Premiere (2026-10-11): ímã, seleção vinculada, marcador e chave inglesa (Configurações da timeline) no
 topo da coluna das trilhas; **alvo de trilha** (rótulo V1/A1 azul = alvo; clique tira, Shift+clique todas do tipo; `semAlvo`
@@ -175,14 +180,14 @@ SFace 37 MB, Apache-2.0). Analisa em segundo plano SÓ quadros-chave, ffmpeg em 
 OpenCV, folga entre quadros, nada na placa; PAUSA no play/export/preparo/Comp/motion (`ve_ps_pausar`). Agrupa em perfis (foto
 de frente, nome no projeto `VE.pessoas = [{nome, c}]`), abrir o perfil = todas as cenas; "Quem é?" por foto ou quadro do
 monitor. Índice por arquivo em `<cache>/Canivete Render Cache/rostos/`. API `VEPS_API` (`buscar(caminho)` para o agente).
-Bancada: `D:/kanivete_testes/rosto` (mesma pessoa 0,43–0,89; outras ≤ 0,30); testes `D:/kanivete_testes/scripts/teste_pessoas*.py`.
+Bancada: `D:/Kanivete/Testes/rosto` (mesma pessoa 0,43–0,89; outras ≤ 0,30); testes `D:/Kanivete/Testes/scripts/teste_pessoas*.py`.
 Usar SEMPRE antes de pôr GC: confirmar que o rosto da cena é da pessoa do nome.
 
 **MOGRT** (2026-10-20, etapas 1–2): `.mogrt` do After vira Comp editável — `Functions/mogrt.py` (lê o .aep com py-aep, MIT:
 camadas, quadros-chave com a Bézier do After, mãe, fosco, Comp ao contrário espelhada) + `frontend/js/editor-mogrt.js`
 (monta; Gráficos essenciais por faixa via variação da Comp; plano rápido: mãe parada/fosco retangular viram transformar e
 Cortar animado, `_corte_animado` no ffmpeg). Guia e pendências: `Instructions/agente/mogrt.md`. Teste:
-`teste_export.py --casos mogrt` (usa `D:/kanivete_testes/mogrt/lower.mogrt`).
+`teste_export.py --casos mogrt` (usa `D:/Kanivete/Testes/mogrt/lower.mogrt`).
 
 **Estabilizador** (Warp Stabilizer, 2026-10-23): efeito Distorcer › Estabilizador; o vigia troca o clipe por uma cópia
 estabilizada oculta (`frontend/js/editor-estab.js` + `Functions/estabilizador.py`, L1 + zoom exato; 3–5× menos tremor que o
@@ -217,7 +222,7 @@ PDF em camadas, MP4 com animação e vídeo dentro, Kani criando a palestra (`sl
 **Apresentação para qualquer aparelho** (2026-10-17): Exportar › `.html` único com o reprodutor (`frontend/slider-player/player.html`,
 `slider-html.js`, `Functions/slider_html.py`; mídias e fontes dentro, celular com toque); guia › "Apresentação para qualquer aparelho".
 Testes: `py -3.13 testes/teste_slider.py`, `teste_slider_html.py`, `teste_slider_extra.py` (atalhos com teclado de verdade) e `teste_slider_arquivos.py
-[--kani]` (arquivos abertos no LibreOffice de `D:/kanivete_testes/libreoffice`) — porta 9333.
+[--kani]` (arquivos abertos no LibreOffice de `D:/Kanivete/Testes/libreoffice`) — porta 9333.
 
 ## Ata Kanivete (At, verde; Beta) — reunião do Google Meet vira ATA
 Chrome à parte (perfil próprio, login uma vez) com a captura injetada por CDP (`frontend/ata/captura.js`: microfone e
@@ -277,7 +282,7 @@ de evolução do AutoFrame): `Instructions/agente/direcao-de-arte.md`.
 do .vknv; abre sem caminho (Ctrl+S grava um .vknv ao lado). Vêm cortes, trilhas, vínculos, velocidade, Motion/Opacidade
 (com quadros-chave), transições (Cross Dissolve, Pop, Constant Power), sequências aninhadas e Ultra Key → Chroma Key
 (aproximado); o resto vai para o relatório. Teste: `python testes/teste_premiere.py "<projeto.prproj>"`
-(use uma CÓPIA do projeto do usuário, ex. `D:\kanivete_testes\premiere\`).
+(use uma CÓPIA do projeto do usuário, ex. `D:\Kanivete\Testes\premiere\`).
 Mapa do formato, mapeamento, limitações e pendências: `Instructions/importar-premiere.md`.
 Volta para o Premiere: XML do FCP7 (`Functions/premiere_xml.py`, Arquivo › Exportar para o Premiere; teste
 `testes/teste_premiere_xml.py`).
@@ -351,8 +356,8 @@ verdade (app em `--agente=9333`): `testes/teste_caneta.py` (Caneta, demarcadores
 Gerar imagem com IA (Z-Image-Turbo 6B Q4_K; com referência, FLUX.2 klein — ambos no stable-diffusion.cpp Vulkan, sob demanda; `KNV.gerar`): seção no mesmo guia.
 **Diagramar (carrossel, feed, story): `KNV.cena` — HTML/CSS vira camadas; `py -3.13 tools/knv.py peca.html --formato feed` (carrossel: `<section class="slide">`, `--exportar pasta`)**;
 **antes de diagramar carrossel/flyer/story, ler `Instructions/agente/direcao-carrossel.md`**; referências do Pinterest:
-`tools/refs.py` (Kani dá nota a cada uma) e técnicas já aprendidas em `D:\kanivete_biblioteca\tecnicas\tecnicas.json` (hierarquia, herói, ponte, catálogo de técnicas; o revisor confere com `KNV.revisarDirecao`);
-guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:\kanivete_biblioteca` com recursos/modelos/amostras, `data-cor`, `recurso:`, `--ver`, `--comparar`, `--variacoes`, `KNV.etapa`). Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
+`tools/refs.py` (Kani dá nota a cada uma) e técnicas já aprendidas em `D:\Kanivete\Biblioteca\tecnicas\tecnicas.json` (hierarquia, herói, ponte, catálogo de técnicas; o revisor confere com `KNV.revisarDirecao`);
+guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:\Kanivete\Biblioteca` com recursos/modelos/amostras, `data-cor`, `recurso:`, `--ver`, `--comparar`, `--variacoes`, `KNV.etapa`). Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
 `Instructions/agente/design-photo-kanivete.md`.
 
 ## Sound Kanivete (áudio multipista)
@@ -372,7 +377,7 @@ ainda NÃO faz"): ferramenta nova ou mudança visível → acrescentar lá. O ge
 (API, pendências, armadilhas, planos) e caminhos de arquivo; busca só com nota ≥ 5 (sem trecho aleatório). Contas o app
 faz (`kani.contas`) e entrega prontas; data de hoje e versão no prompt; `_ollama_tem` guardado 20 s (sem Ollama o Windows
 levava 1,5 s por mensagem). Bateria: `py -3.13 testes/teste_kani_respostas.py` (porta 9333; rodar ao mexer no prompt/ajuda). Nome em
-`kani.NOME`. Avatar `frontend/identidade/kani.webp` (original `D:/kanivete_biblioteca/marcas/kani/kani_oficial.png`, inteira com cantos arredondados como o logo). Ouvir: voz Fran
+`kani.NOME`. Avatar `frontend/identidade/kani.webp` (original `D:/Kanivete/Biblioteca/marcas/kani/kani_oficial.png`, inteira com cantos arredondados como o logo). Ouvir: voz Fran
 (OmniVoice 12 passos + `kani.PRONUNCIA` para nomes do app e siglas) mantida carregada enquanto o chat está aberto (`omnivoice_tool.manter_carregado`/`descarregar`,
 runner `serve`), ~3 s por leitura. Teste: `py -3.13 testes/teste_kani.py` (porta 9334).
 **Kani cria no chat** (2026-10-12): imagem (Z-Image), efeito sonoro (EzAudio), narração (Fran) e vinheta (narração + jingle
@@ -443,16 +448,16 @@ processo). 50 passos (padrão; o Pailer achou "muito melhor" que 25) ≈ 35 s po
 A Kani reescreve o pedido POR BAIXO (`melhorar_pedido`, `SISTEMA_PEDIDO`) no formato que o EzAudio gera melhor
 (boas práticas do artigo: legenda descritiva em inglês estilo AudioCaps, ordem dos eventos, sem jargão, sem fala/música,
 objetos nunca "groan"), sem fugir do pedido; Ollama (think false, keep_alive 0) ou llama.cpp da Kani (parado depois),
-sempre saindo da placa antes da geração. Conversão: `D:\kanivete_testes\sfx\ez`
+sempre saindo da placa antes da geração. Conversão: `D:\Kanivete\Testes\sfx\ez`
 (exportar.py, enxugar.py, consertar.py). Teste: `py -3.13 testes/teste_sfx.py [pasta]`.
 
 ## Soundboard (pack de sons do editor)
 - Não vai no build: o painel baixa `soundboard-vN.zip` do release `soundboard-vN` (pré-release, para não virar
   o "latest" do updater) e instala em `<app>/soundboard/`. Só sons CC0 (Kenney, Freesound filtrado por CC0).
 - **Pack v5** (2026-10-18, 287 sons/16 categorias, 10 MB; v3 = + 22 whooshes suaves curtos para a Legenda Premium; v4/v5 = 17 sub
-  drops e 16 sons de UI digital SINTETIZADOS por `D:/kanivete_testes/sfx_pack/sintetizar_subdrops.py` e `sintetizar_v2.py`, sem licença de terceiros):
+  drops e 16 sons de UI digital SINTETIZADOS por `D:/Kanivete/Testes/sfx_pack/sintetizar_subdrops.py` e `sintetizar_v2.py`, sem licença de terceiros):
   `tools/fatiar_sfx.py` (corta no mínimo de silêncio, nomeia, anota a origem no manifesto) e `tools/pack_sfx.py`
-  (Opus 128k/96k mono, volume nivelado; `--zip N` monta o release). Mestres WAV e manifesto em `D:/kanivete_testes/sfx_pack`
+  (Opus 128k/96k mono, volume nivelado; `--zip N` monta o release). Mestres WAV e manifesto em `D:/Kanivete/Testes/sfx_pack`
   (sons de marca/jogo/filme/biblioteca paga ficam marcados "licenca" e fora do pack). Pack novo: suba `VERSAO` em
   `Functions/soundboard.py`, publique `soundboard-vN.zip` no release `soundboard-vN` (pré-release); o app oferece "Atualizar".
   O v1 (Kenney/Freesound) era montado por `tools/montar_soundboard.py`.
@@ -491,16 +496,16 @@ Infraestrutura braçal (achar no código, troca mecânica, rodar teste, diagnost
 Notas, formas, texto, setas que grudam, caneta/marca-texto/borracha, imagens e GIFs, frames com apresentação; lobby com
 modelos (prévia real) e grade dos quadros com prévia (`thumb.png`). `Functions/kaniboard.py` (`kb_*`), `frontend/js/kaniboard*.js`,
 `css/kaniboard.css`, API `KBO_API`. Prefixo `kbo-` porque o plugin KaniBrowser usa `.kb-*` e `window.KB_API`.
-Guia: `Instructions/agente/kaniboard.md`. Testes avulsos: `D:/kanivete_testes/scripts/kb_teste.py` e `kb_teste2.py`.
+Guia: `Instructions/agente/kaniboard.md`. Testes avulsos: `D:/Kanivete/Testes/scripts/kb_teste.py` e `kb_teste2.py`.
 
 ## Porta do modo agente nos scripts (2026-11-04)
-`tools/porta_agente.py`: scripts não usam mais 9222/9333 fixo; `porta(9222)` (app do Pailer) e `porta(9333)` (app de teste) leem o `agente.json` (o do APPDATA atual e o de `D:\kanivete_testesppdata`) e devolvem a porta viva. Nunca cruza os apps (faixa 9222-9231 = Pailer; fora dela = teste). `--porta` explícito continua valendo. Conferir: `py -3.13 tools/porta_agente.py 9333`. Script novo: copiar a linha de import do topo de `tools/aplicar.py` e usar `_porta_agente(9333)`.
+`tools/porta_agente.py`: scripts não usam mais 9222/9333 fixo; `porta(9222)` (app do Pailer) e `porta(9333)` (app de teste) leem o `agente.json` (o do APPDATA atual e o de `D:\Kanivete\Testesppdata`) e devolvem a porta viva. Nunca cruza os apps (faixa 9222-9231 = Pailer; fora dela = teste). `--porta` explícito continua valendo. Conferir: `py -3.13 tools/porta_agente.py 9333`. Script novo: copiar a linha de import do topo de `tools/aplicar.py` e usar `_porta_agente(9333)`.
 
 ## Cor automática por escopos (2026-11-06)
 `tools/agente/cor_auto.py`: mede quadros (luma p0,5/p99,5, pixel estourado/esmagado, média Cb/Cr dos neutros, pele pelo YuNet com matiz/saturação/luz) e busca, por descida coordenada, os valores do efeito `lc` (temp, tint, exp, hi, wh, sh, bl e, se houver rosto, HSL secundário na pele: qs/qr) que põem tudo nas faixas, sem sair da grade do cliente mais que o preciso. Cada tentativa usa a mesma LUT do app: `tools/agente/lc_lut.js` roda `frontend/js/editor-lc.js` no node (processo aberto, uma linha JSON por pedido). `reel_fala.py` chama `ajustar()` por fonte (cache em `<trabalho>/cor/`) e põe uma camada de cor por trecho de fonte visível. ~20 s por fonte.
 
 ## Perfil comum: app de trabalho do Claude e app do Pailer (2026-11-07)
-- `tools/agente/abrir_teste.py` liga `CANIVETE_PERFIL_COMUM=1`: a cópia 9333 usa a pasta de prévias e os limites de cache das preferências REAIS do Pailer (`Functions/perfil_comum.py`, `video_cutter._cache_cfg`), e cada projeto aberto/salvo vai para `%USERPROFILE%/AppData/Roaming/CaniveteDoPailer/recentes_comuns.json`; o app do Pailer junta essa lista aos recentes em `prefs_load`. Rascunhos em `D:\kanivete_testes` não entram. Testes automáticos (sem a variável) seguem isolados.
+- `tools/agente/abrir_teste.py` liga `CANIVETE_PERFIL_COMUM=1`: a cópia 9333 usa a pasta de prévias e os limites de cache das preferências REAIS do Pailer (`Functions/perfil_comum.py`, `video_cutter._cache_cfg`), e cada projeto aberto/salvo vai para `%USERPROFILE%/AppData/Roaming/CaniveteDoPailer/recentes_comuns.json`; o app do Pailer junta essa lista aos recentes em `prefs_load`. Rascunhos em `D:\Kanivete\Testes` não entram. Testes automáticos (sem a variável) seguem isolados.
 - Uma cópia só: `_abrir_em_outra_copia` vale também para `python main.py`; só `--agente=PORTA` abre outra.
 
 ## Assets editáveis: `comp_html.py` (2026-11-11)
@@ -519,7 +524,7 @@ pedaço cujo BEN2 continua para longe da faixa (moto, placa) é descartado. Pont
 piores quadros afastados viram quadros-base. Caso Carlinhos: topo da cabeça e orelhas 1,4–3,6% → 0,0–0,3% numa rodada.
 
 ## MCP de vídeo: ver, medir e desfazer (lote 12)
-Tira de quadros (`kanivete_tira_quadros`), `consultar_timeline`, `analisar_mix`, pontos de restauração + lote `transacional`, e `kanivete_imagem_do_dia_video` (MagnetUS, `tools/agente/imagem_dia_video.py`, modelo em `D:/kanivete_biblioteca/modelos/magnetus_imagem_dia_video/`). Detalhe e cuidados: `Instructions/agente/roadmap-mcp-video.md` (seção "Lote 12"). Testes: `D:/Kanivete/Plugins/kanicode/tests/test_mcp_kanivete.py` e `testes/teste_imagem_dia_video.py`.
+Tira de quadros (`kanivete_tira_quadros`), `consultar_timeline`, `analisar_mix`, pontos de restauração + lote `transacional`, e `kanivete_imagem_do_dia_video` (MagnetUS, `tools/agente/imagem_dia_video.py`, modelo em `D:/Kanivete/Biblioteca/modelos/magnetus_imagem_dia_video/`). Detalhe e cuidados: `Instructions/agente/roadmap-mcp-video.md` (seção "Lote 12"). Testes: `D:/Kanivete/Plugins/kanicode/tests/test_mcp_kanivete.py` e `testes/teste_imagem_dia_video.py`.
 
 ## Vigia do WebView2 (`Functions/vigia_webview.py`, 2026-11-16)
 Causa do dia: um `msedgewebview2` do app foi a 14 GB (25 MB/s, app parado), a RAM livre caiu a 0,7 GB e o PC todo travou; a página nem respondia ao CDP e a causa não foi reproduzida (tira_quadros, troca de sequência, abrir V1 e reproduzir: memória estável). Por isso o app agora se vigia sozinho.
@@ -539,13 +544,13 @@ Causa do dia: um `msedgewebview2` do app foi a 14 GB (25 MB/s, app parado), a RA
 - No projeto aberto, as duas formas continuavam visíveis na timeline, com referência de mídia, tamanho e posição corretos. Seus canvases guardados tinham alfa 0 em todos os pontos conferidos; desenhar os mesmos dados num canvas novo produzia alfa 255. A recuperação anterior cobria WebGL, mas não a perda dos pixels do Canvas 2D, cujo contexto restaurado volta vazio.
 - `veGrCanvas` observa `contextlost` e `contextrestored`; `veGrRecuperar` descarta o cache de gráficos e a textura do giz, limpa os quadros compostos e pede redesenho. Não altera clipes, sequência, histórico, agulha ou dirty. Não cancelar o evento de perda do Canvas 2D: sua restauração automática deve continuar habilitada.
 - `testes/teste_recuperacao_gpu.py` agora tem 10 casos: os quatro novos simulam a perda dos pixels e os eventos do Canvas 2D em formas, cor sólida/PNG, pincel/base, giz e aparar caminho. Os quatro falhavam antes da correção; todos passaram depois. Os seis anteriores continuam cobrindo WebGL real, cache e player. A simulação 2D não reproduz falha física do driver.
-- Aplicado sem recarregar o app 9222. As duas faixas voltaram, alfa 255; monitor antes/depois conferido em `D:/kanivete_testes/recuperacao_gpu/faixas_antes.png` e `faixas_depois.png`. Snapshot, dirty, sequência e agulha idênticos antes/depois.
+- Aplicado sem recarregar o app 9222. As duas faixas voltaram, alfa 255; monitor antes/depois conferido em `D:/Kanivete/Testes/recuperacao_gpu/faixas_antes.png` e `faixas_depois.png`. Snapshot, dirty, sequência e agulha idênticos antes/depois.
 
 ### Desfoque radial no export da placa (17/11/2026, abas 132/135)
-- Fila do projeto Brasativa/Dagô recusava `blur_radial` em `novo_22_abraco_calcadao.mp4`, com motivo genérico "vídeo com efeito fora do Luz e Cor". Não era falta de memória nem falha do NVENC. Plano capturado em `D:/kanivete_testes/export_gpu_132/plano_original.json`.
+- Fila do projeto Brasativa/Dagô recusava `blur_radial` em `novo_22_abraco_calcadao.mp4`, com motivo genérico "vídeo com efeito fora do Luz e Cor". Não era falta de memória nem falha do NVENC. Plano capturado em `D:/Kanivete/Testes/export_gpu_132/plano_original.json`.
 - `Functions/export_placa.py`: `_lc_ok` admite o efeito; `_passos_lc` usa `_shader_blur_radial`. Duas passadas gaussianas numa textura separada, mistura radial com raio/suavidade/centro da prévia. Intensidade zero não gera passada. Misturas com filtros híbridos mantêm o mesmo filtro de CPU daquela camada, sem derrubar a timeline inteira.
 - `testes/teste_export.py --placa --casos desfoqueradial,desfoqueradialajuste --folha`: ambos passaram na placa, 62 quadros e verificação por região, médias máximas 1,7 e 3,5. O primeiro teste usa fundo estático para não confundir quadro vizinho da fonte com diferença do efeito. Tolerâncias preservadas.
-- `D:/kanivete_testes/export_gpu_132/teste_trecho_real.py`: recorta o trecho do efeito a partir do plano congelado, conserva as quatro camadas sobrepostas e renderiza sem acessar o app; barra de progresso do KaniCode. Resultado `placa=true`, 2,9 s, 1920×1080/30. PNG do resultado conferido, com as duas faixas visíveis. Som não faz parte deste teste e o vídeo completo não foi exportado.
+- `D:/Kanivete/Testes/export_gpu_132/teste_trecho_real.py`: recorta o trecho do efeito a partir do plano congelado, conserva as quatro camadas sobrepostas e renderiza sem acessar o app; barra de progresso do KaniCode. Resultado `placa=true`, 2,9 s, 1920×1080/30. PNG do resultado conferido, com as duas faixas visíveis. Som não faz parte deste teste e o vídeo completo não foi exportado.
 - Backend aplicado ao app 9222 via `vk_recarregar('Functions.export_placa')`: um módulo recarregado, sem erros. Snapshot, dirty, sequência e agulha preservados. App de teste usado pelos casos foi fechado pelo próprio teste.
 
 ### Identidade e borda de atividade (17/11/2026, aba 132)
@@ -565,7 +570,7 @@ Fala de arquivo bruto (depoimento, entrevista) com tempo por palavra, para escol
 
 `main.py --agente` e `Runapp.bat --agente` não pulam a instância única. PID registrado e vivo
 vale mesmo sem resposta do CDP ou com modo agente desligado; falha de comunicação bloqueia outra janela.
-Portas de teste exigem APPDATA em D:/kanivete_testes, com mutex separado por perfil.
+Portas de teste exigem APPDATA em D:/Kanivete/Testes, com mutex separado por perfil.
 Código: `Functions/instancia_unica.py`, `_abrir_em_outra_copia` no main e CLI do KaniCode
 `plugins/kanivete/kanivete.py`. Teste sem abrir apps: `py -3.13 testes/teste_instancia_unica.py`.
 Executável compilado antigo mantém o comportamento antigo até próxima compilação; não reiniciar nem fechar
@@ -586,3 +591,7 @@ Regra universal: maiúscula só em começo de frase/fala nova; nomes sempre. `py
 
 ## Escolha de take e grade musical (escolher_take.py)
 Estudo do Teaser ExpoCatadores (2026-11-24, `Instructions/agente/estudo-teaser-expocatadores.md`): nenhuma métrica de imagem acerta o trecho que o Pailer escolhe (45% x 44% ao acaso); a ferramenta só filtra defeito e mostra o bruto inteiro. `take BRUTO` (tira + JSON com candidatos e faixas de defeito; altura medida no 1º quadro por causa da rotação do iPhone) e `grade MUSICA --inicio S` (pontos de semicolcheia com força do ataque, `--tudo` lista a grade inteira). Regras: `metodo-edicao-video.md` › Escolha do take; `ritmo-cortes-audio.md` › Montagem musical.
+
+## Entrada unica de reels (reel.py)
+Upload: `py -3.13 tools/agente/reel.py subir render.mp4 --pasta ID [--simular]`. Usa a conexão Google Drive do KaniCode e cria arquivo novo (repetir pode duplicar). Exige arquivo não vazio e ID de destino; confirma ID, nome, tamanho e pasta antes de devolver link. Não muda compartilhamento. Simulação valida localmente sem rede; testes isolados não comprovam upload real. WhatsApp ainda pendente.
+Comandos: tools/agente/reel.py resumo|abrir|montar|conferir arquivo. Resumo de disco com IDs e contagens; abrir delega ao app de teste 9333; montar reaproveita reel_fala.py; conferir usa conferir_edicao.py --sem-ouvir (opcional --ouvir). Logs completos em D:/Kanivete/Testes/reel, saida limitada a 15 linhas e codigo de erro preservado. Validado: sintaxe, resumo, propagacao de erro e cinco testes isolados do upload; montagem e abertura no app ainda nao verificadas nesta etapa.

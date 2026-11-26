@@ -1,6 +1,6 @@
 """Gera no Photoshop camadas de preenchimento de DEGRADÊ (linear 3 cores 30°, radial com transparência): molde do GdFl."""
 import win32com.client
-SAIDA = "D:/kanivete_testes/psd_pre/modelo_deg.psd"
+SAIDA = "D:/Kanivete/Testes/psd_pre/modelo_deg.psd"
 ps = win32com.client.Dispatch("Photoshop.Application"); ps._FlagAsMethod("DoJavaScript")
 jsx = r'''
 app.displayDialogs = DialogModes.NO; app.preferences.rulerUnits = Units.PIXELS;

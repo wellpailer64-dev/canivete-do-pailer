@@ -10,7 +10,7 @@ import argparse, os, subprocess, sys, time, urllib.request
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-BASE = "D:/kanivete_testes/previa_sig/"
+BASE = "D:/Kanivete/Testes/previa_sig/"
 erros = []
 
 # [nome, código que muda, código que desfaz] — rodam com c = o clipe de vídeo na agulha
@@ -41,7 +41,7 @@ def ok(c, nome, det=""):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--video", default="D:/kanivete_testes/respiros/fala_pausas.mp4")
+    ap.add_argument("--video", default="D:/Kanivete/Testes/respiros/fala_pausas.mp4")
     ap.add_argument("--porta", type=int, default=9341)
     ap.add_argument("--sem-abrir", action="store_true")
     a = ap.parse_args()

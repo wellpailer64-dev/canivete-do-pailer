@@ -1,5 +1,5 @@
 """Slider Kanivete — 3ª bateria: os ARQUIVOS. PowerPoint exportado com animações, transições, vídeo (sozinho/repetir/mudo)
-e GIF — conferido abrindo no LibreOffice de verdade (D:/kanivete_testes/libreoffice) e reimportando; PDF (uma página por
+e GIF — conferido abrindo no LibreOffice de verdade (D:/Kanivete/Testes/libreoffice) e reimportando; PDF (uma página por
 slide no tamanho do PowerPoint, texto pesquisável, marcadores, leve × alta); importar PDF e PowerPoint em camadas;
 MP4 com animação quadro a quadro, vídeo tocando dentro e som; passador de slides (PageDown/PageUp, ., B, Esc, F5);
 cores legíveis nos layouts; trocar layout mantendo textos; Kani (com --kani: roda o modelo de verdade).
@@ -14,7 +14,7 @@ sys.path.insert(0, RAIZ)
 ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); ap.add_argument("--kani", action="store_true")
 a = ap.parse_args()
 OUT = os.path.join(tempfile.gettempdir(), "kanivete_teste_slider").replace("\\", "/"); os.makedirs(OUT, exist_ok=True)
-SOFFICE = "D:/kanivete_testes/libreoffice/lo/program/soffice.exe"
+SOFFICE = "D:/Kanivete/Testes/libreoffice/lo/program/soffice.exe"
 falhas = []
 
 
@@ -40,7 +40,7 @@ FOTO_GRANDE = gerar("grande.jpg", ["-f", "lavfi", "-i", "testsrc2=s=6000x4000", 
 
 def soffice(arq, fmt, saida):
     os.makedirs(saida, exist_ok=True)
-    subprocess.run([SOFFICE, "-env:UserInstallation=file:///D:/kanivete_testes/libreoffice/perfil", "--headless", "--convert-to", fmt, "--outdir", saida, arq],
+    subprocess.run([SOFFICE, "-env:UserInstallation=file:///D:/Kanivete/Testes/libreoffice/perfil", "--headless", "--convert-to", fmt, "--outdir", saida, arq],
                    capture_output=True, timeout=240, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return os.path.join(saida, os.path.splitext(os.path.basename(arq))[0] + "." + fmt.split(":")[0])
 
@@ -104,7 +104,7 @@ with sync_playwright() as p:
         import fitz
         ok(os.path.isfile(pdf_lo) and len(fitz.open(pdf_lo)) == n_slides, "LibreOffice abre o PPTX e desenha todos os slides", f"{len(fitz.open(pdf_lo)) if os.path.isfile(pdf_lo) else 0} páginas")
     else:
-        print("  (sem LibreOffice em D:/kanivete_testes/libreoffice: pulei a conferência externa)")
+        print("  (sem LibreOffice em D:/Kanivete/Testes/libreoffice: pulei a conferência externa)")
     r = E("(c) => window.pywebview.api.sd_importar_pptx(c)", pptx)
     sl = r["doc"]["slides"]
     anims = [c["anim"]["tipo"] for s in sl for c in s["camadas"] if c.get("anim")]

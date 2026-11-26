@@ -4,8 +4,8 @@ Código: `Functions/mogrt.py` (leitura) + `frontend/js/editor-mogrt.js` (montage
 ganchos em `editor-comp.js` (`veCompSeqEfetiva`, `veCompEssDefinir`, `veCompEssHtml`), `video_cutter._corte_animado`
 (Cortar animado no ffmpeg) e as entradas de arquivo (`veDropFiles`, `vePjImportarArquivo`, abrir caminho). Ponte
 `ve_mogrt_importar`. Dependência: `py-aep==0.18.2` (MIT; usa fonttools/uharfbuzz/pyyaml/attrs, que o app já tem).
-Teste: `py -3.13 testes/teste_export.py --casos mogrt` (arquivo de referência `D:/kanivete_testes/mogrt/lower.mogrt`,
-cópia do GC CULTSP PRO do Diego Porfírio). Scripts avulsos em `D:/kanivete_testes/scripts/teste_mogrt_*.py`, `mogrt_tempo.py`.
+Teste: `py -3.13 testes/teste_export.py --casos mogrt` (arquivo de referência `D:/Kanivete/Testes/mogrt/lower.mogrt`,
+cópia do GC CULTSP PRO do Diego Porfírio). Scripts avulsos em `D:/Kanivete/Testes/scripts/teste_mogrt_*.py`, `mogrt_tempo.py`.
 
 ## Formato
 `.mogrt` = zip: `definition.json` (campos `clientControls`: id, nome, tipo, valor; `authorApp` aefx|ppro), `thumb.mp4/png`

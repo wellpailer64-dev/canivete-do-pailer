@@ -2,7 +2,7 @@
 
 Código: `Functions/recorte_pro.py` (recorte profissional: `recortar`, `tem_pessoa`), `Functions/removerfundo.py`
 (modelos, sessões ONNX, GPU), `main.py › ie_recorte_pro` (cache em `%LOCALAPPDATA%/CaniveteDoPailer/cache_recorte`, prefixo
-`pro2_`). Bancada de testes (fora do repo): `D:\kanivete_testes\recorte2` (`bench.py`, `zoom.py`, `teste_app.py`, venv
+`pro2_`). Bancada de testes (fora do repo): `D:\Kanivete\Testes\recorte2` (`bench.py`, `zoom.py`, `teste_app.py`, venv
 `venv_dml` com onnxruntime-directml).
 
 ## Como funciona agora (publicado em f0397b6)
@@ -34,7 +34,7 @@ Ponta a ponta no app (recorte novo, sem cache): **antes 30–45 s por imagem** (
 Agora: objeto em sequência **~2 s**; objeto depois de pessoa ~8 s (troca de modelo); pessoa em sequência ~7 s;
 pessoa depois de objeto ~15 s. Mesma imagem de novo: 0,3 s (cache).
 
-## Qualidade (zoom em `D:\kanivete_testes\recorte2\saida\zoom_*.jpg`)
+## Qualidade (zoom em `D:\Kanivete\Testes\recorte2\saida\zoom_*.jpg`)
 | Modelo | Cabelo cacheado com árvores atrás | Garrafa de vidro |
 |---|---|---|
 | ISNet | halo, verde entre os cachos | ok, sólido |

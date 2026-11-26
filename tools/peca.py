@@ -55,7 +55,7 @@ def _falhas(e):
 
 
 PRESET_ENQUETE = r"D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/06 - MAGNETUS/PRESSETS/PRESSET ENQUETE DO DIA.psb"
-PREVIAS = r"D:/kanivete_testes/pecas"
+PREVIAS = r"D:/Kanivete/Testes/pecas"
 # medidas do preset: grupo, tela do monitor (x0, y0, x1, y1) e fatia (x, y, w, h)
 MONITORES = {
  "horizontal": (("FEED 1", (37, 354, 1050, 947), (2, 5, 1080, 1400)), ("STORY 1", (26, 1967, 1049, 2566), (0, 1534, 1080, 1920))),
@@ -151,7 +151,7 @@ def _instrucao(video):
     base = os.path.join(PREVIAS, os.path.splitext(os.path.basename(video))[0])
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", video, "-vf", "fps=1/3,scale=620:-1,tile=4x3", "-frames:v", "1", base + "_quadros.jpg"], check=True)
     import whisper
-    r = whisper.load_model("medium", download_root=r"D:/kanivete_testes/whisper").transcribe(video, language="pt")
+    r = whisper.load_model("medium", download_root=r"D:/Kanivete/Testes/whisper").transcribe(video, language="pt")
     for s in r["segments"]: print(round(s["start"]), s["text"].strip())
     print("quadros:", base + "_quadros.jpg")
     return 0

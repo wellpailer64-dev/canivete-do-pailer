@@ -1,5 +1,5 @@
 """Exporta uma timeline aberta para conferir e mede o resultado: taxa, LUFS, pico e quadros pretos.
-    py -3.13 tools/agente/exportar_conferencia.py "Reels A" D:/kanivete_testes/x/render --nome teste_A [--porta 9333]
+    py -3.13 tools/agente/exportar_conferencia.py "Reels A" D:/Kanivete/Testes/x/render --nome teste_A [--porta 9333]
 Não espera presa ao comando: dispara, acompanha e, se passar de --espera, diz que continua rodando (rodar de novo com --ver).
 Comando longo: usar tarefas_soltas.py. Com muitas camadas de zoom com desfoque de movimento, 2:30 levou ~18 min.
 """

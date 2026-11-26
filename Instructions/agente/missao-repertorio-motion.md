@@ -6,7 +6,7 @@ Cada técnica nova ganha NOME, MÉTODO (como fazer no KANIVETE) e GATILHO (quand
 
 ## Roadmap por vídeo (repetir a cada referência)
 1. **Decupar** — baixar (`video_download baixar`), folha por cenas + folhas a 10 q/s nas viradas, transcrição
-   no idioma certo. Saída: `D:/kanivete_testes/repertorio/NN_nome/decupagem.md` (linha do tempo cena a cena).
+   no idioma certo. Saída: `D:/Kanivete/Testes/repertorio/NN_nome/decupagem.md` (linha do tempo cena a cena).
 2. **Inventariar** — cada movimento vira técnica com nome curto em PT-BR; marcar ✅ já temos / 🧩 temos as
    peças, falta receita / 🔨 falta ferramenta.
 3. **Construir** — ferramentas 🔨 primeiro (código no KANIVETE com teste), receitas 🧩 como ajudantes do `montar.py`.
@@ -32,6 +32,6 @@ Cada técnica nova ganha NOME, MÉTODO (como fazer no KANIVETE) e GATILHO (quand
 `montar.py` (ajudantes: entra/sai, texto+revela, selecao, caminho, mancha+orbita, nulo, cena3d/modelo, faixas automáticas,
 conflitos), `montador.js` (cria Cena 3D e animação de texto a partir do plano), `folha.py` (nossa × referência nos mesmos
 tempos), `assets_codigo.py` (papel, cursor, pontos, palco), `gerar_assets.py` (Z-Image + recorte), `tela_video.py`.
-JS no app de teste: `D:/kanivete_testes/repertorio/cdp.py "<código>" | --quadro saida.jpg t | --salvar`.
+JS no app de teste: `D:/Kanivete/Testes/repertorio/cdp.py "<código>" | --quadro saida.jpg t | --salvar`.
 
 Lição: conferir SEMPRE o arquivo exportado (v1 saiu sem texto/forma/3D porque `exportar_conferencia.py` ignorava camadas dentro de Comp; corrigido). Monitor certo não prova export certo.

@@ -4,8 +4,8 @@ efeito, espera a cópia estabilizada entrar no clipe, muda o corte (cópia nova)
 
     py -3.13 testes/teste_estab.py [--video trecho.mp4] [--porta 9333] [--sem-abrir]
 
-Vídeo padrão: D:/kanivete_testes/estab/saida/C0715_orig.mp4 (6 s, 1080p, câmera na mão; gerado por
-D:/kanivete_testes/scripts/estab_reais.py).
+Vídeo padrão: D:/Kanivete/Testes/estab/saida/C0715_orig.mp4 (6 s, 1080p, câmera na mão; gerado por
+D:/Kanivete/Testes/scripts/estab_reais.py).
 """
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
@@ -23,7 +23,7 @@ sys.path.insert(0, RAIZ)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-BASE = "D:/kanivete_testes/"
+BASE = "D:/Kanivete/Testes/"
 erros = []
 
 

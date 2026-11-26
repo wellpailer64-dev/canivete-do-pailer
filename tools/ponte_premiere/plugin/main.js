@@ -155,10 +155,10 @@ async function executar(pedido) {
     }
 }
 
-// Pela PASTA (D:\kanivete_testes\ponte_premiere): pedido_<id>.json → resposta_<id>.json. Não depende da regra de rede
+// Pela PASTA (D:\Kanivete\Testes\ponte_premiere): pedido_<id>.json → resposta_<id>.json. Não depende da regra de rede
 // do UXP (http local negado com "Manifest entry not found"); o plugin tem localFileSystem: fullAccess.
 const fs = require('fs');
-const PASTAS = ['file:/D:/kanivete_testes/ponte_premiere', 'file:///D:/kanivete_testes/ponte_premiere', 'D:/kanivete_testes/ponte_premiere', 'D:\kanivete_testes\ponte_premiere'];
+const PASTAS = ['file:/D:/Kanivete/Testes/ponte_premiere', 'file:///D:/Kanivete/Testes/ponte_premiere', 'D:/Kanivete/Testes/ponte_premiere', 'D:\\Kanivete\\Testes\\ponte_premiere'];
 async function acharPasta() {
     const erros = [];
     for (const p of PASTAS) {

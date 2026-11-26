@@ -104,7 +104,7 @@ modelo + assinatura 24×24 dos pixels) ficam e aparecem em "mantidas". Camadas c
 como mexida: a camada refeita pelo HTML leva os filtros da antiga (`ieCenaLevarFiltros`).
 
 ## Estado
-- 2026-10-03: Fase 1 pronta e testada (`frontend/js/imagem-cena.js`, `tools/knv.py`; testes em `D:\kanivete_testes\cena`):
+- 2026-10-03: Fase 1 pronta e testada (`frontend/js/imagem-cena.js`, `tools/knv.py`; testes em `D:\Kanivete\Testes\cena`):
   capa de carrossel 1080×1350 idêntica ao Chrome (lado a lado), story com gerar+recorte, rodar de novo preservando
   edições manuais após salvar/reabrir.
 - 2026-10-03: Fase 2 pronta: carrossel de 4 slides retrato (foto atravessando a emenda, componentes, marca), rodar de
@@ -131,10 +131,10 @@ O caro foi LER (páginas do rascunho, quadros de vídeo, prévias), não montar 
 - `knv.py --usuario` (app aberto do Pailer: sem recarregar código, sem fechar documentos; `--nome` ativa o documento
   da peça antes de atualizar), `--formato 1080x1400`, `--psd arq.psd`, `--exportar pasta --base NOME`; avisos repetidos
   viram uma linha (`--avisos todos` para a lista); prévia de carrossel em GRADE (`--colunas`).
-- Modelos de cliente prontos para partir: `D:\kanivete_biblioteca\modelos\magnetus_artigo\LEIA-ME.md`.
+- Modelos de cliente prontos para partir: `D:\Kanivete\Biblioteca\modelos\magnetus_artigo\LEIA-ME.md`.
 
 ## Fluxo barato (2026-10-03, depois do carrossel 3D)
-Biblioteca local `D:\kanivete_biblioteca` (ou `--biblioteca` / `%KANIVETE_BIBLIOTECA%`): `recursos/` (objetos já
+Biblioteca local `D:\Kanivete\Biblioteca` (ou `--biblioteca` / `%KANIVETE_BIBLIOTECA%`): `recursos/` (objetos já
 recortados + .json com prompt/semente), `modelos/` (peças aprovadas, para ESTUDO — as peças nascem do zero),
 `amostras/` (folhas de fontes). `py -3.13 tools/knv.py --listar` mostra o que tem.
 - **Recursos**: `<img src="gerar:..." data-guardar="cavalo">` grava o objeto recortado; depois `<img src="recurso:cavalo">`
@@ -174,7 +174,7 @@ recortados + .json com prompt/semente), `modelos/` (peças aprovadas, para ESTUD
   (`data-sem-selo`) + usuário; `.k-post` = card de post com "•••" e barra de ações (`data-sem-mais`, `data-sem-acoes`);
   `ul.k-check2` = check duplo na `--cor-primaria`; `.k-papel data-amassado=".3"` = folha pautada + papel amassado gerado em
   multiplicação; `.k-rodape data-site data-insta` = linha de site/redes + o conteúdo como texto legal. Exemplo:
-  `D:\kanivete_testes\carrossel_vereador\carrossel_kit.html` (o carrossel vereador em ~1/3 do HTML).
+  `D:\Kanivete\Testes\carrossel_vereador\carrossel_kit.html` (o carrossel vereador em ~1/3 do HTML).
 - Sombras: `box-shadow` com `0` sem `px` agora é lido certo (antes deslocava os números e zerava o desfoque).
 - 2026-10-08 (flyer Festa da Amizade, 3 caminhos): formatos `a5` e `folheto14x21` (2000×3002); `knv.py` com `--formato`
   e sem `--de` agora sempre cria documento novo (antes remontava a cena aberta POR CIMA de outra peça). Armadilhas: camada

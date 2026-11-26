@@ -2,7 +2,7 @@
 sem passar cada operação pelo Claude. Claude escreve o contrato; o Worker conversa com o modelo, valida cada chamada
 (esquema + nomes de camada reais), executa nas APIs reais (tools/worker/executor.js → KNV), devolve o erro ao modelo
 para ele corrigir, passa para o modelo de reserva se travar e, no fim, imprime UMA linha JSON compacta.
-O registro completo (mensagens, chamadas, erros) vai para D:/kanivete_testes/worker/logs/<task_id>.json.
+O registro completo (mensagens, chamadas, erros) vai para D:/Kanivete/Testes/worker/logs/<task_id>.json.
 
 uso: py -3.13 tools/worker/worker.py contrato.json [--modelo qwen3:8b] [--reserva gemma4:e4b] [--porta 9333]
 contrato = {"task_id", "goal", "constraints": {"documento": "x.iknv", "salvar": true, "pasta_exportacao": "D:/..."},
@@ -14,7 +14,7 @@ from playwright.sync_api import sync_playwright
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 FINAIS = ("exportar", "levar_para_editor", "exportar_pdf")
-LOGS = r"D:\kanivete_testes\worker\logs"
+LOGS = r"D:\Kanivete\Testes\worker\logs"
 ap = argparse.ArgumentParser()
 ap.add_argument("contrato"); ap.add_argument("--modelo", default="qwen3:8b"); ap.add_argument("--reserva", default="gemma4:e4b")
 ap.add_argument("--porta", type=int, default=_porta_agente(9333)); ap.add_argument("--max-passos", type=int, default=12)

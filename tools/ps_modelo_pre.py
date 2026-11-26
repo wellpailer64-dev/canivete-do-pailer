@@ -1,6 +1,6 @@
 """Gera no Photoshop camadas de preenchimento de cor sólida (sem seleção e com seleção → máscara): molde."""
 import win32com.client
-SAIDA = "D:/kanivete_testes/psd_pre/modelo_pre.psd"
+SAIDA = "D:/Kanivete/Testes/psd_pre/modelo_pre.psd"
 ps = win32com.client.Dispatch("Photoshop.Application"); ps._FlagAsMethod("DoJavaScript")
 jsx = r'''
 app.displayDialogs = DialogModes.NO; app.preferences.rulerUnits = Units.PIXELS;

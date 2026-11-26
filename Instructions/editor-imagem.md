@@ -6,7 +6,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - `frontend/js/imagem-nucleo.js` — modelo (documento, camadas, máscaras), histórico (copy-on-write + retalhos: com o
   editor parado, cada estado antigo troca a camada inteira só pelo retângulo que mudou, apoiado no estado seguinte —
   `ieHistCompactar`/`ieHistMontar`; 8 pinceladas em 6000×4000: 768 MB → 8 MB, mesmo Ctrl+Z; teste
-  `D:/kanivete_testes/scripts/teste_hist_retalho.py`, app em 9333), composição
+  `D:/Kanivete/Testes/scripts/teste_hist_retalho.py`, app em 9333), composição
   (modos de mesclagem do Photoshop, grupos com passagem, máscara de corte (Alt+Ctrl+G, botão do painel ou **Alt+clique na divisa entre duas camadas**: cursor de corte, prende a de cima na de baixo; de novo solta — `testes/teste_corte_alt.py`), máscaras, efeitos, camadas de ajuste), vista.
 - `frontend/js/imagem-ajustes.js` — matemática dos ajustes (camadas de ajuste do PSD e menu Imagem > Ajustes) e filtros.
 - `frontend/js/imagem-ferramentas.js` — ferramentas (Mover, Letreiro, Laço, Varinha, Corte, Conta-gotas, Carimbo,
@@ -41,7 +41,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   "Opções de mesclagem..."), duplo clique na camada, botão fx do painel, Camada > Estilo de camada. No app em inglês
   a janela usa os termos oficiais do Photoshop (IE_LS_EN). Efeitos aparecem sob a camada (fx ›) com olho por efeito.
   Teste: `testes/teste_misturar_se.py` (fonte do app 9333 em Edge sem janela, ponte simulada; números/pixels,
-  arraste/Alt, teclado, canais, prévia, cancelar/confirmar, histórico e tradução; saída em D:/kanivete_testes/misturar_se).
+  arraste/Alt, teclado, canais, prévia, cancelar/confirmar, histórico e tradução; saída em D:/Kanivete/Testes/misturar_se).
 - Harmonização: Camada > Harmonizar com cenário (`imagem-harmonizar.js`). Escolha assunto e referência; luminosidade
   e cor têm intensidades separadas, com prévia. A análise usa amostras reduzidas dos pixels visíveis, ponderadas pelo
   alfa: exposição pela razão de luminosidade linear (limitada a ±2 EV) e equilíbrio de cores aproximado pelo croma médio.
@@ -75,10 +75,10 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   **Guias inteligentes** (Exibir > Guias inteligentes, `ieGICalc`/`ieGISobre`): ao arrastar no Mover ou no Ctrl+T, linhas
   magenta quando borda/centro bate com outro objeto ou o documento; vão igual a outro par (ou meio entre dois vizinhos)
   mostra "N px" e encaixa; Ctrl parado com o Mover = distâncias até o objeto sob o mouse. Shift no arraste do Ctrl+T trava o eixo.
-  Teste avulso: `D:\kanivete_testes\scripts\teste_guias_int.py` (porta 9333).
+  Teste avulso: `D:\Kanivete\Testes\scripts\teste_guias_int.py` (porta 9333).
   Carrossel à mão (o método do Photoshop): Arquivo > Novo > "Carrossel 1080 × 1440" + Páginas (largura = 1080 × páginas,
   já com as guias e uma fatia por página) → montar → Arquivo > Exportar fatias (`nome_01`, `_02`...).
-  Teste com mouse de verdade: `D:\kanivete_testes\scripts	este_guias.py` (app em --agente=9333).
+  Teste com mouse de verdade: `D:\Kanivete\Testes\scripts	este_guias.py` (app em --agente=9333).
 - `frontend/js/imagem-caneta.js` — Caneta (P) como no Photoshop: clique = canto, arrastar = curva com alças simétricas,
   clicar no 1º ponto fecha, Shift 45°, Alt = converter ponto / quebrar alça, Ctrl = seleção direta, adicionar/excluir
   automaticamente, elástico, Enter/Esc termina, Backspace apaga o último; modo Demarcador ou Forma (camada de forma
@@ -188,7 +188,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   e "Fechar a volta" (a frase ocupa os 360°). Modelo `t.circ = {r, ang, baixo, volta}`; a origem de `t.m` é o CENTRO;
   desenho letra a letra em `ieTextoRenderCirc` (sem kerning entre pares); clique só no anel. Agente:
   `KNV.texto(frase, {x, y, circulo: {raio, ang, baixo, volta}})`. No PSD vai como pixels (`rasterizar`); no .iknv volta
-  editável. Testes: `D:/kanivete_testes/scripts/teste_texto_circulo*.py` (selos, painel + iknv, PSD).
+  editável. Testes: `D:/Kanivete/Testes/scripts/teste_texto_circulo*.py` (selos, painel + iknv, PSD).
 
 ## Efeitos e opções de mesclagem na composição
 - Ordem de desenho como no Photoshop (de baixo para cima): sombra, brilho externo, conteúdo (com o Preenchimento),
@@ -209,8 +209,8 @@ texto intacta do arquivo (novo, sem referência, mexido/movido, ou regravando tu
 editor (`texto_ps`; o Python cria a camada nova mesmo havendo a original). Texto do PSD sem dados do editor é convertido
 (`ieTextoDoPsd`); se não der (fonte ausente/estilos misturados) o salvar PERGUNTA antes. "Referências desencontradas"
 esquece só as camadas ruins (`ruins_uid`). `ieGarantirFonte` carrega a lista de estilos antes (sem ela o texto redesenhado
-saía no peso normal). Teste: `D:\kanivete_testes\scripts\teste_textos_psd.py` (iknv → psd, mover, sem referências, reabrir).
-Recuperação feita: `D:\kanivete_testes\scripts\recuperar_textos.py` (compara cada camada de pixels com o texto de mesmo
+saía no peso normal). Teste: `D:\Kanivete\Testes\scripts\teste_textos_psd.py` (iknv → psd, mover, sem referências, reabrir).
+Recuperação feita: `D:\Kanivete\Testes\scripts\recuperar_textos.py` (compara cada camada de pixels com o texto de mesmo
 nome/slide de um .iknv antigo, inclusive com escala, e põe o texto editável por cima da imagem atual).
 
 - As camadas vêm do Python como PNG **servido da memória** (nada em disco); a página libera com `ie_liberar`.
@@ -296,7 +296,7 @@ nome/slide de um .iknv antigo, inclusive com escala, e põe o texto editável po
     + VAE flux2, 4 passos. Baixado só quando a edição guiada é usada (`ie_gerador_estado/baixar(modelo)`).
   `--offload-to-cpu --fa --vae-tiling` (o VAE inteiro em 1024² pede ~10 GB e falhava).
 - Medição na RTX 3050 8 GB (2026-10-05, mesmos 4 prompts e semente — retrato, corpo inteiro com mãos, três pessoas,
-  produto vidro/metal/plástico; `D:/kanivete_testes/gerador/bench.py`): klein pico 6,7 GB (placa inteira, 1,36 GB são do
+  produto vidro/metal/plástico; `D:/Kanivete/Testes/gerador/bench.py`): klein pico 6,7 GB (placa inteira, 1,36 GB são do
   Windows), 18–20 s/imagem (38 s a 1ª, com carga); **Z-Image pico 5,9 GB, 41–44 s/imagem (61 s a 1ª)**, 4/4 nos dois.
   Z-Image: pele com poros e textura real, mãos certas, rostos de grupo mais naturais; o klein segue mais ao pé da letra
   formas de produto ("facetado"). Interface responde em ≤5 ms durante a geração (servidor à parte).
@@ -349,7 +349,7 @@ nome/slide de um .iknv antigo, inclusive com escala, e põe o texto editável po
 
 ## Desempenho com canvas grandes (2026-10-13)
 Medido no "Dia do instrutor v2" (6480 × 1440, 198 camadas) e num teste de 79 fotos com mesclagens e recortes
-(`D:\kanivete_testes\scripts\teste_arraste_rapido.py`, porta 9333; confere pixel a pixel contra `ieAchatar`):
+(`D:\Kanivete\Testes\scripts\teste_arraste_rapido.py`, porta 9333; confere pixel a pixel contra `ieAchatar`):
 - **Canvas sempre na memória comum** (`ieCanvas` com `willReadFrequently`): misturar canvas da placa com canvas da memória
   fazia o navegador esperar a placa a cada desenho (mesclagem 23 → 2 ms; ir para a tela 18 → 3 ms). Não voltar à placa.
 - **Folha de rascunho recortada** (`ieTemp`): a folha cresce até o maior pedido e `destination-in` percorria a folha
@@ -363,8 +363,8 @@ Medido no "Dia do instrutor v2" (6480 × 1440, 198 camadas) e num teste de 79 fo
 - **Histórico com limite para TODOS os documentos juntos** (`IE_HIST_BYTES` 2,5 GB, `ieHistBytes`/`ieHistPodar`; conta originais de
   objeto inteligente e máscaras): poda primeiro os documentos parados; avisa uma vez.
 Resultado no teste: quadro de arraste 268 → 3,5 ms (13 ms sem o arraste rápido).
-**Rodada 2 (2026-10-16, PSDs/PSB de pranchetas da Magnetus, pacote 8; scripts `D:\kanivete_testes\scripts\bench_psd_pranchetas.py`,
-`trace_zoom.py`, `abre_fecha.py`, `canvas_vivos.py`, cópias em `D:\kanivete_testes\magnetus_psd`):**
+**Rodada 2 (2026-10-16, PSDs/PSB de pranchetas da Magnetus, pacote 8; scripts `D:\Kanivete\Testes\scripts\bench_psd_pranchetas.py`,
+`trace_zoom.py`, `abre_fecha.py`, `canvas_vivos.py`, cópias em `D:\Kanivete\Testes\magnetus_psd`):**
 - **Xadrez e sombra das pranchetas em CSS** (`ieVistaFundo` → `.ie-fundo > i` por baixo do `#ie-canvas`): pintado no canvas, o
   xadrez custava 10–30 ms por quadro só na rasterização (trace: "Paint" do canvas). Zoom no PSB 2262×3449 com 4 pranchetas:
   4,5 s de travadas → 0. Copiar a composição para um canvas da placa PIOROU (o navegador espera a placa): não tentar de novo.
@@ -404,7 +404,7 @@ quando usada; desfazer recompõe o documento inteiro (só o que mudou); históri
   do lado + 2 px): sem isso a borda do objeto vaza e o LaMa reconstrói o objeto (fantasma). Regiões distantes uma por
   vez, com entorno; até 512 px na resolução original, acima disso reduz e amplia (mais macio). Amostra camada atual ou
   todas; saída camada nova (padrão) ou a atual (vale o Atenuar). O pincel de recuperação para manchas continua no
-  `cv2.inpaint` (instantâneo). Teste `testes/teste_conteudo.py` (usa D:/kanivete_testes/lama).
+  `cv2.inpaint` (instantâneo). Teste `testes/teste_conteudo.py` (usa D:/Kanivete/Testes/lama).
 - **Substituição de céu** (Editar, depois de Transformar; `KNV.substituirCeu({ceu: 'arquivo'|'azul'|'por'|'dramatico'|
   'rosado'|'noite', caminho, escala, deslocar, esmaecer, luz, inverter})`): máscara pelo SkySeg (U2Net, MIT,
   `modelos_ia/ceu/skyseg.onnx` baixado na 1ª vez, CPU ~1 s) em `Functions/ceu.py` (`ie_ceu_mascara`, `ie_ceu_cor`),
@@ -434,10 +434,10 @@ quando usada; desfazer recompõe o documento inteiro (só o que mudou); históri
   O retorno de geração registra `tentativas`, `largura`, `altura` e `falhas` (erro e últimas linhas do motor por tentativa);
   `segundos` inclui a carga do modelo e a recuperação. Cache continua sem executar o motor.
   Teste `testes/teste_gerador_recuperacao.py` (sem GPU: recuperação, limite, cancelamento, concorrência, semente e cache).
-  Teste `testes/teste_generativo.py` (D:/kanivete_testes/ceu/carro.jpg; reprova faixa lisa na expansão).
+  Teste `testes/teste_generativo.py` (D:/Kanivete/Testes/ceu/carro.jpg; reprova faixa lisa na expansão).
   Regressão sem carregar IA: `testes/teste_generativo_mascara.py` (app 9333, provedor sintético; retângulo, elipse,
   vãos, seleção suave, contexto deslocado e na borda; diferença zero fora, variações, desfazer/refazer e cantos da expansão).
-  Em pessoas (2026-10-07, D:/kanivete_testes/humanos): espinha/mancha de pele = SEM texto (LaMa, ~3 s, pele natural);
+  Em pessoas (2026-10-07, D:/Kanivete/Testes/humanos): espinha/mancha de pele = SEM texto (LaMa, ~3 s, pele natural);
   com texto ("clear skin") o klein faz mancha lisa de cor diferente. Corpo cortado → expansão SEM texto continua roupa
   e corpo bem; pedir o que não cabe ("jeans e tênis" num quadro que não chega aos pés) encolhe o tronco e dá degrau.
   Costura da expansão: faixa curta (2%, 16–40 px) com degradê; faixa larga (6%) deixava manga meio transparente.
@@ -536,4 +536,4 @@ se o redesenho previsto passa de ~60 ms, a região vira blocos de 512 px (`doc._
 que mudou por último primeiro; arrastando/transformando continua direto. Camera Raw: granulação e vinheta calculadas
 uma vez por documento (`ieCrPosicao`, Int8/Uint8), Claridade numa grade reduzida alinhada ao documento
 (`ieCrDesfReduzido`, sem emenda) e `ieFBox` sem min/max no laço (~2×). Carrossel: 2,6 s → 1,1 s; maior trava 2,6 s →
-0,19 s; imagem igual (diferença máx. 1 nível). Medir: `D:/kanivete_testes/pedro5/medir.py` e `perfil.py`.
+0,19 s; imagem igual (diferença máx. 1 nível). Medir: `D:/Kanivete/Testes/pedro5/medir.py` e `perfil.py`.

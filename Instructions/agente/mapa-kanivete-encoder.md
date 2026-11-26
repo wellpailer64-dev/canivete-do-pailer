@@ -131,7 +131,7 @@ Corte também a base (só os segmentos até T).
 - `py -3.13 testes/teste_export.py [--placa] [--casos a,b]`: prévia × export quadro a quadro. Casos `sinc` (som ×
   imagem) e `multiplicar`; `conferir_taxa` (regra da taxa). O `3d` reprova por uma falha antiga da prévia.
 - `py -3.13 testes/teste_fila.py`: fila e janela Ke.
-- Bancada `D:\kanivete_testes\encoder\`:
+- Bancada `D:\Kanivete\Testes\encoder\`:
   - `capturar_depo.py` grava o plano de uma timeline aberta no app de teste;
   - `bench.py` mede pela CPU e `bench_placa.py` pela placa;
   - `medir_r2.py` mede o antigo × o novo com partes removidas;
@@ -146,13 +146,13 @@ Corte também a base (só os segmentos até T).
 - **Envio ao Drive**: campo "Enviar ao Google Drive (opcional)" no formulário (link de pasta, lembrado); o item pronto
   sobe sozinho (`Functions/drive_envio.py`: confere permissão com arquivo-teste ANTES — a pasta só-leitura dava 403 no
   fim de 4 GB —, rclone com `--use-json-log --stats 1s`, link do arquivo no fim) com barra/MB/s/falta e "Abrir no Drive",
-  "Cancelar envio", "Enviar de novo". API `ve_drive_enviar/estado/cancelar`. Teste: `D:/kanivete_testes/scripts/teste_drive_fila.py`
+  "Cancelar envio", "Enviar de novo". API `ve_drive_enviar/estado/cancelar`. Teste: `D:/Kanivete/Testes/scripts/teste_drive_fila.py`
   (app 9333 + `RCLONE_CONFIG` do usuário; pasta de teste do Pailer 1Xn3AR4NS9eIwdL6Gjddw_Tv0AVC-xbwB).
 - **Arquivo movido = offline**: `veFilaConferirArquivos` confere no disco (`ve_arquivos_faltando`) tudo que a timeline usa
   (também dentro de Comp) antes de congelar; antes um PNG movido saía PRETO sem aviso. Aviso diz o tempo (`m._quando`).
 - **X da janela pergunta** (`_ao_fechar` em main.py → `appSair`): render/preparo/fila/envio em andamento ou projeto não
   salvo; antes o X fechava direto e matou o render na preparação. Página travada: 2º X em 8 s fecha. Teste:
-  `D:/kanivete_testes/scripts/teste_fechar.py`.
+  `D:/Kanivete/Testes/scripts/teste_fechar.py`.
 - **Camada de motion recortada ao desenho** (`cena3d.fim(recortar=True)`, caixa em `<mov>.caixa.json`, plano em
   `veExportPlanClips` com `pk.box`): Comp do GaIA com 16 linhas animadas 196 s → 68 s, imagem igual (máx 5/255). Comp e
   motion em ProRes 4444 pelo codificador `prores` (`-profile:v 4`, não "4444"): ~3× mais rápido que o `prores_ks`.
@@ -163,7 +163,7 @@ Corte também a base (só os segmentos até T).
 - **Corrigir trecho** (botão no item pronto; `Functions/emenda.py`, `veFilaCorrigir`): marcar I/O na timeline em volta do
   erro → exporta só [k1,k2) entre quadros-chave do vídeo pronto (mesmas configurações, sem áudio) e emenda: parte A com
   `-frames:v`, trecho remuxado com `-video_track_timescale` do original, C com `-ss k2` cópia, áudio original; confere
-  contagem de quadros e decodifica a região. Teste: `D:/kanivete_testes/scripts/teste_corrigir.py` (600/600 quadros,
+  contagem de quadros e decodifica a região. Teste: `D:/Kanivete/Testes/scripts/teste_corrigir.py` (600/600 quadros,
   fora do trecho idêntico).
 - **Preparo visível na fila**: o item aparece na hora ("Preparando · Renderizando a Comp X 30% · faltam 12 · 4 min").
 - **Revisor antes do render** (`veFilaRevisar`, não trava): GC × rosto (painel Pessoas: avisa GC sobre OUTRA pessoa com nome,
@@ -179,7 +179,7 @@ Corte também a base (só os segmentos até T).
     Armadilha de teste: os PNGs de texto do trabalho da Comp moram no TEMP do app — fechar o app apaga e o render sai
     sem textos (parecia defeito do codificador).
 0. **PRÓXIMO (combinado 2026-10-08): frear a fila adiantada de quadros.** Com as cópias Full HD a memória da placa
-   cresce de 4,8 → 7,0 GB ao longo do export (`D:/kanivete_testes/encoder/medir_pico_fhd.py`: export 5,6 GB +
+   cresce de 4,8 → 7,0 GB ao longo do export (`D:/Kanivete/Testes/encoder/medir_pico_fhd.py`: export 5,6 GB +
    app 1,4 = 6,9 de 8); no app do usuário estourou em 21% e a conferência (×2,6 agora) manda para a CPU quando o app
    ocupa mais. Investigar num trecho curto (~30 min) de onde vem o crescimento (entradas que começam tarde sendo lidas
    cedo? fila do filtro/decodificador?) e frear; meta: uso estável → a timeline cabe sempre na placa.
@@ -203,7 +203,7 @@ Corte também a base (só os segmentos até T).
 5. Textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"…).
 
 ## 8. Referência para um motor próprio: VapourSynth (lido em 2026-10-08, r81, commit 744afbd)
-Código em `D:\kanivete_testes
+Código em `D:\Kanivete\Testes
 efapoursynth` (clone raso, só leitura; LGPL-2.1: usar como biblioteca sim,
 copiar código para o app não). Por que importa: é o "chef com comanda" que o ffmpeg CLI não é.
 - Pede cada quadro sob demanda, com vários em andamento ao mesmo tempo (thread pool) e cache por nó.

@@ -2,7 +2,7 @@
 
     py -3.13 testes/teste_generativo.py
 
-Foto: D:/kanivete_testes/ceu/carro.jpg. Cada geração ~40 s (placa de 8 GB). Confere: expansão para story 9:16 (tela
+Foto: D:/Kanivete/Testes/ceu/carro.jpg. Cada geração ~40 s (placa de 8 GB). Confere: expansão para story 9:16 (tela
 cresce, camada "Expansão generativa", área nova preenchida com conteúdo, miolo original igual); preenchimento com
 texto numa elipse do céu (muda só dentro); "Gerar outra" e voltar à variação 1; sem texto = LaMa; sem seleção recusa.
 Sai com 1 se reprovar.
@@ -19,8 +19,8 @@ from playwright.sync_api import sync_playwright
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-FOTO = "D:/kanivete_testes/ceu/carro.jpg"
-SAIDA = "D:/kanivete_testes/generativo/"
+FOTO = "D:/Kanivete/Testes/ceu/carro.jpg"
+SAIDA = "D:/Kanivete/Testes/generativo/"
 erros = []
 
 

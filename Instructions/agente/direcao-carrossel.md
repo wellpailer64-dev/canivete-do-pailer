@@ -3,7 +3,7 @@
 Origem: feedback de 2026-10-06 (outros agentes fizeram carrossel genérico: vetor tapando buraco, texto sem hierarquia,
 sem humanização, sem interação entre páginas, sem seguir o roteiro) + 13 referências que o usuário aprovou
 (Jhonatan Lopes/"defender design", Bynet, William Rosa/ansiedade, Spider Man/Peter Parker, Igor Vilela).
-Imagens das referências: `D:\kanivete_biblioteca\referencias\carrossel\`.
+Imagens das referências: `D:\Kanivete\Biblioteca\referencias\carrossel\`.
 Conferência automática: `KNV.revisarDirecao` (roda dentro do `tools/revisor.py` e do `knv.py --revisar`).
 
 ## 1. Regras que TODAS as referências seguem
@@ -82,7 +82,7 @@ Folha de contato primeiro (`knv.py --gerar ... --sementes 7,11,23`), escolha, de
 O agente NÃO escreve HTML de carrossel do zero. Escreve um roteiro JSON (~1–2k tokens) e roda:
 `py -3.13 tools/esqueleto.py roteiro.json --montar [--exportar pasta]` (app de teste em `--agente=9333`).
 Sai o HTML diagramado, o .iknv, a prévia e o revisor (com `--roteiro`, confere se todo texto entrou).
-Formato e exemplo completo: docstring de `tools/esqueleto.py` e `D:\kanivete_testes\direcao\demo.json`.
+Formato e exemplo completo: docstring de `tools/esqueleto.py` e `D:\Kanivete\Testes\direcao\demo.json`.
 `--listar` mostra os esqueletos:
 - `gancho-heroi` capa: gancho gigante + objeto saindo pela borda (`"ponte": true` atravessa para o slide 2).
 - `texto-respiro` coluna de corpo com respiro + objeto cortado no canto (`lado` troca a coluna).
@@ -179,7 +179,7 @@ topo: claridade 16, textura 12, contraste 10, vibração 6, grão 12, vinheta �
   vazio quando o objeto é estreito; estruturas além de "lista" (mito × verdade, antes × depois, história).
 
 ## 10. Como o usuário finalizou o carrossel "Medo de dirigir" (Carlinhos, 2026-10-06)
-Comparação da minha v3 com a versão final dele (camada por camada; prints em `D:\kanivete_testes\carlinhos_medo\comparar`):
+Comparação da minha v3 com a versão final dele (camada por camada; prints em `D:\Kanivete\Testes\carlinhos_medo\comparar`):
 - **Tirou** a estrada amarela contínua dos 10 slides e **escondeu** a arte-final global (textura + Camera Raw).
 - **Ligação entre slides pelo assunto**, não por enfeite: o Daniel do slide 9 sangra para o 8.
 - **Assets do cliente antes de gerar**: personagens 3D da referência (humor: carrinho de mercado, triciclo,

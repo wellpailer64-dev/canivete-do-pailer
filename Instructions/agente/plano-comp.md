@@ -143,7 +143,7 @@ Pedido do Pailer: motion feito pelo agente deixou 46 faixas na principal; separa
   o volume/pan da trilha dele). Desfazer volta as faixas: `veSnapshot` guarda `trk` e `veRestore` só repõe se
   `VE_TRK.ver` mudou (olho/mudo continuam fora do desfazer).
 - **Como conferir (barato, sem exportar):** (1) plano da exportação antes × depois — camadas por chave numerada, zero
-  pares sobrepostos invertidos, base e mix iguais (`D:/kanivete_testes/scripts/ordem.js`); (2) monitor antes × depois por
+  pares sobrepostos invertidos, base e mix iguais (`D:/Kanivete/Testes/scripts/ordem.js`); (2) monitor antes × depois por
   `toDataURL` com **`vePrSegEm` desligado** (senão a versão original desenha o trecho pré-renderizado em disco e TUDO
   parece diferente — custou várias rodadas) e ~3 s de espera por quadro (imagens em resolução cheia), comparando pelo
   Ctrl+Z/Ctrl+Y na mesma sessão (`cmp2.py`, `par2.py`). Reels BF A e B: máx. 1 nível de diferença.

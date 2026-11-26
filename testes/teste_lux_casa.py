@@ -33,7 +33,7 @@ with sync_playwright() as p:
     ok(J("LUXC.m.c3d.modelos.length") == n1, 'refazer')
     J("V3.ir(2)"); ok(abs(J("LUXC.t") - 2) < 1e-3 and J("VE.playhead") != 2 or True, 'agulha própria')
     ok(J("VE.clips.length") == antes['n'], 'Editor segue sem clipe novo')
-    pg.screenshot(path='D:/kanivete_testes/scripts/lux_casa.png')
+    pg.screenshot(path='D:/Kanivete/Testes/scripts/lux_casa.png')
     J("ve3dTelaFechar()"); time.sleep(1)
     ok(J("!V3.lux && document.querySelector('.menu-item.active')?.dataset.tool === 'lux-kanivete' && !document.getElementById('lux-inicio').hidden"), 'fechar volta ao lobby da Lux e solta a casa')
     ok(J("!!document.querySelector('#lux-inicio [data-lx=\"continuar\"]')"), 'lobby oferece continuar a cena')

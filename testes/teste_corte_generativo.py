@@ -8,7 +8,7 @@ from urllib.request import urlopen
 from playwright.sync_api import sync_playwright
 
 for chave, pasta in [('APPDATA', 'appdata'), ('LOCALAPPDATA', 'localappdata'), ('TEMP', 'tmp'), ('TMP', 'tmp')]:
-    os.environ[chave] = str(Path('D:/kanivete_testes') / pasta)
+    os.environ[chave] = str(Path('D:/Kanivete/Testes') / pasta)
 
 ENSAIO = r"""async () => {
     const exigir = (ok, nome) => { if (!ok) throw Error(nome); };

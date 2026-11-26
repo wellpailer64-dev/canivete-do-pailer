@@ -24,7 +24,7 @@ class TesteRecuperacaoGerador(unittest.TestCase):
     def setUp(self):
         self.pilha = ExitStack()
         self.addCleanup(self.pilha.close)
-        self.pasta = self.pilha.enter_context(tempfile.TemporaryDirectory(dir='D:/kanivete_testes/variacoes'))
+        self.pasta = self.pilha.enter_context(tempfile.TemporaryDirectory(dir='D:/Kanivete/Testes/variacoes'))
         self.proc = Mock()
         self.estado = {'proc': self.proc, 'log': [], 'passo': None, 'cancelar': None, 'uso': 0, 'ocupado': False}
         self.pilha.enter_context(patch.object(g, '_srv', self.estado))

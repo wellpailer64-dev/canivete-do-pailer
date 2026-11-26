@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from Functions.midia import ffmpeg
 from Functions.sound_kanivete import _ffprobe_dur
 
-PASTA = Path('D:/kanivete_testes/sound_atalho_ke')
+PASTA = Path('D:/Kanivete/Testes/sound_atalho_ke')
 
 
 class SoundAtalhoKeTest(unittest.TestCase):

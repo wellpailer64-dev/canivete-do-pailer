@@ -49,7 +49,7 @@ if not info:
 outros = [r for r in info["outros"] if r != info["rid"]]
 CACHE = a.cache
 if not CACHE:   # mesma pasta de cache do app (teste ou do usuário)
-    for c in (r"D:/kanivete_testes/cache_teste/Canivete Render Cache/Roto/", os.path.expandvars(r"%APPDATA%/CaniveteDoPailer/Canivete Render Cache/Roto/")):
+    for c in (r"D:/Kanivete/Testes/cache_teste/Canivete Render Cache/Roto/", os.path.expandvars(r"%APPDATA%/CaniveteDoPailer/Canivete Render Cache/Roto/")):
         if os.path.isdir(c + info["rid"]):
             CACHE = c
             break

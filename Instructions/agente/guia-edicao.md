@@ -11,6 +11,12 @@
 - Não salvar nem fechar o app sem pedido. Em ajustes, preservar a timeline aberta e seguir o método; timeline nova só quando o trabalho pedir.
 - Testes de código: app de teste na porta 9333, conforme as instruções aplicáveis à sessão.
 
+## 0.1 ABAS DE PROJETO NO EDITOR
+- `veApLista()` lista `{id,nome,caminho,ativa,naoSalvo}`; `await veApAtivar(id)` ou `await veApAtivarPorNome('nome exato')` troca de projeto. Nome parcial só funciona se for único; aguarde `VE.ready && !VEAP.trocando && !VE._pendingProject` antes de editar.
+- `await veOpenProject(caminho)` reaproveita a aba se o arquivo já estiver aberto; outro arquivo fica em nova aba. `await veNovoProjeto()` cria uma aba vazia; `await veApFechar(id)` pergunta pelas alterações da aba escolhida.
+- Abas inativas guardam JSON e histórico de desfazer, sem players/cache de mídia; a troca cancela preparações de vídeo e pré-render. Abertura e render/preparação da fila bloqueiam trocas concorrentes. Projetos não salvos continuam exigindo salvamento antes de sair: as abas não são uma sessão persistida.
+- Código: `editor-abas-projeto.js`; regressão com dois MP4 e áudio reais: `py -3.13 testes/teste_abas_projeto.py` (instância de teste vazia na 9333, saídas em `D:/Kanivete/Testes/abas_projeto`).
+
 ## 1 LER MÍDIA (barato em tokens) — Functions/agente_midia.py
 - `py -3.13 -m Functions.agente_midia analisar "<proj.vknv>" --nao-usados-em "<timeline>"` → 1 comando:
   folhas de contato (10 vídeos/img) + cena por CLIP local (rótulos em CENAS) + fala (vídeos ≤180 s) + suspeitas
@@ -92,7 +98,7 @@
 - ACHAR O TRECHO PRIMEIRO, barato: folha de contato 1 quadro/min (`ffmpeg -vf fps=1/60,scale=240:-1,tile=8x7`, 1 imagem)
   → transcrever SÓ o trecho (`ffmpeg -ss A -t D` → wav 16k mono → `legendas.transcrever_wav`, somar A aos tempos).
   (2026-10-08: o reconhecimento agora vai em pedaços de 5 min, `legendas.PEDACO_S`, memória constante; 20 min ≈ 90 s.
-  Muitos clipes: transcrever um por um com cache, ex. D:/kanivete_testes/scripts/edgar_transcrever.py.) 7 min = 94 s.
+  Muitos clipes: transcrever um por um com cache, ex. D:/Kanivete/Testes/scripts/edgar_transcrever.py.) 7 min = 94 s.
 - escolher 2–4 assuntos com começo/meio/fim (dica prática, número, frase de efeito); pode juntar trechos distantes
   quando fecham a ideia (ex.: abertura 1:58 + fecho 7:17). Plano: `tools/agente/cortes_entrevista_plano.py`
   (bordas pela energia da voz, legendas com dicionário de erros: auxília→oficina, temparo/tem paro→Tempário,
@@ -137,9 +143,9 @@ Regras embutidas: zoom em camada de ajuste, cor em outra sem bloom (rosto ficava
 Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 30); MOGRT só depois de testar UM renderizado; porta sem resposta não é app fechado; `kb.py js` só na aba da Kani; escrever arquivo com Write, não heredoc com barra; desfoque de movimento nos zooms multiplica o export por ~9 (padrão desligado).
 
 ## CALIBRACAO (histórico de feedback, mais novo em cima; regras atuais no método)
-- 2026-11-13 REELS CASA MORUMBI (Helo Ribeiro), campos novos do `reel_fala.py`: (1) fonte com lapela `{"video": "IMG.MOV", "lapela": "LAPELA/LAPELA 01.mp4", "atraso": s}` (atraso do `sincronizar_lapela.py`): vídeo da câmera `x:"v"` + lapela `x:"a"` vinculados por `lk`, como o "Sincronizar com lapela" do editor, sem copiar vídeo; transcrição em cache `tx/<IMG>_lapela.json` (pode ser fatiada da lapela já transcrita). (2) Narração: fonte só com `lapela` (sem vídeo) + `"cobrir": [[fonte, frase, fonte_imagem, segundo], ...]` na versão; cada imagem vai da sua frase até a próxima. (3) `"identidade"` do cliente (logo girando, pincel, GC com `gc_em` por versão, assinatura animada) no lugar do logo/CTA/finalização padrão; `"sons": false`, `"transicoes_blocos": false`, `"apoio_transicoes": ["push","chicote","pop"]` (1 em 3). (4) `"juntas"` do roteiro (São Paulo, R$ 1.830.000, 168). (5) 4º item do trecho `{"fim": s}` (tempo da fonte) quando a escuta mostra palavra a mais na ponta. Fontes com extensão (`.MOV`) e caminho em subpasta valem. Apoios não se sobrepõem mais. `conferir_edicao`: voz repetida conta só sobreposição real de fonte (lapela única em outra ordem não reprova) e "R$ 1.830.000" não é maiúscula. iPhone com taxa variável perto de 59,94 virou timeline 59,94: escolher `video_base` com média longe da NTSC (fica 60). Exemplo: `D:/kanivete_testes/casamorumbi/roteiro.json`.
+- 2026-11-13 REELS CASA MORUMBI (Helo Ribeiro), campos novos do `reel_fala.py`: (1) fonte com lapela `{"video": "IMG.MOV", "lapela": "LAPELA/LAPELA 01.mp4", "atraso": s}` (atraso do `sincronizar_lapela.py`): vídeo da câmera `x:"v"` + lapela `x:"a"` vinculados por `lk`, como o "Sincronizar com lapela" do editor, sem copiar vídeo; transcrição em cache `tx/<IMG>_lapela.json` (pode ser fatiada da lapela já transcrita). (2) Narração: fonte só com `lapela` (sem vídeo) + `"cobrir": [[fonte, frase, fonte_imagem, segundo], ...]` na versão; cada imagem vai da sua frase até a próxima. (3) `"identidade"` do cliente (logo girando, pincel, GC com `gc_em` por versão, assinatura animada) no lugar do logo/CTA/finalização padrão; `"sons": false`, `"transicoes_blocos": false`, `"apoio_transicoes": ["push","chicote","pop"]` (1 em 3). (4) `"juntas"` do roteiro (São Paulo, R$ 1.830.000, 168). (5) 4º item do trecho `{"fim": s}` (tempo da fonte) quando a escuta mostra palavra a mais na ponta. Fontes com extensão (`.MOV`) e caminho em subpasta valem. Apoios não se sobrepõem mais. `conferir_edicao`: voz repetida conta só sobreposição real de fonte (lapela única em outra ordem não reprova) e "R$ 1.830.000" não é maiúscula. iPhone com taxa variável perto de 59,94 virou timeline 59,94: escolher `video_base` com média longe da NTSC (fica 60). Exemplo: `D:/Kanivete/Testes/casamorumbi/roteiro.json`.
 - 2026-11-12 REELS DEPOIMENTOS NOV (Carlinhos), nota do Pailer na v2: (1) sombra azul do destaque estava na trilha do logo = gambiarra; agora trilhas fixas 5 logo, 6 sombra, 7 texto (`TR_*` no reel_fala) e o conferir reprova "trilha dividida"; (2) destaque é texto GRANDE na metade de baixo sobre azul `#3258c6` vindo da borda (não centralizado); `destaque_tam`, `tarja_y`, `cor_pincel`; (3) fim cortado em "vem pra Carlinhos, vem pra": `fim_voz` agora não passa da próxima palavra e `pausa_na_palavra` corta na pausa real dentro da palavra esticada pela transcrição; (4) voz das alunas baixa: `nivelar_voz` (ganho por corte até +9 dB, `voz_ganho_max`, Hard Limiter) e o conferir reprova diferença > 6 dB; (5) "Just for Fun" soou infantil: trilha de depoimento do Carlinhos = TROPHIES (Cushy). Cache de batidas agora é por música.
-- 2026-11-12 REELS CARLINHOS REVITALIZAÇÃO: no editor escala 100 = pixel nativo; vídeo 4K de celular (rotação -90) ficava 2x ampliado e cortava as cabeças. `reel_fala.py` agora calcula a escala que cobre o quadro (ffprobe + rotação); `escala_base` só se precisar. Campos novos do roteiro: `legenda` (ex. dCor da marca), `tarja_tam`, `logo_fim`/`logo_fim_sc`/`logo_fim_y`, `cta`/`cta_tam`/`cta_y`, `aberracao` (efeito ca nas bordas, na camada de cor). Tarjas seguidas encurtam para não sobrepor. Exemplo: `D:/kanivete_testes/carlinhos_revit/roteiro.json`.
+- 2026-11-12 REELS CARLINHOS REVITALIZAÇÃO: no editor escala 100 = pixel nativo; vídeo 4K de celular (rotação -90) ficava 2x ampliado e cortava as cabeças. `reel_fala.py` agora calcula a escala que cobre o quadro (ffprobe + rotação); `escala_base` só se precisar. Campos novos do roteiro: `legenda` (ex. dCor da marca), `tarja_tam`, `logo_fim`/`logo_fim_sc`/`logo_fim_y`, `cta`/`cta_tam`/`cta_y`, `aberracao` (efeito ca nas bordas, na camada de cor). Tarjas seguidas encurtam para não sobrepor. Exemplo: `D:/Kanivete/Testes/carlinhos_revit/roteiro.json`.
 - 2026-11-06 REELS GORDINHOS AR CONDICIONADO, nota do Pailer: (1) ESPAÇO VAZIO no fim da frase (0,74 s no seg. 8) = desconforto; cortar sempre: `reel_fala.py` agora apara as pontas pela energia da voz no nível do limite (o ruído da oficina passa de 0,6 do limite) e corta pausa interna medida na energia. (2) ZOOM "bruto e aleatório" (108→128→118 por corte, entrada 0): agora só zoom de ênfase marcado no roteiro, entrada com curva, volta suave. (3) Trilha: rock suave com guitarra. (4) Epidemic: o download passou a exigir `uiOrigin=tracklist_button` e `downloadId`; corrigido no epidemic.py, que agora devolve a aba da Kani (é a do WhatsApp da gerente) ao endereço anterior.
 - 2026-11-01 REELS GORDINHOS, ajuste do Pailer: tirou o bloom e mexeu na cor (rosto muito vermelho): ct 22, hi 10, sh -4, wh 7, vib 17. NÃO COMER PALAVRA: cortei o fim de "saturado" porque limitei o corte ao início estimado da próxima palavra; o limite agora é o vale de energia e `checar_cortes.py` ouve os fins. "Sofreu para um reel simples": seguir o método curto acima.
 - 2026-11-01 REELS GORDINHOS UPGRADE: ZOOM DINÂMICO SÓ EM CAMADA DE AJUSTE, nunca escala animada no clipe (técnica do Transform em Adjustment Layer do Premiere; aqui, efeito `zoom`); cor, contraste, bloom e clareza em OUTRA camada de ajuste. Efeito `zoom` faz escala, curva, centro e desfoque; não tem posição nem rotação.
@@ -149,7 +155,7 @@ Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 
   Ao terminar o apoio, corte seco para o trecho com o enquadramento normal. NÃO animar a subida/descida com keyframes:
   o deslocamento antes da entrada da foto deixava um preto rápido embaixo. Conferir os quadros das duas bordas para
   não haver intervalo vazio. Pedido desta rodada = registrar a técnica; manter o vídeo e o restante da edição como estão.
-- 2026-10-24 TEASER NAUTIC BAY V1 ("quase perfeito"; `D:/kanivete_testes/nautic/scripts/montar.py`): (1) DRONE: cortar a
+- 2026-10-24 TEASER NAUTIC BAY V1 ("quase perfeito"; `D:/Kanivete/Testes/nautic/scripts/montar.py`): (1) DRONE: cortar a
   correção de ângulo (o drone mexe rápido antes de estabilizar) e começar no trecho estável. Medir com `movimento.py`
   (correlação de fase a 10 q/s → velocidade e solavanco); `estavel()` pula sozinho até o 1º trecho sem solavanco > 0,08
   nem variação de velocidade > 0,5. (2) LETTERING: uma frase por cena (cada facilidade sobre a cena dela). (3) PELÍCULA
@@ -164,18 +170,18 @@ Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 
   estável (média ≤ 1,5 e pico ≤ 5 px/quadro) e bem composto. (7) NOME: nunca deduzir o nome de alguém pela fala de outra
   pessoa — se a pessoa não diz o nome, letreiro pela função ("CHEF DO CURSO").
 - 2026-10-22 CULTSP PRO 02 Produção Musical Eletrônica (V1 3:51, sem nota ainda): mesmo método do Mega Artesanal V2
-  aprovado (script `D:/kanivete_testes/cultsp2/scripts/montar.py` gera o .vknv; letreiros pelo MOGRT no app). Novidades:
+  aprovado (script `D:/Kanivete/Testes/cultsp2/scripts/montar.py` gera o .vknv; letreiros pelo MOGRT no app). Novidades:
   trilha eletrônica do Epidemic achada pela busca JSON (`fetch('/json/search/tracks/?term=...')` via `kb.py js`, filtro
   hasVocals=false, BPM/gênero/mood) e baixada com o botão Download; MÚSICA TOCANDO NA AULA (detectada por periodicidade
   de onset no som sem fala) entra como momento de som original com a trilha fora; voz da aula ruidosa: Anti Noise 30
   baixa ~4 dB → ganho por trecho (mediana dos quadros com voz) com +3,5 dB no professor. Armadilha: o lower do CULTSP não
   cresce com o texto (sem sourceRectAtTime): título até ~20 caracteres ("PRODUÇÃO MUSICAL ELETRÔNICA" invadiu o logo).
-- 2026-10-22 CULTSP PRO 03 Bananal Cultura e Gastronomia (V1 3:55, sem nota ainda; `D:/kanivete_testes/cultsp3/scripts`):
+- 2026-10-22 CULTSP PRO 03 Bananal Cultura e Gastronomia (V1 3:55, sem nota ainda; `D:/Kanivete/Testes/cultsp3/scripts`):
   blocos novos no montar.py — "nat" (som direto curto da oficina, sem letreiro: "acarajé quente ou frio?", "vou
   experimentar… eu gosto") e "montagem" (B-roll do preparo na batida com a música em cima). Trilha acústica (Gil Felix,
   afoxê) soa ~7 dB abaixo da eletrônica nos mesmos −9/−21 dB → g +6 nos clipes de trilha; medir o render por trecho.
   Fecho que retoma a abertura (fachada à noite) funciona como moldura.
-- 2026-10-23 CULTSP PRO 04 Roadie/Direção de Palco (V1→V2, `D:/kanivete_testes/cultsp4/scripts`). NOTA DO PAILER: "mania de
+- 2026-10-23 CULTSP PRO 04 Roadie/Direção de Palco (V1→V2, `D:/Kanivete/Testes/cultsp4/scripts`). NOTA DO PAILER: "mania de
   pôr muito B-roll em cima da primeira apresentação; demora muito pra mostrar quem está falando". Regra: a 1ª aparição de
   cada pessoa é ROSTO (sem ponte de B-roll, ~11 s antes do 1º plano), inclusive a fala de abertura (nada de B-roll
   cobrindo a apresentação inteira); depois um plano de B-roll por vez entre ~6 s de rosto. Trilha CULTSP desse tema:
@@ -205,7 +211,7 @@ Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 
   3 em sequência → música emotiva na última pergunta. Notas: legenda sobre imagem clara precisa de APOIO = degradê azul
   esfumaçado embaixo (PNG gerado em PIL com alfa suave + ruído; pincel com desfoque ficou faixa dura) só onde há
   legenda sem cartela; erros de gravação com cara de câmera velha (Luz e Cor sat 38/desbotado/vinheta, Aberração,
-  Granulação, PNG de linhas de TV 45%, ● REC piscando por k.op). Script: D:/kanivete_testes/quiz_instrutor/
+  Granulação, PNG de linhas de TV 45%, ● REC piscando por k.op). Script: D:/Kanivete/Testes/quiz_instrutor/
   (montar.py gera o .vknv direto; ajustes.js/degrade.js no app). Armadilhas: veGrMidia devolve o OBJETO da mídia — usar .id;
   trecho de fonte SEMPRE dentro da duração (e ≤ dur − 0,05: passou do fim = tela preta na prévia e no export); arredondar
   st/e de clipes vizinhos pelo MESMO valor (sobra de milésimos fazia o aparar engolir o vizinho).
@@ -213,7 +219,7 @@ Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 
   Instructions/agente/plano-motion.md § "Receita validada". Notas do Pailer: OmniVoice lê palavra com cara de inglês
   em inglês ("finalize" → "finalaize": usar palavra 100% PT, ex. "finaliza"); faltou trilha energética (ele manda a
   dele); quer glow + aberração leve de acabamento e a vinheta do app (frontend/audio/splash.wav) no fim, depois da voz.
-- 2026-10-09 DOCUMENTÁRIO (Linha 4/SIIM, v4→v6; roteiro D:\kanivete_testes\edgar\ROTEIRO_v4_reuniao_gil.md). regras:
+- 2026-10-09 DOCUMENTÁRIO (Linha 4/SIIM, v4→v6; roteiro D:\Kanivete\Testes\edgar\ROTEIRO_v4_reuniao_gil.md). regras:
   · revelação em camadas: o personagem não aparece antes da hora (massa sonora = rua/metrô SEM ele); revela por
     detalhe → rosto de frente (GC) → mais perto; a pergunta (cartela) vem ANTES do 1º plano dele; a resposta começa
     em off sobre apoio e corta para ele em sincronia.

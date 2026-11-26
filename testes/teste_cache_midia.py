@@ -19,7 +19,7 @@ import time
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
-BASE = r"D:\kanivete_testes\cache_midia_teste"
+BASE = r"D:\Kanivete\Testes\cache_midia_teste"
 
 
 def main():

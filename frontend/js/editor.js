@@ -1500,14 +1500,22 @@ function veLegAcompanharCortes() {
     const assin = veLegAssinClipes()
         + '#' + L.map(l => `${l.st}|${l.texto}`).join('¦');
     if (assin === _veLegAssin) return;
-    let mudou = false;
+    // 26/11/2026: legendas sumiam ao abrir/trocar aba de projeto: a fala ainda sem info de áudio (ou com id de mídia
+    // trocado) não era achada e cada legenda saía como "palavra cortada". Projeto carregando: não mexe e tenta depois.
+    if (VE._pendingProject || VE._trocaAba || (typeof VEAP !== 'undefined' && (VEAP.trocando || VEAP.abrindo))) return;
+    const pronta = id => { const md = VE.media[id]; return !!(md && md.info && !md.removido); };
+    let mudou = false, perdidas = 0, ancoradas = 0;
     const novo = [];
     L.forEach(l => {
         let x = l;
+        if (x.corteManual) { novo.push(x); return; }
+        if (x.ancora && (x.ancora.src || []).some(s => s && !pronta(s[0]))) { novo.push(l); return; }   // mídia da fala não carregou: fica como está
         if (!x.ancora || Math.abs(x.ancora.st - x.st) > 0.0005 || x.ancora.tx !== x.texto) { x = veLegAncorar(x); mudou = mudou || x.ancora !== l.ancora; }
-        if (x.ancora) { const y = veLegDaAncora(x); if (!y) { mudou = true; return; } if (y.st !== l.st || y.en !== l.en || y.texto !== l.texto) mudou = true; x = y; }
+        if (x.ancora) { ancoradas++; const y = veLegDaAncora(x); if (!y) { perdidas++; mudou = true; return; } if (y.st !== l.st || y.en !== l.en || y.texto !== l.texto) mudou = true; x = y; }
         novo.push(x);
     });
+    // corte de verdade tira poucas; sumir mais da metade de uma vez = âncoras inválidas (projeto recarregado): não apaga
+    if (perdidas && perdidas >= 3 && perdidas > ancoradas * 0.5) { console.warn('legendas: âncoras não acharam a fala; mantidas', perdidas, ancoradas); return; }
     // nunca encavala: cada uma termina antes da próxima começar
     novo.sort((a, b) => a.st - b.st);
     novo.forEach((l, i) => { const p = novo[i + 1]; if (p && l.en > p.st) { novo[i] = { ...l, en: Math.max(l.st + 0.05, p.st) }; mudou = true; } });
@@ -1590,8 +1598,8 @@ function veLegSplitAt(t, selecionada, quiet) {
         return false;
     }
     vePushHistory();
-    const L = VE.legendas, esq = L[i], dir = { ...veLegClone(esq), st: t };
-    L[i] = { ...esq, en: t };
+    const L = VE.legendas, esq = L[i], dir = { ...veLegClone(esq), st: t, ancora: null, corteManual: true };
+    L[i] = { ...esq, en: t, ancora: null, corteManual: true };
     L.splice(i + 1, 0, dir);
     veLegSelecionar(i + 1);
     veRefresh();
@@ -1631,7 +1639,11 @@ function veRippleRemove(a, b, label) {
         if (c.st >= b - VE_EPS) { out.push({ ...c, st: c.st - d }); return; }
         const esq = c.st < a && a - c.st > tiny;
         if (esq) out.push(veSemTout({ ...c, e: veSrcAt(c, a) }));
-        if (en > b && en - b > tiny) out.push((esq ? lk : x => x)(veSemTin({ ...c, st: a, s: veSrcAt(c, b) })));
+        if (en > b && en - b > tiny) {
+            const dir = (esq ? lk : x => x)(veSemTin({ ...c, st: a, s: veSrcAt(c, b) }));
+            if (esq) delete dir._mcpId; // ao dividir, o pedaço novo precisa de identidade própria
+            out.push(dir);
+        }
     });
     vePushHistory();
     VE.clips = out;
@@ -1745,8 +1757,9 @@ function veLkMapa() {
 // Clipe solto por cima de outro (sobrescrever): o que sobra à direita é um pedaço novo. Antes ele ficava com o mesmo
 // vínculo do pedaço da esquerda — clicar num pegava o outro junto e arrastar desalinhava as camadas. O vínculo novo
 // sai do antigo + o ponto do corte, então a imagem e o som cortados no mesmo ponto continuam um par
-function veLkSobra(c, t) {
+function veLkSobra(c, t, dividido) {
     if (c.lk) c.lk = String(c.lk).split('@')[0] + '@' + Math.round(t * 1000).toString(36);
+    if (dividido) delete c._mcpId;
     return c;
 }
 
@@ -1778,15 +1791,18 @@ function veSyncVinculo() { const b = $ve('ve-vinculo'); if (b) b.classList.toggl
 // E: corta na agulha só os clipes selecionados (' corta todas as trilhas)
 function veCortarSelecionados() {
     const lista = veSelLista();
-    if (!lista.length) {
-        if (VETX.legSel >= 0 && VE.legendas[VETX.legSel]) {
-            if (veLegSplitAt(VE.playhead, true)) veToast('Legenda cortada em ' + veShort(VE.playhead));
-            return;
-        }
+    const legSel = VETX.legSel >= 0 && !!VE.legendas[VETX.legSel];
+    if (!lista.length && !legSel) {
         veToast("Selecione um clipe ou legenda (E corta só os selecionados; ' corta todas as trilhas)");
         return;
     }
-    if (veSplitAt(VE.playhead, false, lista)) veToast('Selecionados cortados em ' + veShort(VE.playhead));
+    const sel0 = VE.sel, selx0 = VE.selx;
+    // legenda selecionada é cortada junto com os clipes selecionados (antes E só cortava a legenda sem clipe selecionado)
+    const clipOk = lista.length ? veSplitAt(VE.playhead, legSel, lista) : false;
+    const legOk = legSel ? veLegSplitAt(VE.playhead, true, true) : false;
+    if (clipOk && legOk) { VE.sel = sel0; VE.selx = selx0; veRefresh(); }
+    if (clipOk || legOk) veToast((legOk && !clipOk ? 'Legenda cortada em ' : 'Selecionados cortados em ') + veShort(VE.playhead));
+    else veToast(legSel && !lista.length ? 'A legenda selecionada não passa pela agulha' : 'Nenhum selecionado passa pela agulha');
 }
 
 // Apaga vários clipes. ripple: fecha os espaços que ficarem vazios em todas as trilhas
@@ -1873,7 +1889,7 @@ function veMoverGrupo(lista, dt, dtr, alt, legs) {
             const en = veEnd(o);
             if (o.tr !== nv.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, nv)) { out.push(o); return; }
             if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-            if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
+            if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b, o.st < a && a - o.st > tiny));
         });
         base = out;
     });
@@ -1926,7 +1942,7 @@ async function veSincronizarClipes() {
             const en = veEnd(o);
             if (o.tr !== nv.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, nv)) { out.push(o); return; }
             if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-            if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
+            if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b, o.st < a && a - o.st > tiny));
         });
         base = out;
     });
@@ -2036,7 +2052,7 @@ function vePlaceClip(novo, exceto = -1) {
         const en = veEnd(o);
         if (o.tr !== novo.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, novo)) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
+        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b, o.st < a && a - o.st > tiny));
     });
     out.push(novo);
     VE.clips = out;
@@ -2306,7 +2322,7 @@ function veMoveClip(i, tr, st) {
         const en = veEnd(o);
         if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, c)) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
+        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b, o.st < a && a - o.st > tiny));
     });
     out.push(moved);
     VE.clips = out;
@@ -3475,7 +3491,7 @@ function veCarve(clips, tr, a, b, exceto, novo) {
         const en = veEnd(o);
         if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS || (novo && !veConflita(o, novo))) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
+        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b, o.st < a && a - o.st > tiny));
     });
     return out;
 }
@@ -4243,16 +4259,28 @@ function veBmMudar(v) {
     veToast(`${veT('Modo de mesclagem')}: ${veT(VE_BM_MAPA[v] ? VE_BM_MAPA[v][1] : 'Normal')}` + (lista.length > 1 ? ` · ${lista.length} ${veT('clipes')}` : ''));
 }
 
+// Os campos de transformação aplicam o mesmo valor à seleção inteira.
+function vePropsAplicarSelecao(c, vals) {
+    const lista = veFxAlvos(c).filter(x => !veLocked(x) && !veIsAudio(x) &&
+        (!veIsAdj(x) || Object.keys(vals).every(k => k === 'op')));
+    if (!lista.length) { veAvisoBloqueio(); return false; }
+    if (lista.some(x => Object.keys(vals).some(k => veKfOn(x, k)) && !veInClip(x))) {
+        veToast('Leve a agulha para dentro dos clipes animados selecionados para criar os quadros-chave');
+        return false;
+    }
+    lista.forEach(x => veApplyProps(x, vals));
+    return true;
+}
+
 function veSetProp(k, val) {
     const c = VE.clips[VE.sel];
     if (!c || !isFinite(val)) return;
     if (k === 'sc') val = Math.max(0.5, Math.min(2000, val));
     if (k === 'op') val = Math.max(0, Math.min(100, val));
-    if (veKfOn(c, k) && !veInClip(c)) { veToast('Leve a agulha para dentro do clipe para criar o quadro-chave'); return; }
-    veApplyProps(c, { [k]: val });
+    if (!vePropsAplicarSelecao(c, { [k]: val })) return;
     veRenderProps();
     veDrawMonitorSoon();
-    if (veKfOn(c, k)) veDraw();
+    if (veFxAlvos(c).some(x => veKfOn(x, k))) veDraw();
 }
 
 function vePropsReset() {
@@ -4800,6 +4828,7 @@ function veMoveSnap(t, excluir) {
 // e os caminhos das mídias (nada é copiado). Duplo clique num .vknv abre o app direto aqui.
 
 function veUpdateTitle() {
+    if (typeof veApAtualizar === 'function') veApAtualizar();   // abas de projeto (editor-abas-projeto.js)
     const el = $ve('ve-proj');
     if (!el) return;
     const nome = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop().replace(/\.(vknv|vcnvt)$/i, '') : '';
@@ -4818,14 +4847,55 @@ function veSeqName(seqId) {
 function veSeqTabsRender() {
     const box = $ve('ve-seq-tabs');
     if (!box) return;
+    if (box._arrasto) return;
     if (!VE.ready || !(VE.sequences || []).length) { box.innerHTML = ''; return; }
     VE.openSequences = (VE.openSequences || []).filter(id => (VE.sequences || []).some(s => s.id === id));
     if (!VE.openSequences.includes(VE.activeSequence)) VE.openSequences.push(VE.activeSequence);
-    box.innerHTML = VE.openSequences.map(id => `<div class="ve-seq-tab${id === VE.activeSequence ? ' active' : ''}" data-seq="${veEsc(id)}" title="${veEsc(veSeqName(id))}">
+    const html = VE.openSequences.map(id => `<div class="ve-seq-tab${id === VE.activeSequence ? ' active' : ''}" data-seq="${veEsc(id)}" title="${veEsc(veSeqName(id))}">
         <span>${veEsc(veSeqName(id))}</span><button data-fechar="${veEsc(id)}" title="Fechar aba">×</button></div>`).join('');
+    if (box._html !== html) { box._html = html; box.innerHTML = html; }
+}
+
+function veSeqTabsArrastar(e) {
+    if (e.button !== 0 || e.target.closest('[data-fechar]')) return;
+    const box = e.currentTarget, tab = e.target.closest('[data-seq]');
+    if (!tab) return;
+    const x0 = e.clientX; let ativo = false, alvo = null, depois = false;
+    const limpa = () => box.querySelectorAll('.alvo-ant,.alvo-dep').forEach(t => t.classList.remove('alvo-ant', 'alvo-dep'));
+    const mov = ev => {
+        if (!ativo && Math.abs(ev.clientX - x0) < 5) return;
+        if (!ativo) { ativo = true; box._arrasto = true; tab.classList.add('arrastando'); }
+        limpa(); alvo = null;
+        const t = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.ve-seq-tab');
+        if (t && t !== tab && box.contains(t)) {
+            const r = t.getBoundingClientRect();
+            depois = ev.clientX > r.left + r.width / 2; alvo = t;
+            t.classList.add(depois ? 'alvo-dep' : 'alvo-ant');
+        }
+    };
+    const fim = () => {
+        document.removeEventListener('pointermove', mov);
+        document.removeEventListener('pointerup', fim);
+        document.removeEventListener('pointercancel', fim);
+        if (!ativo) return;
+        limpa(); tab.classList.remove('arrastando');
+        box._ultimoArrasto = Date.now();
+        if (alvo) {
+            const ids = VE.openSequences.filter(id => id !== tab.dataset.seq);
+            let i = ids.indexOf(alvo.dataset.seq); if (depois) i++;
+            ids.splice(i, 0, tab.dataset.seq);
+            VE.openSequences = ids;
+            if (typeof veMarkDirty === 'function') veMarkDirty();
+        }
+        setTimeout(() => { box._arrasto = false; veSeqTabsRender(); }, 0);
+    };
+    document.addEventListener('pointermove', mov);
+    document.addEventListener('pointerup', fim);
+    document.addEventListener('pointercancel', fim);
 }
 
 function veSeqTabClick(e) {
+    if (Date.now() - ($ve('ve-seq-tabs')._ultimoArrasto || 0) < 250) return;
     const fechar = e.target.closest('[data-fechar]');
     if (fechar) {
         e.stopPropagation();
@@ -4857,6 +4927,7 @@ function veCloseTimelineTab(seqId) {
 // Alterações não salvas: a primeira tentativa avisa; repetir em até 5 s confirma e descarta
 function veConfirmDiscard() {
     if (!VE.ready || !VE.dirty || VE.quickEdit) return true;
+    if (typeof VEAP !== 'undefined' && VEAP.poupar) return true;   // o projeto atual fica guardado numa aba
     if (VE._discardAt && Date.now() - VE._discardAt < 5000) { VE._discardAt = 0; return true; }
     VE._discardAt = Date.now();
     veToast('Há alterações não salvas. Salve com Ctrl+S ou repita para descartar.');
@@ -5008,13 +5079,13 @@ function veOnboardingRender() {
     });
 }
 
-function veProjectData() {
+function veProjectData(opts = {}) {
     veSeqSalvarAtiva();
     return {
         app: 'KANIVETE',
         video: VE.path,
-        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel', 'nulo'].includes(m.kind)
-                && (m.ovDe == null || veMidiaNaTimeline(m.id)))   // variação de Comp que nenhuma faixa usa não vai
+        media: VE.media.filter(m => m.id && (opts.abas || !m.removido) && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel', 'nulo'].includes(m.kind)
+                && (opts.abas || m.ovDe == null || veMidiaNaTimeline(m.id)))   // variação de Comp que nenhuma faixa usa não vai
             .map(m => {
                 const o = { id: m.id, kind: m.kind, name: m.name, pasta: m.pasta || null, cor: m.cor, nome: m.nome };
                 if (m.kind === 'audio') Object.assign(o, { path: m.path, dur: m.dur });
@@ -5043,7 +5114,7 @@ function veProjectData() {
         m0: VE.media[0] ? { pasta: VE.media[0].pasta || null, cor: VE.media[0].cor, nome: VE.media[0].nome,
                             ...(VE.media[0].mel ? { mel: VE.media[0].mel, melOff: !!VE.media[0].melOff } : {}) } : null,
         // Comp apagada do Projeto não vai junto (a timeline dela ficava só para o desfazer)
-        sequences: vePlain((VE.sequences || []).filter(s => !s.comp || s.id === VE.activeSequence || veSeqMedia(s.id)), []),
+        sequences: vePlain((VE.sequences || []).filter(s => opts.abas || !s.comp || s.id === VE.activeSequence || veSeqMedia(s.id)), []),
         activeSequence: VE.activeSequence,
         clips: VE.clips,
         trilhas: VE_TRK,
@@ -5062,7 +5133,9 @@ function veProjectData() {
 function veSaveProject(comoNovo, formato) {
     if (!VE.ready) { veToast('Abra um vídeo antes de salvar'); return Promise.resolve(false); }
     const chaveAntiga = typeof vePrChave === 'function' ? vePrChave() : null;
-    return window.pywebview.api.ve_project_save(VE.projectPath, JSON.stringify(veProjectData()), !!comoNovo, formato || null).then(r => {
+    const dados = JSON.stringify(veProjectData());
+    VE._salvandoProjeto = (VE._salvandoProjeto || 0) + 1;
+    return window.pywebview.api.ve_project_save(VE.projectPath, dados, !!comoNovo, formato || null).then(r => {
         if (!r || !r.success) { if (r && r.error) veToast('Não foi possível salvar: ' + r.error); return false; }
         // XML do Premiere: só uma cópia para lá; o projeto aberto continua sendo o .vknv (e "não salvo", se era)
         if (r.xml) { vePremiereXmlRelatorio(r.name, r.relatorio || {}); return true; }
@@ -5076,7 +5149,7 @@ function veSaveProject(comoNovo, formato) {
         veUpdateTitle();
         veToast('Projeto salvo: ' + r.name);
         return true;
-    });
+    }).finally(() => { VE._salvandoProjeto--; });
 }
 
 // Arquivo › Enviar ao Premiere aberto: o plugin "Kanivete Ponte" (Functions/ponte_premiere.py) importa o XML no projeto
@@ -5153,13 +5226,26 @@ function veResetEditorVazio(opts = {}) {
 
 // Fecha o projeto (aba do editor fechada): volta à tela "arraste um vídeo"
 function veCloseProject() {
+    if (typeof veApLimpar === 'function') veApLimpar();
     veResetEditorVazio({ mostrarInicio: true });
 }
 
-function veOpenProject(path) {
-    if (VE.exportRunning || !veConfirmDiscard()) return;
-    window.pywebview.api.ve_project_open(path || null).then(r => {
-        if (!r || !r.success) { if (r && r.error) veToast(r.error); return; }
+async function veOpenProject(path) {
+    if (VE.exportRunning || (typeof veApBloqueado === 'function' && veApBloqueado())) return false;
+    if (typeof VEAP !== 'undefined' && path) {
+        const aberta = VEAP.abas.find(a => a.path && a.path.replace(/\\/g, '/').toLowerCase() === path.replace(/\\/g, '/').toLowerCase());
+        if (aberta) return veApAtivar(aberta.id);
+    }
+    if (typeof VEAP !== 'undefined') VEAP.abrindo = true;
+    try {
+        const r = await window.pywebview.api.ve_project_open(path || null);
+        if (!r || !r.success) { if (r && r.error) veToast(r.error); return false; }
+        if (typeof VEAP !== 'undefined') {
+            const aberta = VEAP.abas.find(a => a.path && a.path.replace(/\\/g, '/').toLowerCase() === r.path.replace(/\\/g, '/').toLowerCase());
+            if (aberta) { VEAP.abrindo = false; return veApAtivar(aberta.id); }
+        }
+        if (!(typeof veApPoupar === 'function' && veApPoupar()) && !veConfirmDiscard()) return false;
+        if (typeof veApSuspender === 'function') await veApSuspender();
         VE.quickEdit = false;
         VE.quickEditPending = false;
         VE.startScreenDismissed = true;
@@ -5169,7 +5255,12 @@ function veOpenProject(path) {
         const faltaBase = !d.video || (r.missing || []).includes(d.video);
         if (faltaBase) veOpenLostProject();
         else veOpenPath(d.video);
-    });
+        return true;
+    } catch (e) {
+        if (typeof veApCancelar === 'function') veApCancelar();
+        veToast(veT('Não foi possível abrir') + ': ' + String(e));
+        return false;
+    } finally { if (typeof VEAP !== 'undefined') VEAP.abrindo = false; }
 }
 
 function veOpenLostProject() {
@@ -5227,6 +5318,7 @@ function veOpenProjectExternal(path) {
 // Depois que o vídeo do projeto carregou: recoloca imagens, clipes, marcas e visão
 function veApplyProject() {
     const { data: d, path, name, missing, premiere } = VE._pendingProject;
+    const trocouAba = !!VE._trocaAba;
     VE._pendingProject = null;
     VE.projectPath = path;
     if (typeof vePjVerCopiasAntigas === 'function') setTimeout(vePjVerCopiasAntigas, 4000);   // cópias Full HD antigas (editor-projeto.js)
@@ -5315,7 +5407,8 @@ function veApplyProject() {
             }
             // falhou ao abrir (a trilha nova do CULTSP 04 ficou muda, sem forma de onda, 2026-10-23): tenta de novo
             // 2 vezes e, se não der, avisa e marca a mídia — antes desistia em silêncio
-            const carregar = tent => window.pywebview.api.video_cutter_add_audio(m.path).then(r => {
+            const carregar = tent => VE.media[nm.id] !== nm ? null : window.pywebview.api.video_cutter_add_audio(m.path).then(r => {
+                if (VE.media[nm.id] !== nm) return;
                 if (!r || !r.success) {
                     if (tent < 2) return setTimeout(() => carregar(tent + 1), 1500 * (tent + 1));
                     nm.erro = (r && r.error) || 'Não foi possível ler o áudio';
@@ -5431,6 +5524,7 @@ function veApplyProject() {
     veSeqAplicar(VE.sequences.find(s => s.id === VE.activeSequence), { silent: true });
     if (d.fps > 0) VE.fps = +d.fps;   // projeto antigo: a taxa da timeline ficou só no topo do arquivo
     VE.dirty = false;
+    if (typeof veApAplicado === 'function') veApAplicado(ids);   // troca de aba de projeto: devolve o "não salvo" dela
     veUpdateTitle();
     veRegistrarProjetoRecente(path, d);
     if (typeof veCompVerificar === 'function') setTimeout(veCompVerificar, 0);
@@ -5440,7 +5534,7 @@ function veApplyProject() {
     // offline só no painel Projeto (sem uso na timeline) não atrapalha: o aviso diz onde está (relato 2026-10-16: "1 mídia
     // offline" com a timeline inteira presente parecia erro)
     const naTl = faltam ? veOfflineNaTimeline().length : 0;
-    veToast(!faltam ? 'Projeto aberto: ' + name.replace(/\.(vknv|vcnvt|prproj)$/i, '')
+    if (!(trocouAba && !faltam)) veToast(!faltam ? 'Projeto aberto: ' + name.replace(/\.(vknv|vcnvt|prproj)$/i, '')
         : naTl ? `${veT('Projeto aberto')} — ${naTl} ${veT('mídia(s) offline na timeline')}${faltam > naTl ? ` (+${faltam - naTl} ${veT('só no painel Projeto')})` : ''}`
         : `${veT('Projeto aberto')} — ${faltam} ${veT('mídia(s) offline só no painel Projeto (fora da timeline)')}`);
     // importado do Premiere: ainda não é um projeto nosso (Ctrl+S grava um .vknv) e mostra o que não veio
@@ -6625,20 +6719,44 @@ function veEscolherArquivoEditor(quickEdit) {
 }
 
 function veOpenFile() { veEscolherArquivoEditor(false); }
-function veNovoProjeto() { if (VE.exportRunning || !veConfirmDiscard()) return; veCriarProjetoVazio({ quieto: false }); }
+async function veNovoProjeto() {
+    if (VE.exportRunning || (typeof veApBloqueado === 'function' && veApBloqueado())) return false;
+    const guardou = typeof veApPoupar === 'function' && veApPoupar();
+    if (!guardou && !veConfirmDiscard()) return false;
+    if (typeof VEAP !== 'undefined') VEAP.abrindo = true;
+    try {
+        if (typeof veApSuspender === 'function') await veApSuspender();
+        return veCriarProjetoVazio({ quieto: false, forcar: true });
+    } finally { if (typeof VEAP !== 'undefined') { VEAP.abrindo = false; VEAP.poupar = false; } }
+}
 function veQuickEdit() {
     if (VE.exportRunning || !veConfirmDiscard()) return;
+    if (typeof veApConfirmarFecharTudo === 'function' && VEAP.abas.some(a => a.id !== VEAP.ativa && a.dirty)) {
+        veToast(veT('Salve ou feche os outros projetos antes da edição rápida'));
+        return;
+    }
+    if (typeof veApLimpar === 'function') veApLimpar();
     veResetEditorVazio({ quickEdit: true, mostrarInicio: false });
     veToast('Quick edit pronto: arraste uma mídia ou use Abrir vídeo para começar.');
 }
 
-function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
+async function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
     if (!path) return;
     if (/\.(vknv|vcnvt|prproj)$/i.test(path)) { veOpenProject(path); return; }
     if (typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(path)) { if (VE.ready || veConfirmDiscard()) vePsdAbrir(path, { inserir: !!inserirNaTimeline }); return; }
     if (typeof VE_EXT_MOGRT !== 'undefined' && VE_EXT_MOGRT.test(path)) { veMogrtAbrir(path, { inserir: !!inserirNaTimeline }); return; }
     if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
     if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }
+    if (!quickEdit && typeof veApPoupar === 'function') {
+        if (veApBloqueado()) return;
+        veApPoupar();
+        VEAP.abrindo = true;
+        try {
+            await veApSuspender();
+            VE.quickEdit = false; VE.quickEditPending = false; veOpenPath(path);
+        } finally { VEAP.abrindo = false; }
+        return;
+    }
     if (veConfirmDiscard()) {
         VE.quickEdit = !!quickEdit;
         VE.quickEditPending = false;
@@ -6720,7 +6838,8 @@ function veFpsTimeline(ev) {
 
 function veOnPrepare(ev) {
     if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch (e) { return; } }
-    if (ev.path && ev.path !== VE.path && ev.stage === 'info') return;
+    if (ev.geracao != null && VE._projetoGeracao != null && ev.geracao !== VE._projetoGeracao) return;
+    if (ev.path && ev.path !== VE.path) return;
     switch (ev.stage) {
         case 'info': {
             VE.info = ev;
@@ -6767,7 +6886,7 @@ function veOnPrepare(ev) {
             v.addEventListener('loadeddata', () => {
                 veLoading(null);
                 $ve('ve-export-btn').disabled = false;
-                veSeek(0);
+                veSeek(VE.playhead || 0);
                 if (VE.info && VE.info.base_imagem && !VE._pendingProject && !VE.clips.length) veIniciarComImagem();
             }, { once: true });
             break;
@@ -6791,6 +6910,7 @@ function veOnPrepare(ev) {
             $ve('ve-empty').hidden = false;
             $ve('ve-meta').textContent = ev.error || 'Erro ao abrir o vídeo';
             veToast('Não foi possível abrir: ' + (ev.error || 'erro'));
+            if (typeof veApFalhou === 'function') veApFalhou();
             veDraw();
             break;
     }
@@ -7757,6 +7877,7 @@ document.addEventListener('DOMContentLoaded', () => {
     veBuildHeads();
     veInitEvents();
     $ve('ve-seq-tabs')?.addEventListener('click', veSeqTabClick);
+    $ve('ve-seq-tabs')?.addEventListener('pointerdown', veSeqTabsArrastar);
     veSetTool('select');
     veSyncVinculo();
     veDraw();

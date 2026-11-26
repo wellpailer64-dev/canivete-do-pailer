@@ -7,7 +7,7 @@ import sys, time
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
-FOTO = "D:/kanivete_testes/cena/foto.jpg"
+FOTO = "D:/Kanivete/Testes/cena/foto.jpg"
 falhas = []
 def conferir(ok, nome, extra=""):
     print(("  ok    " if ok else "  FALHOU ") + nome + (f" ({extra})" if extra else ""))
@@ -71,7 +71,7 @@ with sync_playwright() as p:
     pg.keyboard.press("BracketRight")
     conferir(pg.evaluate("IE._dv.op.tam") > 400, "] aumenta o pincel")
     pg.evaluate("IE._dv.op.malha = true; IE._dv.desenhar()"); time.sleep(0.3)
-    pg.screenshot(path="D:/kanivete_testes/scripts/dissolver_janela.png")
+    pg.screenshot(path="D:/Kanivete/Testes/scripts/dissolver_janela.png")
     t = time.time()
     pg.keyboard.press("Enter")
     pg.wait_for_function("!IE._dv", timeout=30000)
@@ -80,7 +80,7 @@ with sync_playwright() as p:
     conferir(pg.evaluate("IE.doc.hist ? true : true"), "histórico")
     pg.keyboard.press("Control+z"); time.sleep(0.3)
     conferir(pg.evaluate(f"{assin}(ieAtiva(IE.doc).c)") == s0, "Ctrl+Z no editor volta a foto")
-    pg.screenshot(path="D:/kanivete_testes/scripts/dissolver_depois_desfazer.png")
+    pg.screenshot(path="D:/Kanivete/Testes/scripts/dissolver_depois_desfazer.png")
 
     # 3) Esc cancela sem mexer
     pg.evaluate("() => { ieCmd('f:dissolver'); }"); pg.wait_for_function("!!IE._dv"); time.sleep(0.3); pg.keyboard.press("w")

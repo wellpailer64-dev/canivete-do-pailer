@@ -7,7 +7,7 @@ Uso:
 O que faz (tudo em um passo, sem mexer em app aberto):
   1. acha em "<card>/02 - ASSETS" a BASE STORY (png/jpg) e o VIDEO NO MONITOR (mp4);
   2. acha o áudio do cliente (audio-do-cliente.*, baixado pelo panda.py) e, com --transcrever, transcreve (whisper);
-  3. copia o modelo (D:/kanivete_biblioteca/modelos/magnetus_imagem_dia_video/modelo.vknv), troca as mídias
+  3. copia o modelo (D:/Kanivete/Biblioteca/modelos/magnetus_imagem_dia_video/modelo.vknv), troca as mídias
      e encaixa: exame 0..duracao, base story, trilha com fades, assinatura "Finalização videos.mp4" logo depois;
   4. salva em "<card>/03 - PROJETO/IMAGEM DO DIA - <TEMA>.vknv" e imprime um JSON com o que usou.
 Nunca sobrescreve projeto existente (use --refazer). Não exporta nem entrega.
@@ -23,7 +23,7 @@ import subprocess
 import sys
 import time
 
-MODELO = "D:/kanivete_biblioteca/modelos/magnetus_imagem_dia_video/modelo.vknv"
+MODELO = "D:/Kanivete/Biblioteca/modelos/magnetus_imagem_dia_video/modelo.vknv"
 ASSINATURA = "Finalização videos.mp4"
 TRILHA_PADRAO = "ES_Mindscape - Lennon Hutton.mp3"
 
@@ -89,7 +89,7 @@ def _audio_cliente(card):
 
 def _transcrever(audio):
     import whisper
-    r = whisper.load_model("medium", download_root=r"D:/kanivete_testes/whisper").transcribe(audio, language="pt")
+    r = whisper.load_model("medium", download_root=r"D:/Kanivete/Testes/whisper").transcribe(audio, language="pt")
     return " ".join(s["text"].strip() for s in r["segments"])
 
 

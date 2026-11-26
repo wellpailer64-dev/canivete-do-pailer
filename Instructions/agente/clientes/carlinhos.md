@@ -13,7 +13,7 @@ Aplicar junto das regras gerais de `Instructions/agente/metodo-edicao-video.md`;
 - Cores: azul da marca, amarelo e vermelho da seta; texto principal branco ou azul-escuro.
 - Impresso: documento com sangria de 3 mm e margem de segurança marcada por guias; nada importante fora da segurança.
 - Humanizar: pessoa real ou foto gerada (ChatGPT do Pailer), cena com fundo desfocado, nunca só caixas e texto.
-- Referências de autoescola: `D:/kanivete_biblioteca/refs/carlinhos_mesa` (folhas 1–2).
+- Referências de autoescola: `D:/Kanivete/Biblioteca/refs/carlinhos_mesa` (folhas 1–2).
 
 ## Referência de projeto, não padrão obrigatório
 - Quiz Dia do Instrutor (out/2026): cartelas com pincel azul; na V2 aprovada, erros de gravação no fim, cartela apenas com o texto da pergunta e fundo em composição com participantes sorrindo. Detalhes e origem: `Instructions/agente/guia-edicao.md`, CALIBRACAO de 13 e 15/10/2026. Reutilizar só se o formato e o pedido forem compatíveis.

@@ -27,13 +27,13 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Caixa de área com altura (arrastar com T), texto sobrando (+ vermelho), encadear caixas (clicar no + e noutra caixa / lugar vazio) | revista, folder, cardápio | `caixa_alt`; `encadear` (`ids` em ordem, ou `nova:{x,y}`), `desencadear`; apagar uma caixa fecha a corrente (a raiz passa o texto adiante) |
 | Aparência (vários preenchimentos/traços na mesma forma, cada um com cor, espessura, opacidade, mesclagem, deslocamento, atrás/na frente) e Expandir aparência | contorno duplo em texto, borda de adesivo, logo com camadas | `vetor-aparencia.js`: `aparencia` (acao adicionar/alterar/remover/subir/descer/limpar, tipo preench/traco, cor, espessura, opacidade, deslocar mm, atras), `expandir_aparencia` |
 | Efeitos vivos: Cantos arredondados (vetorial), Sombra projetada, Brilho externo, Desfoque | acabamento | `efeito` (tipo sombra/brilho/desfoque/cantos; dx, dy, desfoque, raio em mm; cor, opacidade, mesclagem). Sombra/brilho/desfoque saem rasterizados a 300 ppi NA COR DA TINTA (imagem CMYK ou Separation + SMask com a silhueta desfocada) — só PDF/X-4; o fechamento acusa em X-1a |
-| Lápis (N), Pincel (B, com perfil), Pincel de bolha (Shift+B), Borracha (Shift+E), Simplificar | desenho à mão, ilustração, retoque de forma | `vetor-desenho.js`: como o Lápis do Illustrator — reamostra, suaviza (gaussiana), procura cantos DEPOIS de suavizar (só bico > 150° na mão livre) e ajusta cúbicas por mínimos quadrados (Schneider: a curva passa perto dos pontos, dentro do erro → sem tremido); Fidelidade 1 (preciso) a 10 (suave), padrão 6 = erro ≈ 6 px de tela (calibrado com `D:/kanivete_testes/scripts/vetor_tremido*.py`); laço fechado em 4 trechos com tangente contínua; `lapis` (pontos mm, fidelidade mm = erro permitido, suavizar 0-10, fechar, espessura pt, perfil), `simplificar` (tolerancia mm, suavizar), `bolha` (pontos, espessura mm, cor: junta com as formas da mesma cor que encosta), `borracha` (pontos, espessura; selecionados ou todos embaixo) |
+| Lápis (N), Pincel (B, com perfil), Pincel de bolha (Shift+B), Borracha (Shift+E), Simplificar | desenho à mão, ilustração, retoque de forma | `vetor-desenho.js`: como o Lápis do Illustrator — reamostra, suaviza (gaussiana), procura cantos DEPOIS de suavizar (só bico > 150° na mão livre) e ajusta cúbicas por mínimos quadrados (Schneider: a curva passa perto dos pontos, dentro do erro → sem tremido); Fidelidade 1 (preciso) a 10 (suave), padrão 6 = erro ≈ 6 px de tela (calibrado com `D:/Kanivete/Testes/scripts/vetor_tremido*.py`); laço fechado em 4 trechos com tangente contínua; `lapis` (pontos mm, fidelidade mm = erro permitido, suavizar 0-10, fechar, espessura pt, perfil), `simplificar` (tolerancia mm, suavizar), `bolha` (pontos, espessura mm, cor: junta com as formas da mesma cor que encosta), `borracha` (pontos, espessura; selecionados ou todos embaixo) |
 | Setas e perfil de largura no traço, ferramenta Largura (Shift+W) | setas de diagrama, traço caligráfico | `alterar` com `seta_ini`/`seta_fim` (seta, triangulo, circulo, quadrado, barra), `seta_esc` %, `perfil` (uniforme, lente, afinar, afinar_inicio, gota, bico ou [[t, larg]]); viram formas (tela = PDF) |
 | Setor (pizza/rosca, com vão), Arco, `A`/`T` no `d` do caminho | mosaico de fotos em fatias, gráfico, selo | `setor` (cx, cy, raio, de/ate graus — 0 = 3 h, horário —, raio_interno, vao mm), `arco`; `caminho` com `d` SVG completo (M L H V C S Q T A Z) |
 | QR code vetorial | gráfica: QR em vetor, nunca imagem | `qrcode` (conteudo, x, y, tamanho mm com a margem, cor, correcao L/M/Q/H, fundo, margem em módulos — padrão 4, a zona de silêncio que o celular precisa): módulos unidos numa forma só (lib `qrcode`) |
 | Ícones (Tabler Icons, MIT, ~5000) | ícones de serviço/contato sem desenhar à mão | `icone` (nome de tabler.io/icons, x, y, tamanho mm, cor, estilo outline/filled, espessura): baixa uma vez para `%APPDATA%/CaniveteDoPailer/icones` |
 | Hifenizar (Parágrafo) | texto justificado sem "rios" | `hifen`/`hifenizar` (true = pt_BR, 'en_US'...) no `texto`/`alterar`; pyphen (dicionários do LibreOffice), 6+ letras, 2 antes / 3 depois; só o trecho de letras da palavra |
-| Traçado de imagem (Image Trace) | logo do cliente em PNG/JPG → vetor para a gráfica | **v2 (2026-10-15)**: Objeto › Traçado de imagem… (janela com prévia ao vivo) / `vetorizar` {predef: logo (padrão) | cores3 | cores6 | cores16 | pb | silhueta | traco | tecnico | cinza | foto_alta | foto_baixa, cores, limpar auto|true|false, fundo, modo empilhado|recortado (plotter/vinil), detalhe/suavidade 0-100, ignorar_branco, cores_marca (true), agrupar (false), manter_imagem}. Motor `Functions/vetor_tracar.py`: VTracer (MIT) + o que o Illustrator não faz — limpeza por IA antes (Real-ESRGAN arte em imagem < 1200 px ou JPEG), fundo liso tirado pela borda com as frestas do contorno fechadas (o branco de dentro das letras fica), N cores exatas (k-means em Lab e cada forma volta para a cor escolhida), cores encaixadas nas AMOSTRAS (cor da marca CMYK/Pantone exata, distância RGB < 48). Sai já em curvas e SOLTO (sem Expandir/Desagrupar), selecionado, imagem oculta; Editar › Selecionar mesma cor (`selecionar_mesma_cor`) apaga o que não presta de uma vez. Bancada `D:/kanivete_testes/trace` (comparar.py: o motor antigo desmanchava letras e lavava cores; JPEG de 320 px do WhatsApp → 61–96 formas limpas em ~0,5 s). Motor antigo: `motor:'antigo'`. Teste `D:/kanivete_testes/scripts/teste_tracar.py` + caso no teste_vetor |
+| Traçado de imagem (Image Trace) | logo do cliente em PNG/JPG → vetor para a gráfica | **v2 (2026-10-15)**: Objeto › Traçado de imagem… (janela com prévia ao vivo) / `vetorizar` {predef: logo (padrão) | cores3 | cores6 | cores16 | pb | silhueta | traco | tecnico | cinza | foto_alta | foto_baixa, cores, limpar auto|true|false, fundo, modo empilhado|recortado (plotter/vinil), detalhe/suavidade 0-100, ignorar_branco, cores_marca (true), agrupar (false), manter_imagem}. Motor `Functions/vetor_tracar.py`: VTracer (MIT) + o que o Illustrator não faz — limpeza por IA antes (Real-ESRGAN arte em imagem < 1200 px ou JPEG), fundo liso tirado pela borda com as frestas do contorno fechadas (o branco de dentro das letras fica), N cores exatas (k-means em Lab e cada forma volta para a cor escolhida), cores encaixadas nas AMOSTRAS (cor da marca CMYK/Pantone exata, distância RGB < 48). Sai já em curvas e SOLTO (sem Expandir/Desagrupar), selecionado, imagem oculta; Editar › Selecionar mesma cor (`selecionar_mesma_cor`) apaga o que não presta de uma vez. Bancada `D:/Kanivete/Testes/trace` (comparar.py: o motor antigo desmanchava letras e lavava cores; JPEG de 320 px do WhatsApp → 61–96 formas limpas em ~0,5 s). Motor antigo: `motor:'antigo'`. Teste `D:/Kanivete/Testes/scripts/teste_tracar.py` + caso no teste_vetor |
 | Bibliotecas de cor (livros Pantone & cia.) | cor especial exata da gráfica | `vetor-cores.js`: o app NÃO traz livros (dados do fabricante); lê .acb (Adobe Color Book, achados em Program Files/Adobe/*/Presets/.../Color Books) e .ase (Swatch Exchange) postos em %APPDATA%/CaniveteDoPailer/cores. Lab → CMYK alternativo pelo perfil (relativo + BPC). `bibliotecas_cor`, `cores_biblioteca` (busca), `cor_biblioteca` (biblioteca/arquivo, nome "286" ou todas; ids + preench/traco aplica). Aba Amostras › Bibliotecas de cor |
 | Recolorir arte | adaptar arte de cliente, trocar CMYK por Pantone | `cores_arte` (cores da seleção ou de tudo, mais usada primeiro), `recolorir` (trocas [{de, para}], tolerancia, tudo): troca em preenchimento, traço, paradas de degradê, trechos de texto, Aparência, efeitos e grupos. Menu Objeto › Recolorir arte |
 | Amostras de padrão | estampa, fundo de convite, embalagem | `vetor-padroes.js`: `criar_padrao` (seleção vira a peça; espaco mm; larg/alt; apagar_originais) → amostra; `padrao` (nome, escala %, angulo, dx/dy, traco) ou cor "padrao:Nome" em qualquer comando. Tela: peça renderizada no zoom (createPattern); PDF: tiling pattern VETORIAL (PaintType 1, recursos da página: especiais continuam especiais). Menu Objeto › Criar padrão |
@@ -172,7 +172,7 @@ sangria, mín. 6 pt), `marcas_comp` (mm; padrão 15 pt) e `marcas_esp` (pt; padr
   usada na tela, no .aknv, no Empacotar e como SMask no PDF/X-4. **Dados nativos do .ai** (AIPrivateData, Zstandard
   ou zlib; só os primeiros 16 MB): nomes das pranchetas e cores especiais declaradas (viram amostras).
   Cor: tela e conversões em Colorimétrico Relativo + compensação de ponto preto (igual ao padrão da Adobe; RGB→CMYK→tela
-  volta igual). Conferência com arquivos reais: `D:/kanivete_testes/scripts/vetor_comparar_ai.py` (render do PDF
+  volta igual). Conferência com arquivos reais: `D:/Kanivete/Testes/scripts/vetor_comparar_ai.py` (render do PDF
   embutido × Vetor) e `vetor_ida_volta.py` (abrir → mexer → .aknv → PDF/X-4 → reabrir).
 - **SVG**: lxml + parser próprio de `d` (inclui arcos A), formas, estilos (atributos, `style`, `<style>` com `.cls-N`
   do Illustrator), herança, transform, degradês (objectBoundingBox e userSpaceOnUse, href), clipPath, `use`/`symbol`,
@@ -186,13 +186,13 @@ O que não vira objeto entra no `relatorio` (mostrado ao abrir).
 ## 6. Testes e histórico
 - `testes/teste_vetor.py`: cartão pelos comandos, aparência/efeitos (PDF com efeitos na cor da tinta), texto (trechos, parágrafo, encadear, caminho, estilos, juntar, glifos, PDF), Pathfinder, alinhar, fechamento + correção, desfazer, PDF X-4 e X-1a
   verificados com a cor especial preservada, PNG, salvar/reabrir .aknv, abrir PDF/SVG/PPTX, SVG → CMYK, sem erro de JS.
-- Mouse de verdade: `D:\kanivete_testes\scripts\vetor_mouse.py` (retângulo, mover, elipse, caneta, texto, copiar/colar, desfazer);
+- Mouse de verdade: `D:\Kanivete\Testes\scripts\vetor_mouse.py` (retângulo, mover, elipse, caneta, texto, copiar/colar, desfazer);
   `vetor_desenho_ui.py` (lápis, pincel, bolha, borracha, Largura, seta pelo painel); `vetor_texto_ui.py` (caixa com altura, + vermelho → encadear, texto em caminho, trecho no painel).
 - 2026-10-04 v1: Worker `VETOR_FLYER_03` (flyer A6 do zero, alinhar, fechamento, PDF/X-4) — 8 operações, 0 erros, 20 s.
   Lições: o modelo manda "Arial Bold" como fonte (agora entendido); exportar_pdf precisa estar nas finais do worker.py.
 
 ## 7. Desafio: flyer "webmart" refeito do zero (2026-10-04)
-Referência de agência (Illustrator) refeita só pelos comandos (`D:/kanivete_testes/flyer_webmart/montar.py`, fotos geradas
+Referência de agência (Illustrator) refeita só pelos comandos (`D:/Kanivete/Testes/flyer_webmart/montar.py`, fotos geradas
 pelo FLUX local com semente fixa em `gerar_fotos.py`; `comparar.py` = referência × PDF). Técnicas que fecharam a peça:
 - faixa verde = retângulo ∪ círculo e **Deslocar +9 / −9 mm** (fechamento morfológico: arredonda só os cantos côncavos — a
   "concordância" do Illustrator); foto do escritório + retângulo em modo **cor** + outro em **multiplicação**, dentro de máscara
@@ -206,7 +206,7 @@ fechamento pegou fatias passando 1 mm do corte sem chegar na sangria (aviso cert
 Ainda não: ampliar foto por IA (o gerador vai até 2048 px → 224 ppi na faixa: aviso `resolucao_baixa`), ferramenta de degradê na arte e Blend.
 
 ## 8. Desafio: identidade visual completa "MARÉ" (2026-10-04)
-Manual de marca fictício feito só pelos comandos: `D:/kanivete_testes/idv/montar.py` (`--final` grava .aknv, PDF e PNGs na
+Manual de marca fictício feito só pelos comandos: `D:/Kanivete/Testes/idv/montar.py` (`--final` grava .aknv, PDF e PNGs na
 pasta pedida), fotos de direção pelo FLUX local (`gerar_fotos.py`). 16 pranchetas 16:9 (320×180 mm) nomeadas: capa,
 conceito, logotipo, construção/área de proteção/redução mínima, versões, usos incorretos, tipografia, paleta (CMYK/RGB/HEX/
 Pantone ref., largura = proporção de uso), elementos (padrão de ondas + ícones), fotografia, tom de voz (diga × evite), grid,
@@ -236,7 +236,7 @@ sem sangria do fechamento são de gráfica). Documento de tela: `novo {destino:'
 - Painel Propriedades › 3D (sliders) e menu Objeto › 3D.
 - `retocar_letra` {letra|faixa|trecho, rot, escala, subir, espaco, cor} = ferramenta Retocar tipo: o texto segue editável
   (motor: `rot` por glifo em `_desenhar`, girando no meio da largura sobre a linha de base).
-IDV v2 (`D:/kanivete_testes/idv/marca.py` + `montar2.py`): símbolo = disco cortado por onda com vão (pathfinder: interseção/
+IDV v2 (`D:/Kanivete/Testes/idv/marca.py` + `montar2.py`): símbolo = disco cortado por onda com vão (pathfinder: interseção/
 subtração com a faixa contornada); logotipo = Playfair Bold em curvas, tracking −25, acento trocado pelo sol (subcaminho mais
 alto removido com `definir_subs`); diagramação editorial (número de seção grande, grid, sumário); mockups 3D sobre fotos FLUX
 (mesa com luz lateral; areia com sombra de coqueiro para flat lay). Lições: criar a arte DENTRO da página antes de medir
@@ -277,7 +277,7 @@ Ainda não: oclusão própria no girar 3D (perfil que se esconde atrás de si), 
   Vetor é um pouco mais larga e quebrava a linha de novo). Logo a partir de fonte: `tools/logotipo.py` (marca sereno).
 - Fonte variável sem arquivo por peso (Inter): o motor converte o estilo (SemiBold, Light...) no eixo `wght` sozinho.
 - `tools/vk_cena.py` + `marca.json` (cores hex+cmyk viram `var(--nome)` e a paleta; fontes `var(--titulo)`/`var(--texto)`).
-  Kit da marca = documento com os símbolos (assinaturas, logotipo, símbolo, versões negativas): `D:/kanivete_biblioteca/marcas/<marca>/`.
+  Kit da marca = documento com os símbolos (assinaturas, logotipo, símbolo, versões negativas): `D:/Kanivete/Biblioteca/marcas/<marca>/`.
 - `revisar` / `VKN.revisar()` (`vetor-revisor.js`): solto, fora, transborda, sobreposto, contraste (WCAG 4,5/3 com a cor
   real abaixo do texto), margem, pequeno, vazio, prancheta vazia; agrupa ocorrências iguais; erro × aviso.
 - `VKN.curto = true` ou `{curto: true}`: comandos devolvem só id/ids/caminho/contagens.
@@ -343,7 +343,7 @@ duplicar, Ctrl+D como no Illustrator, tela de início com modelos.
   entra na ordem do documento (layout livre: grade de 10 embaixo de tudo); um Ctrl+Z desfaz a série. ANTES de criar,
   confere se a fonte tem todos os caracteres (`sem_glifo` do `texto_geometria`, glifo 0) e recusa. Medido: 200 placas em
   30 ms; PDF/X-4 de 200 páginas verificado; .ai nativo de 200 pranchetas em 4–7 s (Illustrator 30 reabre com 200
-  pranchetas, números únicos, 100 × 40 mm exatos, CMYK igual). Testes `D:/kanivete_testes/scripts/teste_serie_vetor.py`
+  pranchetas, números únicos, 100 × 40 mm exatos, CMYK igual). Testes `D:/Kanivete/Testes/scripts/teste_serie_vetor.py`
   e `teste_serie_ai.py` (Illustrator aberto). Ao trabalhar com arquivo de cliente: instalar a fonte da marca antes.
 - Teste `testes/teste_pranchetas.py [--debug]` (comandos + mouse de verdade; app em --agente=9333). A 1ª rodada logo
   depois de recarregar a página pode perder o mouse; rode de novo.

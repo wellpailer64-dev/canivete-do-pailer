@@ -5,8 +5,8 @@ import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa
 import os, sys, time
 from playwright.sync_api import sync_playwright
 
-AUDIO = r"D:\kanivete_testes\ke_media\quick_misto.mp3"
-VIDEO = next((a for a in sys.argv[1:] if not a.startswith('--')), r"D:\kanivete_testes\autoframe\quick_misto.mp4")
+AUDIO = r"D:\Kanivete\Testes\ke_media\quick_misto.mp3"
+VIDEO = next((a for a in sys.argv[1:] if not a.startswith('--')), r"D:\Kanivete\Testes\autoframe\quick_misto.mp4")
 falhas = []
 def ok(c, m):
     print(('OK  ' if c else 'FALHA ') + m)

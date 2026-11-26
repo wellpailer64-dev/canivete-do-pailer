@@ -18,7 +18,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 ARQ = os.path.join(RAIZ, "tools", "worker", "arquiteto.py")
-SAIDA = r"D:\kanivete_testes\arquiteto_local"
+SAIDA = r"D:\Kanivete\Testes\arquiteto_local"
 JOBS = {}
 
 
@@ -156,7 +156,7 @@ button{border:0;border-radius:8px;background:var(--acc);color:#111;font-weight:7
   <div class="group"><label class="label">Referencia (print/caminho)</label><input id="referencia" placeholder="D:\referencias\ref.png"><input id="refFile" type="file" accept="image/*" onchange="uploadRef()" style="margin-top:8px"></div>
   <div class="group"><label class="label">Pasta de materiais</label><input id="materiais" placeholder="D:\materiais\cliente"></div>
   <div class="group"><label class="label">Documento .iknv</label><input id="documento" placeholder="D:\pecas\post.iknv"></div>
-  <div class="group"><label class="label">Exportar em</label><input id="exportar" placeholder="D:\kanivete_testes\arquiteto_local\export"></div>
+  <div class="group"><label class="label">Exportar em</label><input id="exportar" placeholder="D:\Kanivete\Testes\arquiteto_local\export"></div>
   <div class="group checks"><label><input id="executar" type="checkbox" checked> executar</label><label><input id="pensar" type="checkbox"> pensar mais</label></div>
   <button class="secondary" onclick="prepClaude()">Preparar briefing para Claude</button>
   <div class="hint">Para qualidade final, use o briefing e cole no chat do Claude.</div>

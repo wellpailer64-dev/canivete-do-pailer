@@ -21,7 +21,7 @@ _mutex = None
 def dados_isolados():
     """Só o perfil de testes no D pode ter uma instância separada da do Pailer."""
     base = os.path.normcase(os.path.realpath(os.environ.get("APPDATA") or os.path.expanduser("~")))
-    testes = os.path.normcase(os.path.realpath("D:/kanivete_testes"))
+    testes = os.path.normcase(os.path.realpath("D:/Kanivete/Testes"))
     try:
         return os.path.commonpath([base, testes]) == testes
     except ValueError:

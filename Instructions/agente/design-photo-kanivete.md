@@ -2,17 +2,17 @@
 
 Objetivo: montar peças (flyers, posts, capas) no editor de imagem como um designer faria no Photoshop, gastando
 pouco: números em vez de prints, etapas salvas em vez de recomeçar, ferramentas certas em vez de força bruta.
-Primeiro caso: flyer "Baile da Bonita" (`D:\kanivete_testes\flyer\`, referência `referencia.png`, receitas `f1..f6`).
+Primeiro caso: flyer "Baile da Bonita" (`D:\Kanivete\Testes\flyer\`, referência `referencia.png`, receitas `f1..f6`).
 
 **Peças de diagramação (carrossel, feed, story, post): comece por `KNV.cena` (HTML/CSS → camadas) — guia em
 `Instructions/agente/plano-cena.md`. A API abaixo fica para foto, pintura, recorte e retoques depois da cena.**
 
 ## Fluxo
-1. App de teste visível (o usuário gosta de assistir): `APPDATA=D:\kanivete_testes\appdata LOCALAPPDATA=D:\kanivete_testes\localappdata
-   TEMP=D:\kanivete_testes\tmp TMP=D:\kanivete_testes\tmp py -3.13 main.py --agente=9333` (Python 3.13 tem as dependências).
+1. App de teste visível (o usuário gosta de assistir): `APPDATA=D:\Kanivete\Testes\appdata LOCALAPPDATA=D:\Kanivete\Testes\localappdata
+   TEMP=D:\Kanivete\Testes\tmp TMP=D:\Kanivete\Testes\tmp py -3.13 main.py --agente=9333` (Python 3.13 tem as dependências).
    Só UM app na 9333; abrir um segundo confunde o CDP.
 2. Receita = JS curto com chamadas `KNV.*`, uma por etapa (base, plantas, jeans, textos, rabiscos, ajustes...).
-3. `py -3.13 D:\kanivete_testes\flyer\rodar.py fN.js --de etapas/eN-1.iknv --salvar etapas/eN.iknv [--mapa] [--ignorar "Camada"]`
+3. `py -3.13 D:\Kanivete\Testes\flyer\rodar.py fN.js --de etapas/eN-1.iknv --salvar etapas/eN.iknv [--mapa] [--ignorar "Camada"]`
    - recarrega os `imagem-*.js` do disco (funções e tabelas `IE_*`): mudou o código do editor → NÃO precisa reiniciar o app
      (só mudanças em `main.py`/Python ou em estado inicial de `IE` pedem reinício);
    - `--limite` (120 s): passou disso interrompe o JS (Runtime.terminateExecution) em vez de travar o app;
@@ -98,8 +98,8 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
   dessaturada em MULTIPLY; vinhetas com degradê radial em MULTIPLY.
 - Título de cartaz: palavras em camadas separadas em escada, giradas juntas (`girar(ang,{centro})` com o centro comum),
   sombra suave + traçado fino; rabiscos brancos à mão (formas + pincel 4–5 px) preenchem os vazios.
-- Material: Pexels por id (`baixar.py`), fontes do Google Fonts em `D:\kanivete_testes\flyer\fontes` registradas por usuário.
-- **Checklist de acabamento (feedback do designer, flyer Gospel `D:\kanivete_testes\gospel\e1..e3`)**:
+- Material: Pexels por id (`baixar.py`), fontes do Google Fonts em `D:\Kanivete\Testes\flyer\fontes` registradas por usuário.
+- **Checklist de acabamento (feedback do designer, flyer Gospel `D:\Kanivete\Testes\gospel\e1..e3`)**:
   leitura de texto sobre foto = pincel dureza 0 na cor mais escura da paleta numa camada embaixo (op ~85%) ou caixa/sombra;
   máscara de camada + pincel macio preto da cintura para baixo em toda pessoa recortada; margem lateral generosa no
   rodapé (~100 px em 1080); luz de trás (pincel claro em Divisão) + luz da FRENTE vazando pelas brechas entre os corpos
@@ -113,7 +113,7 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
   inteligente (lista embaixo da camada, olho, duplo clique edita). Fontes: `KNV.instalarFonte('Nome do Google Fonts')`.
 
 ## Técnicas aprendidas — carrossel 3D "Design que vende" (2026-10-03)
-Peça: `D:\kanivete_testes\carrossel3d\` (carrossel.html + .iknv + export/). Reproduzir uma referência, passo a passo:
+Peça: `D:\Kanivete\Testes\carrossel3d\` (carrossel.html + .iknv + export/). Reproduzir uma referência, passo a passo:
 1. **Medir a referência**: escala = 1080 / largura de um slide na imagem de referência (ex.: 633 px → ×1,705). Anotar
    x/y/tamanho de cada bloco na referência e converter; títulos pelo tamanho da caixa (largura do texto), não pelo olho.
 2. **Fonte de display parecida**: instalar candidatas do Google (`KNV.instalarFonte`) e montar uma folha de amostras
@@ -128,7 +128,7 @@ Peça: `D:\kanivete_testes\carrossel3d\` (carrossel.html + .iknv + export/). Rep
    - Cor: o verde do FLUX sai saturado no máximo (176,249,0). Corrigir com **filtros inteligentes no próprio objeto**
      (`KNV.ativar(peça); KNV.cmd('aj:matiz', {h: 34, s: -52, l: -4}); KNV.cmd('aj:brilho', {br: -4, ct: 35})`):
      painel limpo e a cor anda junto ao mover/duplicar. Camada de ajuste presa (corte) só se um ajuste vale para várias.
-   - Antes de aplicar, comparar 3 variações lado a lado num recorte (`D:\kanivete_testes\scripts\cor_teste.py`:
+   - Antes de aplicar, comparar 3 variações lado a lado num recorte (`D:\Kanivete\Testes\scripts\cor_teste.py`:
      muda os valores, `ieCompor`, copia a área para um canvas e salva JPEG).
 4. **Elementos que atravessam a emenda** (peão entre slides, faixa verde contínua): soltos na tira, fora das
    `<section>`, `position:absolute` com `left` em px da tira, `data-livre`. Faixa = `<svg>` com `<path>` de stroke grosso.
@@ -158,7 +158,7 @@ Peça: `D:\kanivete_testes\carrossel3d\` (carrossel.html + .iknv + export/). Rep
    slide:N` e `--variacoes` no lugar de prévias grandes, `KNV.etapa` para receitas que podem rodar de novo.
 
 ## Carrossel "Valer" (corrida, 2026-10-03) — ~46 mil tokens (o 3D custou ~146 mil)
-Modelo de estudo: `D:\kanivete_biblioteca\modelos\carrossel-valer-corrida`. O que funcionou e as armadilhas:
+Modelo de estudo: `D:\Kanivete\Biblioteca\modelos\carrossel-valer-corrida`. O que funcionou e as armadilhas:
 - Fluxo: `--amostras` (fontes) → HTML medido da referência (×2,7; 400×534 → 1080×1440) → `--referencia --comparar`
   (3 rodadas) → `--ver` só no detalhe → `KNV.etapa` para o acabamento → `--exportar`. Sem prévia grande nenhuma vez.
 - Pessoa do FLUX atravessando a emenda: `data-proporcao="3:4"`, `object-fit: cover`, `object-position: 50% 0%`; luz
@@ -172,7 +172,7 @@ Modelo de estudo: `D:\kanivete_biblioteca\modelos\carrossel-valer-corrida`. O qu
 - Pendente: `<g transform>` dentro de `<svg>` parece não ser aplicado pela cena (manchas não se moveram) — investigar.
 
 ## Flyer "Prime Fest" (2026-10-03) — primeiro com o Worker: ~30 mil tokens do Claude
-Modelo de estudo: `D:\kanivete_biblioteca\modelos\flyer-prime-fest`; peça em `D:\kanivete_testes\flyer_prime`.
+Modelo de estudo: `D:\Kanivete\Biblioteca\modelos\flyer-prime-fest`; peça em `D:\Kanivete\Testes\flyer_prime`.
 - Divisão: Claude = medir a referência (≈400×500 → 1080×1350, ×2,7), HTML da cena, prompts e escolha das sementes;
   Worker (Qwen3 8B) = finalização por contrato (degradê do título, sombras dos adesivos, acabamento, exportar):
   1 contrato, 7 operações, 0 erros, 28 s.
@@ -191,11 +191,11 @@ Modelo de estudo: `D:\kanivete_biblioteca\modelos\flyer-prime-fest`; peça em `D
   sombra, desfoque). Virou receita + ferramenta do Worker: `KNV.receita.mascaraDegrade(nome,{lado,inicio})` (usa o
   contorno real dos pixels), `rastro(nome,{angulo,distancia})` (cópias para trás + desfoque de movimento, camada
   "· rastro" embaixo), `luz([[x,y,raio]],{cor,intensidade,acima})`, `tratarFoto(nome,{ambiente})`,
-  `profundidade(nome,raio)`. Contrato de exemplo: `D:\kanivete_testeslyer_prime\contrato_acab.json` (export2/).
+  `profundidade(nome,raio)`. Contrato de exemplo: `D:\Kanivete\Testeslyer_prime\contrato_acab.json` (export2/).
   **Checklist padrão de toda peça com pessoa/objeto** — mande no contrato de finalização.
 
 ## Carrossel "6 meses de gestão" (vereador, 3 slides, 2026-10-03) — ~44 mil tokens do Claude
-Peça: `D:\kanivete_testes\carrossel_vereador\` (carrossel.html, depois.js, contrato_acab.json, export/).
+Peça: `D:\Kanivete\Testes\carrossel_vereador\` (carrossel.html, depois.js, contrato_acab.json, export/).
 - Referência 738×327 → 3 × 1080×1440 (×4,39): medir em recortes 3× por slide e converter (×1,4634).
 - Avatar redondo: `<img data-corte>` dentro do círculo (máscara de corte); foto pequena o bastante para caber cabeça +
   ombros (cabeça ≈ 55% do círculo, queixo dentro). A mesma geração (prompt/semente) serve de avatar.
@@ -223,16 +223,16 @@ Recarregar o app de teste sem reabrir: CDP `Network.setCacheDisabled` + `Page.re
 guarda os .js em cache; `page.reload()` simples pode manter a versão velha).
 
 ## Técnicas do Pinterest (2026-10-08): referência que vira técnica anotada
-1. `py -3.13 tools/refs.py "busca 1" "busca 2" --tema "<peça, cores, o que destacar>" --pasta D:/kanivete_biblioteca/refs/<peça>
+1. `py -3.13 tools/refs.py "busca 1" "busca 2" --tema "<peça, cores, o que destacar>" --pasta D:/Kanivete/Biblioteca/refs/<peça>
    --porta <app>` — Pinterest headless, folhas numeradas, paleta medida e nota + técnicas da Kani (gemma4) por referência
    em `refs.json`; o Claude olha só `top.jpg` (~6 min, quase sem token). Não usar o navegador do usuário para isso.
-2. Antes de inventar, ler `D:/kanivete_biblioteca/tecnicas/tecnicas.json` (campo `quando`): técnica já anotada = receita pronta.
+2. Antes de inventar, ler `D:/Kanivete/Biblioteca/tecnicas/tecnicas.json` (campo `quando`): técnica já anotada = receita pronta.
 3. Técnica NOVA usada numa peça → ficha `<id>.md` (pilha, valores, cuidados) + `<id>_ref.jpg` + resultado + receita em
    `tecnicas/receitas/`, e uma linha no `tecnicas.json`. Primeiras: `bloco-virada-de-lote`, `fundo-pista-feixes`.
 4. Revisão da Kani numa peça com logos do cliente: passar o que é intocável (logos) para ela não comentar.
 
 ## Fluxo com direção (2026-10-08, depois de "poluído, amador, genérico" no flyer Festa da Amizade) — vale sobre o resto
-Gabarito: `D:/kanivete_biblioteca/gabarito_pailer.json` (29 PSDs do usuário medidos: ~6 palavras, margem 13,5%, herói
+Gabarito: `D:/Kanivete/Biblioteca/gabarito_pailer.json` (29 PSDs do usuário medidos: ~6 palavras, margem 13,5%, herói
 1,66× o 2º texto, só Sombra/Sobreposição de cor, poluição ~10,5% de bordas). Erro que levou a isso: copiar ingredientes
 das referências (dourado, brilho, fonte) sem as relações (hierarquia, proporção, respiro, unidade).
 1. **Briefing de 3 linhas aprovado pelo usuário**: mensagem principal, ordem de importância, tom. Não decidir sozinho
@@ -244,4 +244,4 @@ das referências (dourado, brilho, fonte) sem as relações (hierarquia, propor�
    claridade 39, vibratilidade 13, nitidez 39, grão 30) + Multiplicar atrás do herói.
 5. `KNV.revisarGabarito()` (também no `revisarPeca`/`tools/revisor.py`) antes de mostrar; a Kani só confere coisas
    objetivas, nunca nota de gosto (VLMs não avaliam estética: AesEval-Bench, ICLR 2026).
-6. Ficha em `D:/kanivete_biblioteca/tecnicas` só com status aprovado pelo usuário.
+6. Ficha em `D:/Kanivete/Biblioteca/tecnicas` só com status aprovado pelo usuário.

@@ -3,7 +3,7 @@ pincel_roto.py — Pincel Roto do Vídeo Kanivete (o Roto Brush do After Effects
 partir de traços num quadro-base e segue pelos outros quadros.
 
 Motor: SAM 2.1 de vídeo em ONNX fp16 (diffusionstudio, Apache-2.0, revisão fixa, baixado no 1º uso), no
-onnxruntime-DirectML (qualquer placa DX12) ou na CPU. Duas qualidades (2026-10-18, D:/kanivete_testes/roto/bancada.py):
+onnxruntime-DirectML (qualquer placa DX12) ou na CPU. Duas qualidades (2026-10-18, D:/Kanivete/Testes/roto/bancada.py):
 - "alta"   = Hiera-Small 1024 fp16 (112 MB): 0,28 s/quadro na RTX 3050 — mais rápido E mais fiel que o Tiny fp32 de antes
              (0,50 s/quadro; microfone e mão ficavam grudados no corpo);
 - "rapido" = Hiera-Tiny 512 fp16 (83 MB): 0,07 s/quadro; borda mais grosseira. Padrão sem placa (CPU: 0,6 s × 3,6 s).
@@ -12,7 +12,7 @@ para o próximo (só quando o objeto foi achado: quadro em que ele some não est
 
 Como no After:
 - traço verde (soma) / Alt vermelho (tira) num quadro → quadro-base; os traços viram poucos pontos (muitos pontos
-  confundem o modelo: medido em D:/kanivete_testes/recorte_video/sam_teste); ponto com rótulo 2 = "Selecionar assunto"
+  confundem o modelo: medido em D:/Kanivete/Testes/recorte_video/sam_teste); ponto com rótulo 2 = "Selecionar assunto"
   (máscara do BEN2 do Remover fundo como ponto de partida; os traços somam/tiram por cima);
 - Freeze: pintar só calcula o quadro-base (resposta na hora); o seguimento roda quando pedir (congelar) ou sozinho se a
   tela estiver em "Seguir sozinho". Cada trecho entre dois quadros-base é seguido pela METADE: a 1ª metade a partir do
@@ -756,7 +756,7 @@ def _calc_base(j, M, q):
         hr, sc, pt, _ = M.decodificar(e, f2, (_pontos_miolo(pre) + pts)[-MAX_PONTOS:])
         if pts:
             # com memória o modelo resiste a pegar parte nova (mão borrada fora do corpo); lido sem memória, só pelos
-            # traços, ele pega — o que soma é o maior dos dois (medido: D:/kanivete_testes/roto/sonda_mao.py)
+            # traços, ele pega — o que soma é o maior dos dois (medido: D:/Kanivete/Testes/roto/sonda_mao.py)
             livre = M.decodificar(e, e["feats2_no_mem"], pts)[0]
             hr = np.maximum(hr, livre)
         hr, sc = _somar_tirar(pre, hr, sc, pts)

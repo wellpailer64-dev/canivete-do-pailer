@@ -11,7 +11,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 from Functions import estabilizador as E
 from arqs import FF
 
-O = "D:/kanivete_testes/estab/sint"; os.makedirs(O, exist_ok=True)
+O = "D:/Kanivete/Testes/estab/sint"; os.makedirs(O, exist_ok=True)
 B3 = "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/COLAB/DIEGO PORFÍRIO/CULTSP PRO/03 - BANANAL CULTURA E GASTRONOMIA/BRUTOS"
 BASES = [(3063, 2.0), (3129, 2.0), (3060, 2.0)]
 SUAV = float(sys.argv[1]) if len(sys.argv) > 1 else 50

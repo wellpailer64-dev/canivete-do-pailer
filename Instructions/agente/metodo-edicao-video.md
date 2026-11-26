@@ -6,13 +6,36 @@ Detalhes: API e histórico em `guia-edicao.md`; teoria em `tecnicas-de-montagem.
 ## Ordem de trabalho
 1. **Consultar**: método e neurônios gerais de vídeo; depois buscar pelo nome do cliente com `brain_search`, informando o projeto/cliente, ler sua ficha em `Instructions/agente/clientes/` e os últimos RENDERS. Regras do cliente complementam as gerais; preferência específica documentada prevalece sobre padrão visual geral para aquele cliente. Não levar estilo de um cliente para outro; pedido atual prevalece. Se faltar ficha ou a identidade for incerta, não inventar.
 2. **Combinar**: pedido grande, mandar 3 a 5 linhas com o que entendeu, plano e custo antes de mergulhar.
-3. **Ver e ouvir**: transcrição e uma folha de quadros por vídeo. Sem abrir o app ainda.
+3. **Ver e ouvir**: consultar primeiro as folhas, transcrições e o mapa de brutos já salvos para o projeto. Na primeira leitura, guardar as folhas e um mapa pesquisável com pasta, arquivo, descrição do que acontece e timecodes dos trechos vistos; indicar lacunas e não inventar conteúdo. Ao mudar a pasta, conferir arquivos novos, alterados e ausentes e analisar apenas o necessário, preservando as anotações válidas. Sem abrir o app ainda.
+   Para criar ou atualizar o índice: `py -3.13 tools/agente/mapa_brutos.py atualizar --brutos "PASTA_BRUTOS" --destino "PASTA_MAPA"` (destino no D, fora dos brutos). Consultar: mesma chamada com `buscar --termo "assunto"`; após olhar e ouvir, registrar cada trecho com `anotar --arquivo "CAMINHO_RELATIVO" --inicio SEG --fim SEG --descricao "cena observada"`. O mapa busca também na transcrição disponível. A folha tem oito amostras e não descreve cenas automaticamente nem substitui ver o bruto inteiro na escolha do take; complete as anotações após a leitura. O índice não importa folhas anteriores automaticamente.
 4. **Montar**: a ferramenta do formato, sem script novo. Reel falado: roteiro JSON + `tools/agente/reel_fala.py`.
 5. **Conferir**: `py -3.13 tools/agente/conferir_edicao.py projeto.vknv`. Só mostrar com REPROVADO zerado; o que vier como OUVIR, ouvir.
 6. **Olhar**: `tools/agente/quadros_monitor.py`, uma folha.
 7. **Exportar para conferir**: `tools/agente/exportar_conferencia.py`, em tarefa solta. Deve sair pela placa.
 8. **Entregar**: salvar e deixar aberto no app dele. Exportar de verdade e mudar o card só com o ok.
-9. **Aprender**: nota nova dele vira regra aqui e no cérebro no mesmo dia.
+9. **Aprender**: seguir o "Gatilho de aprendizado" abaixo (escopo GLOBAL/TIPO/CLIENTE, 1 linha, termo do glossário).
+
+## Checklist de editor profissional (antes da V1) — termos em `glossario-editor.md`
+[GLOBAL] vale para todo vídeo do gênero; [TIPO] só para o tipo citado.
+- [GLOBAL] Classificar o tipo de edição (glossário) antes de montar.
+- [GLOBAL] Reutilizar o mapa e as folhas dos brutos do projeto; atualizar só mídias novas, alteradas ou ausentes e registrar cenas e timecodes vistos para escolher A-roll e B-roll sem repetir a leitura completa.
+- [Entrevista/Depoimento] Arco começo-meio-fim; nunca abrir no meio de uma explicação.
+- [Entrevista/Evento] Intro do personagem com nat sound (chegada, aplausos), take inteiro se bom.
+- [Entrevista/Evento] Establishing shots: 2 a 4 takes de ~1 s, só trilha, sem repetir pessoa nem revelar a protagonista.
+- [Entrevista/Evento] Respiro de B-roll do evento antes do outro, trilha sobe.
+- [GLOBAL] A voz manda: fala baixa → voz alta + denoise + bed calma bem baixa (ducking).
+- [GLOBAL] Legenda menor, mais alta, na safe zone e nunca sobre o lower third.
+- [GLOBAL] Transição com moderação: corte seco/no beat no meio; transição + whoosh só no outro.
+- [GLOBAL] Acabamento sutil: glow e CA fracos, centro limpo, adjustment layer no topo; bug pequeno no canto, some no outro.
+- [GLOBAL] Peça para outro veículo/página usa a identidade de quem publica.
+- [GLOBAL] Projeto e render aprovado na pasta da peça, V1, V2...
+- [GLOBAL] Manter os ajustes do Pailer: só ajuste pontual, aplicado no app aberto.
+
+## Gatilho de aprendizado (permanente)
+Toda correção, ajuste ou aprovação do Pailer numa edição = lição. No mesmo turno:
+1. Escopo: **GLOBAL** (serve a qualquer edição do gênero) → este checklist + neurônio da classe "Edição de Vídeo · <classe>"; **TIPO** → item marcado [Tipo]; **CLIENTE/PROJETO** → `clientes/<cliente>.md` + brain_remember com `projeto`. Na dúvida entre cliente e global, perguntar ao Pailer.
+2. Escrever em 1 linha, com o termo do glossário; termo novo → acrescentar no glossário.
+3. Atualizar o que já existe (sem duplicar); conferir com brain_search usando uma pergunta genérica.
 
 ## Ajuste em projeto pronto (barato, nota de 2026-11-02)
 1. `conferir_edicao.py projeto --sem-ouvir` primeiro; ela lista os problemas. Nada de despejar a timeline no chat.
@@ -44,7 +67,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
   O HTML precisa de `<meta name="kv" content="w=..;h=..;fps=..;dur=..">` e camadas com `data-kv="texto|caixa|img"`
   (sem `data-kv` o `<svg>` de filtro derruba o amostrador). O `.mov` antigo fica desativado embaixo para comparar.
   Fonte do `@font-face` precisa estar instalada; o tradutor troca o apelido pelo nome real (aviso se faltar).
-  Conferir o arquivo da Comp (quadro do `.mov` em `D:\Canivete Render Cache\Comps` sobre cor), não a prévia leve.
+  Conferir o arquivo da Comp (quadro do `.mov` em `D:\Kanivete\Cache\Canivete Render Cache\Comps` sobre cor), não a prévia leve.
 - **Quando ficar em `.mov`**: ao lado do render vai `<nome>.fonte.json` (fonte, parâmetros, comando para refazer, como
   editar). `render_html.py` do projeto já grava sozinho; gerador em Python grava a ficha igual. Pasta `<nome>_fonte/` com
   o HTML/plano quando houver Comp.
@@ -54,7 +77,7 @@ Trabalho profissional: todo asset que eu crio (lettering, GC, título, créditos
 1. **Decidir**: vai sobre a edição e o Pailer pode querer mexer? → Comp. Efeito que o HTML faz e a Comp não (filtro SVG, `backdrop-filter`, `drop-shadow` em imagem) → `.mov` com ficha.
 2. **Fonte primeiro**: HTML em `<pasta do asset>/X_fonte/` com `<meta name="kv">` e `data-kv` em toda camada; fontes instaladas (conferir `fontes_reais()` sem aviso).
 3. **Montar**: `comp_html.py ... --alvo X.mov` (sem `--so-plano` só quando o app do Pailer estiver aberto; ao vivo, sem recarregar).
-4. **Conferir o arquivo, não a prévia**: quadro do `.mov` da Comp em `D:\Canivete Render Cache\Comps` sobre cor de fundo, num instante de pico (texto cheio) e noutro de entrada. A prévia leve mostra retângulo preto atrás de transparência: defeito conhecido, não vai no export.
+4. **Conferir o arquivo, não a prévia**: quadro do `.mov` da Comp em `D:\Kanivete\Cache\Canivete Render Cache\Comps` sobre cor de fundo, num instante de pico (texto cheio) e noutro de entrada. A prévia leve mostra retângulo preto atrás de transparência: defeito conhecido, não vai no export.
 5. **Comparar com o antigo**: o `.mov` fica desativado embaixo; listar para o Pailer o que mudou (ex.: sombra que o HTML dava e a Comp não tem) e dizer se dá para recolocar como efeito na Comp.
 6. **Entregar sem salvar**: dizer a trilha e o tempo, pedir que ele confira e salve.
 7. **Fechar a ponta**: ficha `.fonte.json` se sobrar `.mov`; registrar no catálogo/cérebro se o método ou a ferramenta for novo; anotar na missão.
@@ -137,3 +160,13 @@ Vídeo novo = pasta nova na sequência do mês (última "07 - ..." → "08 - REE
 - Um app só: nunca abrir outro KANIVETE; porta sem resposta não é app fechado. App de teste fecha ao terminar (2026-11-01).
 
 **Exportação (regra do Pailer, 2026-11-06):** todo render vai para a pasta `04 - RENDERS` do card do projeto (nunca só para a pasta de teste) e, ao terminar, abrir essa pasta no Explorer (`explorer /select,arquivo`). `exportar_conferencia.py` já abre; passe a `04 - RENDERS` como pasta de saída.
+
+## Regras fixas do Pailer (26/11/2026, reels OP Capricho) — valem para todo cliente
+- Zoom: sem tranco. Entrada 1,2–1,6 s, saída ~1,2 s, suavidade 85, deriva 0, no máximo 112%.
+- Música: troca de volume (baixo sob a fala → alto no fim) sempre com constant power (atout/atin cp ~0,8 s).
+- Entradas de texto e asset: animações nativas (texto `c.txa`, VE_TXA: revelar, subir, pop...; imagem `tin` de VE_TR). Nada de quadros-chave de escala na mão.
+- Texto: entrelinha justa (`tx.ent` 90–95), nunca 120.
+- Imagem ON ↔ B-roll: transição nativa na entrada e na volta (pushzoom, slide, pull, dissolve, flash). Corte seco só entre falas.
+- Merchant (vídeo com arte de parceiro): a arte do parceiro é a finalização; não usar o logo do cliente no fim.
+`reel_fala.py` já aplica as cinco primeiras.
+- Corte nunca dentro de palavra: silêncio curto (0,10–0,15 s) no meio da palavra é fechamento de boca (p, t, k, "pr"), não fim de fala. `pausa_na_palavra` só corta com >= 0,20 s ("Ca|pricho" perdeu o fim, 26/11). Ao revisar, ouça nome de marca/pessoa inteiro em cada emenda.

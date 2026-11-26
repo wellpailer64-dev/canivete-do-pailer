@@ -1,14 +1,14 @@
 """Teste da ponte Vetor → Editor (Cena 3D), app em --agente=9333: copo (girar) com rótulo coral, caixa (extrudar com
 chanfro) com arte coral na frente e anel (extrudar com furo) vão para uma cena 3D do Editor (enviar_editor_3d).
 Confere: 3 modelos na cena, quadro com o objeto opaco no meio e fundo transparente, coral do rótulo e azul da caixa
-presentes, furo do anel vazado. Grava o quadro em D:\\kanivete_testes\\editor3d\\vetor.png para olhar."""
+presentes, furo do anel vazado. Grava o quadro em D:\\Kanivete\\Testes\\editor3d\\vetor.png para olhar."""
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import base64, io, json, os, sys
 sys.stdout.reconfigure(encoding="utf-8")
 from PIL import Image
 from playwright.sync_api import sync_playwright
-SAI = r"D:\kanivete_testes\editor3d"; os.makedirs(SAI, exist_ok=True)
-MAT = os.path.join(os.environ.get("TEMP", r"D:\kanivete_testes\tmp"), "canivete_teste_export", "material1", "a.mp4")
+SAI = r"D:\Kanivete\Testes\editor3d"; os.makedirs(SAI, exist_ok=True)
+MAT = os.path.join(os.environ.get("TEMP", r"D:\Kanivete\Testes\tmp"), "canivete_teste_export", "material1", "a.mp4")
 falhas = []
 def ok(c, m):
     print(("  ok  " if c else "  FALHOU  ") + m)

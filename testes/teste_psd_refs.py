@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 from psd_tools import PSDImage
 
 ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); a = ap.parse_args()
-PASTA = os.path.join(os.environ.get("TEMP", "D:/kanivete_testes/tmp"), "teste_psd_refs"); os.makedirs(PASTA, exist_ok=True)
+PASTA = os.path.join(os.environ.get("TEMP", "D:/Kanivete/Testes/tmp"), "teste_psd_refs"); os.makedirs(PASTA, exist_ok=True)
 PSD = os.path.join(PASTA, "refs.psd").replace("\\", "/")
 
 PREP = r"""async () => {

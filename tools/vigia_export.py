@@ -9,12 +9,12 @@ SÓ LENDO (não clica em nada), e no fim confere o arquivo gerado.
 Rodar em segundo plano (run_in_background): imprime uma linha a cada 10% e o resumo final; sai com 1 se falhar.
 Conferência do arquivo: resolução/qps/duração (× duração da timeline ativa), quadros pretos (blackdetect, fora do
 fade final), silêncio longo, LUFS integrado e pico real (ebur128; referência YouTube −14 a −16 LUFS, pico ≤ −1 dBTP).
-Relatório completo em D:/kanivete_testes/vigia/<arquivo>.txt."""
+Relatório completo em D:/Kanivete/Testes/vigia/<arquivo>.txt."""
 import argparse, json, os, re, subprocess, sys, time
 
 sys.stdout.reconfigure(encoding="utf-8")
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAIDA_REL = "D:/kanivete_testes/vigia"
+SAIDA_REL = "D:/Kanivete/Testes/vigia"
 
 ESTADO_JS = """() => {
   const f = (typeof VEFILA === 'object' && VEFILA) ? VEFILA : null;

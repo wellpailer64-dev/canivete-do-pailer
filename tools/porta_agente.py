@@ -7,12 +7,13 @@
     py -3.13 tools/porta_agente.py [9222|9333]   -> mostra a porta escolhida e as cópias vistas
 
 Regras:
-- Lê os dois agente.json: o do %APPDATA% atual e o do app de teste (D:/kanivete_testes/appdata). Só conta cópia com
+- Lê os dois agente.json: o do %APPDATA% atual e o do app de teste (D:/Kanivete/Testes/appdata). Só conta cópia com
   estado "ligado", porta anotada e pid vivo.
 - Nunca cruza os dois apps: pedido de teste (fora de 9222-9231) não cai no app do Pailer, e vice-versa.
 - CANIVETE_AGENTE_PORTA vale se for do mesmo tipo do pedido.
-- A porta pedida, se estiver viva no arquivo, ganha. Senão, a cópia mais recente do mesmo tipo que responder em
-  /json/version. Nada achado -> devolve a pedida (comportamento antigo).
+- A porta pedida, se estiver viva no arquivo, ganha. Senão, só reutiliza uma única cópia do mesmo tipo.
+  Mais de uma candidata exige escolha explícita; não troca de projeto pela data do registro.
+  Nada achado -> devolve a pedida (isso não autoriza abrir outra cópia).
 """
 import json
 import os
@@ -20,18 +21,23 @@ import sys
 import urllib.request
 
 FAIXA_PAILER = range(9222, 9232)
-TESTE_APPDATA = r"D:\kanivete_testes\appdata"
+TESTE_APPDATA = r"D:\Kanivete\Testes\appdata"
 
 
 def _pid_vivo(pid):
     try:
         import ctypes
-        h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))   # PROCESS_QUERY_LIMITED_INFORMATION
+        kernel = ctypes.windll.kernel32
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        kernel.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        kernel.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        h = kernel.OpenProcess(0x1000, False, int(pid))   # PROCESS_QUERY_LIMITED_INFORMATION
         if not h:
             return False
         codigo = ctypes.c_ulong()
-        ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(codigo))
-        ctypes.windll.kernel32.CloseHandle(h)
+        kernel.GetExitCodeProcess(h, ctypes.byref(codigo))
+        kernel.CloseHandle(h)
         return codigo.value == 259   # STILL_ACTIVE
     except Exception:
         return False
@@ -69,14 +75,17 @@ def porta(padrao=9222):
         env = int(os.environ.get("CANIVETE_AGENTE_PORTA") or 0)
     except ValueError:
         env = 0
-    if env and mesmo_tipo(env):
-        return env
     vivas = [i["porta"] for i in instancias() if mesmo_tipo(i["porta"])]
+    if env and mesmo_tipo(env):
+        if vivas and env not in vivas:
+            raise RuntimeError(f'CANIVETE_AGENTE_PORTA={env} conflita com as instâncias registradas {vivas}; corrija a variável, não abra outra cópia.')
+        return env
     if padrao in vivas:
         return padrao
-    for p in reversed(vivas):   # mais recente primeiro
-        if _responde(p):
-            return p
+    if len(set(vivas)) > 1:
+        raise RuntimeError(f'Mais de uma instância candidata: {vivas}. Identifique o projeto e informe a porta; não escolhi a mais recente.')
+    if vivas:
+        return vivas[0]
     return padrao
 
 

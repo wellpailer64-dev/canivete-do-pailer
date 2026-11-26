@@ -1,5 +1,5 @@
 """Rastreador de movimento (editor-rastro.js + Functions/rastreador.py) no app de verdade, com GABARITO: um quadro
-parado tremido com tremor conhecido (tools/rastreador/bancada.py gera D:/kanivete_testes/estab/sint/3129_congelado_tremido.mp4).
+parado tremido com tremor conhecido (tools/rastreador/bancada.py gera D:/Kanivete/Testes/estab/sint/3129_congelado_tremido.mp4).
 Abre o vídeo, põe uma cor sólida pequena na V2, abre o rastreador, caixa num canto forte, rastreia para frente, confere
 o erro do caminho, aplica num Nulo novo e na cor sólida (quadros-chave seguem o ponto), rastreia para trás do meio,
 print do monitor e exportação (a cor sólida acompanha o ponto no arquivo).
@@ -22,7 +22,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from Functions import estabilizador as E  # noqa: E402
 
-SINT = "D:/kanivete_testes/estab/sint/"
+SINT = "D:/Kanivete/Testes/estab/sint/"
 VID = SINT + "3129_congelado_tremido.mp4"
 erros = []
 
@@ -89,11 +89,11 @@ def main():
         print("falta o vídeo do gabarito: rode py -3.13 tools/rastreador/bancada.py")
         return 2
     GT = gabarito()
-    saida = "D:/kanivete_testes/rastro/"
+    saida = "D:/Kanivete/Testes/rastro/"
     os.makedirs(saida, exist_ok=True)
     app = None
     if not a.sem_abrir:
-        B = "D:/kanivete_testes/"
+        B = "D:/Kanivete/Testes/"
         env = dict(os.environ, APPDATA=B + "appdata", TEMP=B + "tmp", TMP=B + "tmp", LOCALAPPDATA=B + "localappdata")
         app = subprocess.Popen([sys.executable, os.path.join(RAIZ, "main.py"), f"--agente={a.porta}"], cwd=RAIZ, env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

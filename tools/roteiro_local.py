@@ -216,7 +216,7 @@ if __name__ == "__main__":
     ap.add_argument("--modelo", default="qwen3:8b"); ap.add_argument("--slides", type=int, default=5)
     ap.add_argument("--itens", default="", help="itens obrigatórios do briefing separados por ; (ex.: 'pão;iogurte;castanhas')")
     ap.add_argument("--montar", action="store_true"); ap.add_argument("--exportar"); ap.add_argument("--exemplo",
-        default=r"D:\kanivete_biblioteca\modelos\carrossel-esqueletos-demo\demo.json")
+        default=r"D:\Kanivete\Biblioteca\modelos\carrossel-esqueletos-demo\demo.json")
     ap.add_argument("--etapas", action="store_true", help="lista em microtarefas (precisa de --itens)"); ap.add_argument("--primaria", default="#ff3b22")
     ap.add_argument("--perfil", help="nome;cargo;@usuario"); ap.add_argument("--estilo", help="força o estilo (senão o mapa sugere)")
     ap.add_argument("--hibrido", action="store_true", help="redator gemma3:12b na capa/metáforas/virada + --modelo nos itens")

@@ -7,10 +7,10 @@ from urllib.request import urlopen
 
 from playwright.sync_api import sync_playwright
 
-SAIDA = Path('D:/kanivete_testes/misturar_se')
+SAIDA = Path('D:/Kanivete/Testes/misturar_se')
 SAIDA.mkdir(parents=True, exist_ok=True)
 for nome, pasta in [('TEMP', 'tmp'), ('TMP', 'tmp'), ('APPDATA', 'appdata'), ('LOCALAPPDATA', 'localappdata')]:
-    destino = Path('D:/kanivete_testes') / pasta
+    destino = Path('D:/Kanivete/Testes') / pasta
     destino.mkdir(parents=True, exist_ok=True)
     os.environ[nome] = str(destino)
 with urlopen(f'http://127.0.0.1:{_porta_agente(9333)}/json/list', timeout=5) as resposta:

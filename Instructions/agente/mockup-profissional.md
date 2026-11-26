@@ -1,8 +1,8 @@
 # Mockup profissional — o que os PSDs dos estúdios fazem (estudo 2026-10-15)
 
-5 mockups dissecados camada por camada em `D:/kanivete_biblioteca/mockups/estudo/<nº>/dissecado/`
+5 mockups dissecados camada por camada em `D:/Kanivete/Biblioteca/mockups/estudo/<nº>/dissecado/`
 (`arvore.txt`, `ficha.json` com efeitos/ajustes/máscaras, `camadas/NNN.png`, `folha_camadas.jpg`; prévias juntas em
-`folha_previas.jpg`). Dissecador: `D:/kanivete_testes/scripts/dissecar_psd.py arquivo.psd` (psd_tools).
+`folha_previas.jpg`). Dissecador: `D:/Kanivete/Testes/scripts/dissecar_psd.py arquivo.psd` (psd_tools).
 
 | nº | mockup | camadas | técnica que ensina |
 |---|---|---|---|
@@ -78,9 +78,9 @@ Dois caminhos, um para cada uso:
      de ar IOR 1/1,42), tampa com ranhuras por relevo; 2. rótulo = película 0,004 acima do corpo com a arte em
      textura (nítida); 3. chanfro em todas as quinas do perfil (`arredondar`); 4. ciclorama na cor da marca (rebate de
      cor no produto); 5. softboxes compridos (chave/recorte) + teto + HDRI de estúdio (Poly Haven CC0,
-     `D:/kanivete_biblioteca/hdri`); 6. **cor "Khronos PBR Neutral"** (AgX deixava o verde de marca pastel);
+     `D:/Kanivete/Biblioteca/hdri`); 6. **cor "Khronos PBR Neutral"** (AgX deixava o verde de marca pastel);
      7. adaptativo 0,004 + OIDN "accurate" (sem ondas no fundo); 8. câmera com dutch (roll) e desfoque (fstop).
-  1400 px / 320 amostras na RTX 3050: pote 44 s, bastão em gel 53 s. Saídas em `D:/kanivete_testes/estudio`.
+  1400 px / 320 amostras na RTX 3050: pote 44 s, bastão em gel 53 s. Saídas em `D:/Kanivete/Testes/estudio`.
   Pendências: gel menos "suco" (absorção mais fraca/teal e fundo menos saturado perto), texto branco sobre gel
   claro precisa de contraste, pretos mais fundos (bandeira preta/rim), biblioteca de cenas (flutuando, repetição em
   fileira, macro), modelos importados (.glb) com rótulo, painel manual + comando do agente.

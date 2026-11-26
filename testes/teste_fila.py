@@ -1,4 +1,4 @@
-"""Fila de render do Editor (editor-fila.js) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila),
+"""Fila de render do Editor (editor-fila.js) — abre um app próprio (porta 9334, dados em D:/Kanivete/Testes/fila),
 monta duas timelines com material gerado, põe as duas na fila de uma vez, roda a fila e confere os arquivos.
 
     py -3.13 testes/teste_fila.py
@@ -16,7 +16,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from Functions.midia import ffmpeg  # noqa: E402
 
-BASE = "D:/kanivete_testes/fila/"
+BASE = "D:/Kanivete/Testes/fila/"
 SAIDA = BASE + "saida/"
 PORTA = 9334
 erros = []

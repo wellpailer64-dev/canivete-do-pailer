@@ -12,11 +12,12 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 
 ## WhatsApp
 - Recepção rápida: `wa_comando.py ouvir` aguarda notificação do observador DOM pela ponte, com conferência de segurança a cada 20s; confirma antes de transcrever e usa fila persistida. `wa_comando.py estado` mostra etapas/falhas. Script `whatsapp_eventos`; detalhes e limites em `kanibrowser/EXTENSAO.md`.
-- Pedidos por áudio no grupo KaniCode: `wa_comando.py ouvir` transcreve mensagens próprias novas por ID e encaminha à gerente; primeira leitura só marca histórico. Falha não vira pedido nem é repetida automaticamente; conferir log `D:/kanivete_testes/wa_comando/ouvinte.log`.
+- Pedidos por áudio no grupo KaniCode: `wa_comando.py ouvir` transcreve mensagens próprias novas por ID e encaminha à gerente; primeira leitura só marca histórico. Falha não vira pedido nem é repetida automaticamente; conferir log `D:/Kanivete/Testes/wa_comando/ouvinte.log`.
 - Contexto compacto no navegador interno: `kb.py --onde kanicode scripts rodar --nome whatsapp_contexto`. Para mensagens carregadas, dados `{"conversa":"Nome completo","n":3}`; confere conversa exata, não rola e não envia. Guia `kanibrowser/EXTENSAO.md`.
 - Primeira noção da conversa: `WT resumo --conversa X --n 40`. A Kani já errou quem falou, data e o que estava pendente (2026-11-02): é só orientação; antes de agir, conferir no texto completo, cujo caminho vem na saída.
 - Ler mensagens: `WA ler --conversa X --n 20 --transcrever`. Procurar conversa: `WA conversas --busca termo`.
 - Baixar: `WA arquivo --conversa X --nome parte --pasta P`; `WA midia --conversa X --tipo video --duracao 1:10 --saida a.mp4`; `--tipo foto`.
+- **Varredura da conversa/grupo** (quem, data, hora, tipo, links, imagem/áudio/arquivo; salva .md+.json em `D:/Kanivete/KaniBrowser/wa_varreduras`, imprime só resumo): `py -3.13 "D:/Kanivete/Plugins/kanibrowser/wa.py" varrer --conversa X [--n 300] [--desde AAAA-MM-DD] [--de-quem nome] [--tipo-msg link,imagem,audio,arquivo,texto] [--busca termo] [--transcrever] [--json]`. Gatilhos: "o que rolou/combinaram no grupo", "o que X falou", "resume a conversa", "o que falta/pendente", "onde está o link/arquivo/foto", "o que mandaram hoje/desde segunda", antes de abrir demanda ou responder cliente sem contexto. Escolha: contexto geral = `varrer --desde` (ou `--n 100`); só links = `links`; só 3 últimas = `ler`; `--transcrever` já põe a fala dos áudios na varredura (cache: o 2º uso é grátis; toca o áudio mudo, então fica marcado como ouvido; combine com `--desde`/`--n` para não transcrever histórico à toa). Ler o `.md` gerado (por dia) em vez de repetir a leitura; conferir no texto antes de agir.
 - Todos os links da conversa (meus e dele, sem repetir, com quem/quando/texto): `WA links --conversa X [--busca drive] [--data AAAA-MM-DD] [--json]`. Lê a conversa inteira (~5 min); "último link" = o mais recente da lista.
 - Enviar só com ok do Pailer: `WA enviar --conversa X --texto "..."`.
 - Mandar vídeo, Reels, exportação ou arquivo: `WA enviar --conversa X --arquivo v.mp4 --texto legenda`. Vídeo acima de 16 MB vai como arquivo, sem compressão; `--comprimir` só se pedirem. Ver como iria sem postar: `--sim` (só simula). PDF e documento vão sem `--documento`: essa opção é para foto e vídeo sem compressão. Nunca testar em grupo de cliente.
@@ -61,7 +62,7 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Padrão: logo ao lado do nome escrito, nível em palavra, todas as experiências com abertura e bullets de uma ideia cada. Duas colunas podem sair fora de ordem em robôs antigos: avisar.
 
 ## Texto atrás da pessoa / gancho de reel
-- Receita completa e armadilhas: `Instructions/agente/receita-gancho-texto-atras.md`. Máscara por pessoa e conferida por número: `py -3.13 D:/kanivete_testes/scripts/roto_pessoa.py --base CLIPE --nome NOVO --tr N --soma "x,y;x,y;x,y" --tira "x,y" --caixa x0,x1,y0,y1 --fora x0,x1,y0,y1` (rodar em segundo plano, ~1,5 min).
+- Receita completa e armadilhas: `Instructions/agente/receita-gancho-texto-atras.md`. Máscara por pessoa e conferida por número: `py -3.13 D:/Kanivete/Testes/scripts/roto_pessoa.py --base CLIPE --nome NOVO --tr N --soma "x,y;x,y;x,y" --tira "x,y" --caixa x0,x1,y0,y1 --fora x0,x1,y0,y1` (rodar em segundo plano, ~1,5 min).
 - Recorte do Roto cortando cabeça/orelha/óculos (ou checar se está bom) sem olhar imagem: `py -3.13 tools/agente/roto_refinar.py --clip "NOME"` mede contra o BEN2 (falta % por quadro; moto/placa/outra pessoa ficam de fora); `--aplicar` põe os pontos, congela e remede. BEN2 na CPU ~20 s/quadro, guardado em `<cache>/ref` (2ª vez 3 s). `--tirar` mede sobra (objeto na frente da pessoa também conta: conferir antes de tirar).
 
 ## Demandas
@@ -73,7 +74,7 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 ## Gerar imagem / upscale fiel / textura / PNG de marca
 Gatilho: precisa de imagem gerada, upscale ou asset no estilo do cliente → **Codex CLI** (conta do ChatGPT), nunca o navegador primeiro.
 `cd PASTA_SAIDA && codex exec --skip-git-repo-check -s workspace-write -i ORIG.png -- "Use a ferramenta de geração de imagem (image_generation, não Python)... Salve como NOME.png na pasta atual"`
-Prompt depois de `--`. ~2 min; paralelo com `&`. Exemplo: `D:/kanivete_testes/scripts/dad/codex_up.sh`. Conferir lado a lado.
+Prompt depois de `--`. ~2 min; paralelo com `&`. Exemplo: `D:/Kanivete/Testes/scripts/dad/codex_up.sh`. Conferir lado a lado.
 
 - **QR Code personalizado** (cores, pontos, olhos, logo no centro; PNG/SVG/PDF; confere leitura): `py -3.13 Functions/qr_personalizado.py "<link>" --saida pasta/qr [--tipo url|wifi|whatsapp|pix] [--cor #hex --fundo #hex --olho #hex] [--pontos quadrado|arredondado|bolinha] [--logo png --logo-pct 17]`. Sai com código 2 e aviso se não leu em todos os tamanhos. Aba visual "QR Code" (menu Códigos, frontend/js/qr.js) pronta (salva PNG/SVG/PDF e copia); pelo chat: MCP kanivete_qr (sem app aberto).
 

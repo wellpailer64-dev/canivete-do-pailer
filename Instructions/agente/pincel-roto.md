@@ -18,7 +18,7 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
 ## Rodada 2 (2026-10-18)
 - **Modelo**: SAM 2.1 de vídeo fp16 da diffusionstudio (Apache-2.0, revisões fixas, MD5): "alta" = Hiera-Small 1024
   (`modelos_ia/sam2_small_video_fp16`, 112 MB) e "rapido" = Hiera-Tiny 512 (`sam2_tiny_video_fp16`, 83 MB). Bancada
-  `D:/kanivete_testes/roto/bancada.py` (RTX 3050, 1080p): Tiny fp32 antigo 0,50 s/quadro; **Small fp16 0,28** (e segue a
+  `D:/Kanivete/Testes/roto/bancada.py` (RTX 3050, 1080p): Tiny fp32 antigo 0,50 s/quadro; **Small fp16 0,28** (e segue a
   mão que o Tiny perdia, microfone sai limpo — `folha_mao.jpg`, `folha_bancada.jpg`); Tiny 512 fp16 0,07 (borda grossa).
   Na CPU o Small fp16 é lento (codificador 3,6 s) → sem placa o padrão é "rapido". Qualidade fica no projeto (`rd.q`);
   trocar refaz as memórias dos quadros-base (`info.qual`; npz de outro modelo é apagado ao abrir).
@@ -39,7 +39,7 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
 - **Descontaminar cores** (`descontaminar`, padrão 100%): Blur-Fusion em 2 passadas (Forte & Pitié 2021; médias da
   pessoa e do fundo ponderadas pelo alfa, raios 90 e 6 px em 1080p), médias em meia resolução e a fórmula final só nos
   pixels da faixa da borda: 0,15 s/quadro. Some a auréola escura em volta do cabelo/rosto sobre fundo claro
-  (`D:/kanivete_testes/roto/descont.py`, `exp_lado.jpg`). Exportação: `_video_descontaminado` lê o vídeo ORIGINAL por
+  (`D:/Kanivete/Testes/roto/descont.py`, `exp_lado.jpg`). Exportação: `_video_descontaminado` lê o vídeo ORIGINAL por
   tubo do ffmpeg, 4 linhas de conta, grava ProRes 4444 por tubo (15 s: 12,6 → 38,5 s). Prévia igual: `c/c_N.png` (cor
   nova só na faixa, meia resolução) desenhada com `source-atop` depois do `destination-in`; mudar só a descontaminação =
   tarefa "cores" (não refaz o alfa).
@@ -73,7 +73,7 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
   refaz sempre a partir dele: + pedaços novos que tocam um ponto verde (o maior entre a leitura COM memória — com 2 pontos
   do miolo do recorte de antes — e a leitura SEM memória, só pelos traços), − onde o modelo tirou perto de um ponto
   vermelho. Só os pontos, com memória, a correção da mão virava "só a pele" (cabelo e camisa sumiam); com memória o modelo
-  resiste a pegar a mão borrada fora do corpo, sem memória pega (`D:/kanivete_testes/roto/sonda_mao.py`).
+  resiste a pegar a mão borrada fora do corpo, sem memória pega (`D:/Kanivete/Testes/roto/sonda_mao.py`).
 - **Poucos pontos**: traço vira 1 ponto (curto) ou 3 (15/50/85% do caminho); máximo 12 por quadro. Muitos pontos
   (15+) deram máscara fantasma (cinza no quadro todo) — medido no protótipo.
 - Medido (RTX 3050, 1080p): **0,56 s/quadro** propagando (codificador 0,20 + memória 0,25 + resto 0,1); 15 s de vídeo ≈ 4 min
@@ -97,7 +97,7 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
 - Exportação: `veTxPngs` → `veRotoPreparar` → `pincel_roto.video_alfa` (quadro ORIGINAL + alfa → ProRes 4444,
   `recorte_<hash>.mov`, refeito só se algo mudou) → no plano o clipe vira vídeo transparente começando em `a` (CPU:
   overlay com alfa; placa: `_entrada_video_alfa`).
-- Teste: `py -3.13 testes/teste_roto.py [--dur 15]` (porta 9336, D:/kanivete_testes/roto): base pela API, correção com o
+- Teste: `py -3.13 testes/teste_roto.py [--dur 15]` (porta 9336, D:/Kanivete/Testes/roto): base pela API, correção com o
   mouse, print da tela, exporta CPU e placa, confere texto atrás da pessoa e prévia × arquivo.
 
 ## Por que este modelo (pesquisa 2026-10-11)
@@ -110,7 +110,7 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
 ## Resultados (2026-10-11)
 - `teste_roto.py --dur 15`: 450 quadros em 300 s no app (0,67 s/quadro; 0,56 fora do app); correção com o mouse no
   quadro 180 traz a mão de volta nos quadros 160–190 (propaga para trás); CPU e placa: pessoa por cima do texto (dif 1,4),
-  0,00% do texto vazando na pessoa, prévia × arquivo 3,0–3,5. Vídeo: `D:/kanivete_testes/recorte_video/resultado/`.
+  0,00% do texto vazando na pessoa, prévia × arquivo 3,0–3,5. Vídeo: `D:/Kanivete/Testes/recorte_video/resultado/`.
 - Furo fechado pequeno (< 0,6% do quadro, sem encostar na borda) é tapado no Refinar borda (lentes, dedos).
 
 ## Pendências

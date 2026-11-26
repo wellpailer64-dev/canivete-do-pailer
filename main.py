@@ -67,10 +67,41 @@ def _js(fn, data):
             pass
 
 
+def _pasta_ja_aberta(pasta):
+    """True se alguma janela do Explorer já mostra essa pasta; nesse caso a traz para a frente (restaura se
+    minimizada) em vez de abrir outra janela da mesma pasta."""
+    try:
+        import subprocess as _sp
+        alvo = os.path.normcase(os.path.normpath(os.path.abspath(pasta))).rstrip("\\")
+        ps = ("$s=New-Object -ComObject Shell.Application;"
+              "foreach($w in $s.Windows()){try{$p=$w.Document.Folder.Self.Path;if($p){'P|'+$p+'|'+$w.HWND}}catch{}}")
+        r = _sp.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                    capture_output=True, text=True, timeout=8, creationflags=0x08000000)
+        for linha in (r.stdout or "").splitlines():
+            partes = linha.strip().split("|")
+            if len(partes) == 3 and os.path.normcase(os.path.normpath(partes[1])).rstrip("\\") == alvo:
+                try:
+                    import ctypes
+                    u = ctypes.windll.user32
+                    h = int(partes[2])
+                    if u.IsIconic(h):
+                        u.ShowWindow(h, 9)
+                    u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)   # Alt libera o SetForegroundWindow
+                    u.SetForegroundWindow(h)
+                except Exception:
+                    pass
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def _abrir_pasta(caminho):
     try:
         if caminho and os.path.exists(caminho):
-            os.startfile(caminho if os.path.isdir(caminho) else os.path.dirname(caminho))
+            pasta = caminho if os.path.isdir(caminho) else os.path.dirname(caminho)
+            if not _pasta_ja_aberta(pasta):
+                os.startfile(pasta)
     except Exception:
         pass
 
@@ -189,7 +220,8 @@ def select_image(tool):
 
 def open_folder(path):
     try:
-        os.startfile(path)
+        if not (os.path.isdir(path) and _pasta_ja_aberta(path)):
+            os.startfile(path)
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -251,7 +283,7 @@ def audio_cutter_export(file_path, cuts, output_format="mp3", tracks=None, main_
                     "duration": resultado.get("duration"),
                 })
                 try:
-                    os.startfile(resultado.get("output_folder") or os.path.dirname(file_path) or os.getcwd())
+                    _abrir_pasta(resultado.get("output_folder") or os.path.dirname(file_path) or os.getcwd())
                 except Exception:
                     pass
             else:
@@ -268,6 +300,20 @@ def audio_cutter_export(file_path, cuts, output_format="mp3", tracks=None, main_
 # ========================================
 _ve_prepare_stop = None
 _ve_export_stop = None
+_ve_midias_stop = set()
+_ve_midias_trava = threading.Lock()
+_ve_projeto_geracao = 0
+
+
+def ve_projeto_suspender():
+    global _ve_projeto_geracao
+    if _ve_prepare_stop is not None:
+        _ve_prepare_stop.set()
+    with _ve_midias_trava:
+        _ve_projeto_geracao += 1
+        for stop in _ve_midias_stop:
+            stop.set()
+    return {"success": True, "geracao": _ve_projeto_geracao}
 
 
 def _ve_emit(fn, data):
@@ -286,12 +332,14 @@ def video_cutter_prepare(file_path):
         _ve_prepare_stop.set()
     stop = threading.Event()
     _ve_prepare_stop = stop
+    geracao = _ve_projeto_geracao
 
     def run():
         try:
-            preparar(file_path, lambda ev: None if stop.is_set() else _ve_emit("veOnPrepare", ev), stop)
+            preparar(file_path, lambda ev: None if stop.is_set() else _ve_emit("veOnPrepare", {**ev, "path": file_path, "geracao": geracao}), stop)
         except Exception as e:
-            _ve_emit("veOnPrepare", {"stage": "error", "error": str(e)})
+            if not stop.is_set():
+                _ve_emit("veOnPrepare", {"stage": "error", "error": str(e), "path": file_path, "geracao": geracao})
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
@@ -304,14 +352,23 @@ def ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False, trechos
     fundo = prévia leve de um vídeo só do painel, com o app sem nada mais urgente (prioridade 2: uma conversão
     por vez e sempre com vaga livre para o que for para a timeline)."""
     from Functions.video_cutter import preparar_midia
+    stop = threading.Event()
+    with _ve_midias_trava:
+        _ve_midias_stop.add(stop)
+        geracao = _ve_projeto_geracao
 
     def run():
         try:
-            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}),
+            preparar_midia(path, lambda ev: None if stop.is_set() else _ve_emit("veOnMidia", {**ev, "id": mid, "path": path, "geracao": geracao}),
+                           stop_event=stop,
                            prioridade=0 if urgente else 2 if fundo else 1, leve=bool(leve) and not urgente and not fundo,
                            trechos=trechos)
         except Exception as e:
-            _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e)})
+            if not stop.is_set():
+                _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e), "path": path, "geracao": geracao})
+        finally:
+            with _ve_midias_trava:
+                _ve_midias_stop.discard(stop)
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
@@ -1042,7 +1099,8 @@ def reveal_file(path):
     try:
         if path and os.path.exists(path):
             import subprocess as _sp
-            _sp.Popen(["explorer", "/select,", os.path.normpath(path)])
+            if not _pasta_ja_aberta(os.path.dirname(os.path.abspath(path)) if os.path.isfile(path) else path):
+                _sp.Popen(["explorer", "/select,", os.path.normpath(path)])
             return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2429,7 +2487,7 @@ def transcrever_salvar_txt(texto, pasta_origem):
         path_txt = os.path.join(pasta_saida, f"transcricao_{timestamp}.txt")
         with open(path_txt, "w", encoding="utf-8") as f:
             f.write(texto)
-        os.startfile(pasta_saida)
+        _abrir_pasta(pasta_saida)
         return {"success": True, "path": path_txt}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2612,7 +2670,7 @@ def remover_fundo_salvar(indices, pasta_destino):
                 item["resultado_pil"].save(path_saida, format="PNG")
                 saved += 1
         if saved > 0:
-            os.startfile(pasta_destino)
+            _abrir_pasta(pasta_destino)
         return {"success": True, "saved": saved}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -2702,7 +2760,7 @@ def organizador_videos(folder_path, operadores=None, nome_projeto_premiere=None)
                              nome_projeto_premiere=nome_projeto_premiere)
             if _window:
                 _window.evaluate_js("updateOrganizadorVideosProgress({complete: true})")
-                os.startfile(folder_path)
+                _abrir_pasta(folder_path)
         except Exception as e:
             log(f"❌ Erro: {e}")
             if _window:
@@ -3401,6 +3459,9 @@ class ApiBridge:
     def video_cutter_prepare(self, file_path):
         return video_cutter_prepare(file_path)
 
+    def ve_projeto_suspender(self):
+        return ve_projeto_suspender()
+
     def video_cutter_export(self, file_path, segments, output_format="mp4", qualidade="medium",
                             resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
                             camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None, quadro=None,
@@ -3651,7 +3712,7 @@ class ApiBridge:
     # Painel Pessoas: rostos do projeto agrupados por pessoa + busca por foto (Functions/busca_rosto.py; editor-pessoas.js)
     def _rosto_cache(self, base):
         from Functions import render_cache
-        return os.path.join(base or os.path.expanduser("~"), render_cache.PASTA_RAIZ)
+        return os.path.join(render_cache.normalizar_base(base) or os.path.expanduser("~"), render_cache.PASTA_RAIZ)
 
     def ve_ps_analisar(self, midias, base=None, nomes=None):
         from Functions import busca_rosto
@@ -5594,10 +5655,10 @@ class ApiBridge:
 
     def ve_agente_porta(self):
         """Porta do modo agente desta abertura (Preferências → Modo desenvolvedor). teste = app das baterias de teste
-        (modo agente numa porta que não é a 9222 do app do Pailer — 9333/9334/9337…; ou APPDATA/TEMP em kanivete_testes;
+        (modo agente numa porta que não é a 9222 do app do Pailer — 9333/9334/9337…; ou APPDATA/TEMP em Kanivete/Testes;
         ou CANIVETE_TESTE=1): no fim de um render só um toque curto, sem a voz da Fran nem o som de concluído."""
         pastas = " ".join(os.environ.get(k) or "" for k in ("APPDATA", "TEMP", "LOCALAPPDATA")).lower()
-        teste = (os.environ.get("CANIVETE_TESTE") == "1" or "kanivete_testes" in pastas
+        teste = (os.environ.get("CANIVETE_TESTE") == "1" or ("kanivete"+chr(92)+"testes" in pastas or "kanivete/testes" in pastas)
                  or (_PORTA_AGENTE is not None and int(_PORTA_AGENTE) != 9222))
         return {"porta": _PORTA_AGENTE, "teste": teste}
 
@@ -6375,7 +6436,7 @@ def _abrir_em_outra_copia():
         from Functions import instancia_unica, projeto
         porta = _porta_agente()
         if porta and porta not in range(9222, 9232) and not instancia_unica.dados_isolados():
-            print("[instância] porta de teste exige APPDATA isolado em D:/kanivete_testes; não abri outra cópia")
+            print("[instância] porta de teste exige APPDATA isolado em D:/Kanivete/Testes; não abri outra cópia")
             return True
         if not instancia_unica.ja_aberta():
             return None

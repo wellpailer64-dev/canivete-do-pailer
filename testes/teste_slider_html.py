@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from playwright.sync_api import sync_playwright
 
 ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); a = ap.parse_args()
-OUT = "D:/kanivete_testes/slider_html"; os.makedirs(OUT, exist_ok=True)
+OUT = "D:/Kanivete/Testes/slider_html"; os.makedirs(OUT, exist_ok=True)
 falhas = []
 def ok(cond, nome, extra=""):
     print(("  ok  " if cond else "  FALHOU ") + nome + (f"  ({extra})" if extra else ""), flush=True)

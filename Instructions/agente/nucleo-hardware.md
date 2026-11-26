@@ -44,7 +44,7 @@ Correções, que valem para todo PC:
 2. **Medidor de áudio.** O fundo (escala, ~20 números, L/R, trilhos) é desenhado uma vez numa imagem guardada. A cada quadro ele só
    cola a imagem e desenha as barras. Isso tirava mais 10% do play.
 
-Perfil de CPU do play: `D:/kanivete_testes/scripts/hw_perfil_play.py projeto.vknv porta [s]`. Depois das correções, ~90% do tempo
+Perfil de CPU do play: `D:/Kanivete/Testes/scripts/hw_perfil_play.py projeto.vknv porta [s]`. Depois das correções, ~90% do tempo
 é trabalho nativo (decodificar e compor vídeo).
 
 ## Fase 2 (2026-10-10): os módulos seguem o plano
@@ -69,7 +69,7 @@ Perfil de CPU do play: `D:/kanivete_testes/scripts/hw_perfil_play.py projeto.vkn
 ## Fase 3 (2026-10-10): exportar, recortar e Kani no PC leve
 Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script Python dentro da simulação, sem abrir o app.
 
-**Exportar** (`D:/kanivete_testes/encoder/bench.py DEPO_ATUAL`, depoimento de 98 s):
+**Exportar** (`D:/Kanivete/Testes/encoder/bench.py DEPO_ATUAL`, depoimento de 98 s):
 - No forte: 101 s.
 - No leve: 669 s. O gargalo era o x264 `medium`. Num trecho de 20 s, decodificar leva 8 s; o medium crf18, 35 s; o veryfast crf17, 13 s.
   A qualidade foi a mesma (SSIM 0,949 e PSNR 32,5 nos três) e o arquivo saiu +4%.
@@ -97,11 +97,11 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
   - Por isso foi descartado (honestidade vem primeiro, kani-motor.md).
 
 ## Fase 4 (2026-10-10): Photo, partida e o resto da exportação no PC leve
-- **Photo, PSD real de 284 MB** (3000×3928, 9 camadas; cópia em `D:/kanivete_testes/hw/psd/carrossel.psd`): abre em ~9–11 s nos dois PCs.
+- **Photo, PSD real de 284 MB** (3000×3928, 9 camadas; cópia em `D:/Kanivete/Testes/hw/psd/carrossel.psd`): abre em ~9–11 s nos dois PCs.
   - No leve, a memória reservada da árvore chega a 4,7 GB de 5,6. Desse total, a GPU process da WebView tem 1,9 GB reservados
     (0,45 GB em uso) e o Python 1,4 GB.
   - O psd_tools deixa ciclos de referência: `editor_imagem.liberar` agora roda `gc.collect()`, e o Python em uso cai de 0,36 para 0,10 GB.
-  - Medir: `D:/kanivete_testes/scripts/hw_photo_psd.py porta arquivo.psd`.
+  - Medir: `D:/Kanivete/Testes/scripts/hw_photo_psd.py porta arquivo.psd`.
 - **Partida no leve:** o app fica parado (~0% de CPU) desde 5 s depois de abrir. Não há tarefa de fundo pesando (`hw_partida.py`).
 - **Exportar pela CPU, o que sobra** (`hw_capturar_cmd.py` + `hw_ablacao.py`, 15 s do depo no leve):
   - Os filtros sozinhos, sem gravar, levam 36 s.
@@ -110,7 +110,7 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
     o Quick Sync (h264_qsv, que o app já detecta) na gravação. Medir num PC real.
 
 ## Fase 5 (2026-10-10): play — o vídeo correndo atrás do som
-- O teste de play passava do limite de buscas e esperas até no PC forte. O grampo `D:/kanivete_testes/scripts/hw_buscas.py`
+- O teste de play passava do limite de buscas e esperas até no PC forte. O grampo `D:/Kanivete/Testes/scripts/hw_buscas.py`
   anota quem pede cada busca e mostrou o motivo:
   - o `veSeguirAudio` buscava o player da tela "para onde o som está agora";
   - a busca leva ~0,3 s e o som segue andando, então o player chegava atrasado de novo;
@@ -130,7 +130,7 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
   - 90% dos quadros: até 33 ms → até 26 ms.
 
 ## Fase 6 (2026-10-10): Vetor — zoom numa malha de degradê congelava
-- `D:/kanivete_testes/idv/idv_v2.aknv` (21 MB) tem 7 malhas 3D com 8.580 células. Medido com `hw_vetor.py` e `hw_vetor_perfil.py`:
+- `D:/Kanivete/Testes/idv/idv_v2.aknv` (21 MB) tem 7 malhas 3D com 8.580 células. Medido com `hw_vetor.py` e `hw_vetor_perfil.py`:
   - o redesenho normal leva 5 ms;
   - o **1º redesenho depois de um zoom 4× levava 20–26 s** no PC forte e 29 s no leve.
 - A causa estava em `vkMalhaDesenhar`: fatias de ~3 px da tela, cada uma com fill + stroke e conversão CMYK. No zoom isso virava
@@ -144,11 +144,11 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
   - tela inteira: 2,2 s → 46 ms e 20 s → 0,3 s;
   - PC leve: o pior redesenho caiu de 29 s para 14 ms.
   - De quebra, sumiram defeitos da versão antiga: chuvisco no brilho, listras na borda e um risco preto entre células 3D.
-    Veja `D:/kanivete_testes/hw/malha_cmp_z4.png` (antiga à esquerda).
+    Veja `D:/Kanivete/Testes/hw/malha_cmp_z4.png` (antiga à esquerda).
 - `testes/teste_vetor.py` PASSOU: 159 ok, sem erro de JS.
 
 ## Fase 7 (2026-10-10): Sound Kanivete — a tela caía para 8 quadros/s no play
-- Medido com `D:/kanivete_testes/scripts/hw_som.py` (N faixas com áudio longo, travadas acima de 100 ms em 20 s de play).
+- Medido com `D:/Kanivete/Testes/scripts/hw_som.py` (N faixas com áudio longo, travadas acima de 100 ms em 20 s de play).
   Com 2 faixas: 152 travadas no PC forte, e a tela caía de 30 para 8 quadros/s.
 - O JS estava 93% parado. O culpado era o **processo gráfico da WebView, em 100% de um núcleo**: `skDesenhar` refazia a linha
   do tempo inteira a cada quadro, com a onda em um retângulo de 1 px por coluna (milhares por faixa).
@@ -188,12 +188,12 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
 ficariam no player velho.
 
 ## Fase 9 (2026-10-10): cópias de edição com quadro-chave curto (a causa do arraste lento)
-- **O protótipo WebCodecs não ajudou sozinho.** Ele está em `D:/kanivete_testes/webcodecs`: `wc_proto2.js` e `medir_wc.py`,
+- **O protótipo WebCodecs não ajudou sozinho.** Ele está em `D:/Kanivete/Testes/webcodecs`: `wc_proto2.js` e `medir_wc.py`,
   com decodificador contínuo, cache de quadros e de bytes. Deu ~280 ms por passo, empatado com o `<video>` (262 ms).
 - **Causa:** as cópias "Otimizados FullHD" tinham quadro-chave a cada 4–8 s, o padrão do codificador. Para mostrar um quadro
   qualquer, qualquer decodificador refaz centenas de quadros. O HEVC do celular tem um por segundo.
   As prévias leves (0,5 s) e as renderizadas (10 quadros) já eram curtas.
-- **Medido no `<video>` do app** (`D:/kanivete_testes/webcodecs/medir_gop.py`, 60 s de um clipe do depo):
+- **Medido no `<video>` do app** (`D:/Kanivete/Testes/webcodecs/medir_gop.py`, 60 s de um clipe do depo):
 
   | Formato | Pulo | Vai e vem | Tamanho |
   |---|---|---|---|
@@ -202,7 +202,7 @@ ficariam no player velho.
   | GOP 0,5 s | 30 ms | 28 ms | 142 MB |
   | GOP 0,25 s com quadros B | 27 ms | 24 ms | 144 MB |
 
-- **No projeto real**, num espelho em `D:/kanivete_testes/depo_rapido`, gerado por `scripts/espelho_depo_rapido.py`, sem tocar
+- **No projeto real**, num espelho em `D:/Kanivete/Testes/depo_rapido`, gerado por `scripts/espelho_depo_rapido.py`, sem tocar
   nos arquivos do cliente. Sem prévias renderizadas nos dois, para ser justo:
   - arraste numa direção: 76 → 36 ms por movimento, travadas 14 → 5;
   - vai e vem: 71 → 37 ms, travadas 40 → 17;
@@ -215,7 +215,7 @@ ficariam no player velho.
   - `media_server.register`: arquivo regravado (data ou tamanho mudaram) ganha token novo, a URL muda e o player recarrega.
   - Editor (`vePjVerCopiasAntigas`, editor-projeto.js): ao abrir um projeto com cópias antigas, pergunta uma vez se quer
     refazer em segundo plano. "Agora não" fica lembrado por projeto. No fim, a troca é automática.
-  - Teste: `py -3.13 testes/teste_copias_edicao.py` (porta 9395, tudo em `D:/kanivete_testes/copias_edicao`). Pulo 98 → 24 ms.
+  - Teste: `py -3.13 testes/teste_copias_edicao.py` (porta 9395, tudo em `D:/Kanivete/Testes/copias_edicao`). Pulo 98 → 24 ms.
 - **Cuidado:** o depo.vknv aponta para os vídeos REAIS do cliente. O app de teste mostra a pergunta de refazer. Nunca clicar
   "Refazer" nele; usar o espelho.
 

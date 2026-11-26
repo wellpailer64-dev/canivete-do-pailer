@@ -743,7 +743,7 @@ CASOS = {
     """, r"""
         return (async () => {
             VE.playhead = 0;
-            const m = await veMogrtAbrir('D:/kanivete_testes/mogrt/lower.mogrt', { inserir: true });
+            const m = await veMogrtAbrir('D:/Kanivete/Testes/mogrt/lower.mogrt', { inserir: true });
             if (!m) return;
             const a = VE.clips.find(c => veCompBase(veMediaOf(c)) === m);
             const ids = Object.fromEntries(m.mogrt.controles.map(c => [c.nome, c.id]));

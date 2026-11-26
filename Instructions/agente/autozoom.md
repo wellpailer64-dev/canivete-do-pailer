@@ -29,7 +29,7 @@ Conferido 2026-10-18: escala medida numa grade = curva (±0,03); prévia × quad
 placa 3,8. Armadilha: `fps` no `exportar_video` é TEXTO (`f'{fps:.3f}'`) — `float(fps)`.
 
 ## Teste
-`py -3.13 testes/teste_autozoom.py [--sem-placa]` (porta 9338, D:/kanivete_testes/autozoom). API: `VEAZ_API.gerar({qtd,
+`py -3.13 testes/teste_autozoom.py [--sem-placa]` (porta 9338, D:/Kanivete/Testes/autozoom). API: `VEAZ_API.gerar({qtd,
 estilo, forca})`, `.remover()`, `.lista()`, `.escala(c, T)`.
 
 ## Pendências

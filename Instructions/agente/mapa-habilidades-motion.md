@@ -11,10 +11,10 @@ Legenda: ⭐ = o Pailer elogiou nominalmente · 🔓 = desbloqueada (usada e apr
 ## Peças que destravaram
 | Peça | Data | Nota do Pailer | Pasta |
 |---|---|---|---|
-| Propaganda KANIVETE (ref. Pinterest, 23 s) | 2026-10-10 | "ficou perfeito" | `D:/kanivete_testes/motion_kanivete/` |
-| Intro "SEQUÊNCIA DE APROVADOS" (Carlinhos, ref. Dodge, 5 s) | 2026-10-12 | "superou em TODOS os pontos", aprovado de primeira | `D:/kanivete_testes/intro_aprovados/` |
-| 2 reels Black Friday A/B + mosaico (Carlinhos, "Sinal amarelo", 24 s) | 2026-10-20 | mosaico: "melhora muito boa"; reels: "falta pouco" | `D:/kanivete_testes/bf_carlinhos/` |
-| Ref 01 "Everyone wants shortcuts" (Missão Repertório, Pinterest, 16 s) | 2026-11-04 | (aguardando nota) | `D:/kanivete_testes/repertorio/01_shortcuts/` |
+| Propaganda KANIVETE (ref. Pinterest, 23 s) | 2026-10-10 | "ficou perfeito" | `D:/Kanivete/Testes/motion_kanivete/` |
+| Intro "SEQUÊNCIA DE APROVADOS" (Carlinhos, ref. Dodge, 5 s) | 2026-10-12 | "superou em TODOS os pontos", aprovado de primeira | `D:/Kanivete/Testes/intro_aprovados/` |
+| 2 reels Black Friday A/B + mosaico (Carlinhos, "Sinal amarelo", 24 s) | 2026-10-20 | mosaico: "melhora muito boa"; reels: "falta pouco" | `D:/Kanivete/Testes/bf_carlinhos/` |
+| Ref 01 "Everyone wants shortcuts" (Missão Repertório, Pinterest, 16 s) | 2026-11-04 | (aguardando nota) | `D:/Kanivete/Testes/repertorio/01_shortcuts/` |
 
 ## Ferramenta-base: plano em código (montar.py + montador.js)
 🔓 A timeline inteira sai de um script: cada camada é um dicionário (tipo, trilha, início, duração, propriedades,
@@ -73,7 +73,7 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
   vinheta leve; versão escura na cor da marca para a abertura. Sem baixar nada.
 - 🔓 **Grade tracejada sutil**, objeto recortado com sombra, mini-objeto no canto, cursor clicando.
 - 🔓 **Colagem em profundidade na Cena 3D** (teste "Pravda Noir", soviético + noir, 2026-10-14, o Pailer: "tá perfeito")
-  — pasta `D:/kanivete_testes/jornal/` (gerar.py → recorte.py → montar.py). Como fazer:
+  — pasta `D:/Kanivete/Testes/jornal/` (gerar.py → recorte.py → montar.py). Como fazer:
   1. **Assets**: Z-Image (`gerador_imagem.gerar`) com prompts de foto P&B de jornal (fundo de página, fábrica, pessoa,
      silhueta, foguete) + formas em numpy/PIL (sol, estrela, faixa diagonal, manchetes em Impact/Times).
   2. **Textura de recorte** (`recorte.py`): duotom tinta `#141210` × papel `#ECE2C9` + grão; **retícula** de jornal a 45°
@@ -132,7 +132,7 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
 - Parallax automático de UMA foto (mapa de profundidade). (Vídeo em modelo 3D: ✅ textura de vídeo, ref 01.)
 - Respiro de quadro (o quadro inteiro encolhe 97% com borda preta por 2 quadros, ref 01 em 3,35 s): precisa de Comp-pai com escala.
 
-## Peça: V1 GaIA (Smart Tree/Finep, 8 min, 2026-10-14) — `D:/kanivete_testes/smarttree/v1/` (base.py + montar_v1.py + montador.js)
+## Peça: V1 GaIA (Smart Tree/Finep, 8 min, 2026-10-14) — `D:/Kanivete/Testes/smarttree/v1/` (base.py + montar_v1.py + montador.js)
 - 🔓 **Documentário inteiro por plano em código**: cobertura e motion presos às PALAVRAS da narração (`em("frase", apos)`
   sobre o palavras.json do Whisper); respiros = trechos da narração com folga (`RESPIROS`). Narração nova = transcrever e
   remontar (o ritmo acompanha). `sequencia([...])` = cada tomada vai até a próxima.
@@ -149,7 +149,7 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
 - Armadilha: fonte instalada só para o usuário (Fraunces) NÃO aparece no editor (cai no Arial). Conferir medindo a
   largura no canvas (`measureText` igual ao Arial = falta); `document.fonts.check` sempre diz sim.
 
-## Peça: Reels Black Friday A/B (Carlinhos, 2026-10-19) — `D:/kanivete_testes/bf_carlinhos/` (montar.py gera as 2 timelines)
+## Peça: Reels Black Friday A/B (Carlinhos, 2026-10-19) — `D:/Kanivete/Testes/bf_carlinhos/` (montar.py gera as 2 timelines)
 - 🔓 **Trilha escolhida por medida** (não dá para ouvir): prévias do Epidemic (`audiocdn.epidemicsound.com/lqmp3/...`,
   capturadas tocando cada linha) → librosa: energia por segundo, BPM, batidas. Procurar **pausa seca + drop** (FLACO,
   Azucares: pausa 29,5–33,0, drop 33,27). Começar o reel numa frase da música (16 tempos antes do drop): gancho 8 tempos,
@@ -180,7 +180,7 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
   Kali Kush (Switch Remix, instr.): silêncio 77,55–79,2, drop 80,797; 2ª parada 92,75–95,75 com a volta em 96,0 = CTA no
   silêncio e o botão bate na volta. **Licença**: Creator NÃO cobre cliente nem anúncio pago — não confirmar o diálogo.
 
-## Peça: Ref 01 "Everyone wants shortcuts" (Missão Repertório, 2026-11-04) — `D:/kanivete_testes/repertorio/01_shortcuts/`
+## Peça: Ref 01 "Everyone wants shortcuts" (Missão Repertório, 2026-11-04) — `D:/Kanivete/Testes/repertorio/01_shortcuts/`
 Estética "papel + manchas": papel claro com grade fina, manchas pretas orgânicas, tipografia Montserrat preta, objetos 3D
 cinza. Decupagem em `decupagem.md`; tudo sai de `montar.py` (+ `montador.js` que já cria Cena 3D do plano e `txa`);
 comparação lado a lado com `folha.py t1 t2 …` (nossa em cima, referência embaixo, MESMOS tempos). Faixas automáticas:

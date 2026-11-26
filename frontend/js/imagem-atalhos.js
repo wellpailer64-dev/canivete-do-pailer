@@ -30,7 +30,7 @@ Object.assign(IE_ATALHOS, {
     'Shift+Ctrl+L': 'autoTom', 'Alt+Shift+Ctrl+L': 'autoContraste', 'Shift+Ctrl+B': 'autoCor',
     // camadas
     'Alt+Ctrl+A': 'camTodas', 'Alt+.': 'camTopo', 'Alt+,': 'camBase', 'Alt+Shift+[': 'camAddAbaixo', 'Alt+Shift+]': 'camAddAcima',
-    'Alt+Shift+Ctrl+E': 'carimbarVisiveis', 'Ctrl+2': 'alvoCamada', 'Ctrl+\\': 'alvoMascara', '/': 'travaTransp',
+    'Alt+Shift+Ctrl+E': 'carimbarVisiveis', 'Ctrl+2': 'travaCamada', 'Ctrl+\\': 'alvoMascara', '/': 'travaTransp',
     '\\': 'mascaraRubi', '+': 'bmProximo', 'Shift+-': 'bmAnterior',
     // seleção
     'Shift+Ctrl+D': 'selRefazer',
@@ -143,6 +143,14 @@ Object.assign(IE_CMDS, {
     camBase: doc => { const t = ieTodas(doc); if (t.length) ieAtivar(t[0].id, doc); },
     camAddAcima: doc => { const t = ieTodas(doc), i = t.findIndex(L => L.id === doc.ativa); if (t[i + 1]) ieAtivar(t[i + 1].id, doc, { somar: true }); },
     camAddAbaixo: doc => { const t = ieTodas(doc), i = t.findIndex(L => L.id === doc.ativa); if (i > 0) ieAtivar(t[i - 1].id, doc, { somar: true }); },
+    travaCamada: doc => {
+        const sel = ieSelecionadas(doc);
+        if (!sel.length) return;
+        const bit = IE_TRAVA.tudo, ligar = !(sel[0].travas & bit);
+        sel.forEach(L => { L.travas = ligar ? (L.travas | bit) : (L.travas & ~bit); });
+        ieHist(ieT(ligar ? 'Travar camada' : 'Destravar camada'));
+        ieUiCamadas();
+    },
     alvoCamada: doc => { doc.mascaraAlvo = false; ieUiCamadas(); ieOpcoesRender(); },
     alvoMascara: doc => { const L = ieAtiva(doc); if (L && L.m) { doc.mascaraAlvo = true; ieUiCamadas(); ieOpcoesRender(); } },
     travaTransp: doc => {
@@ -524,7 +532,7 @@ const IE_REF_ATALHOS = [
     ['Camadas', 'Alt+Shift+Ctrl+E', 'Carimbar visíveis numa camada nova', 1], ['Camadas', 'Alt+[ / ] (Shift: somar)', 'Camada de baixo / de cima', 1],
     ['Camadas', 'Alt+. / Alt+,', 'Camada do topo / da base', 1], ['Camadas', 'Ctrl+[ / ] (Shift: até o fim)', 'Recuar / avançar a camada', 1],
     ['Camadas', 'Ctrl+clique na miniatura (Shift/Alt)', 'Carregar seleção (somar/subtrair/cruzar)', 1], ['Camadas', 'Alt+clique no olho', 'Mostrar só esta', 1],
-    ['Camadas', 'Shift+clique / Alt+clique na máscara', 'Desativar máscara / ver só a máscara', 1], ['Camadas', 'Ctrl+2 / Ctrl+\\', 'Editar a camada / a máscara', 1],
+    ['Camadas', 'Shift+clique / Alt+clique na máscara', 'Desativar máscara / ver só a máscara', 1], ['Camadas', 'Ctrl+2', 'Travar / destravar camada', 1], ['Camadas', 'Ctrl+\\', 'Editar a máscara', 1],
     ['Camadas', 'Duplo clique na camada / no nome', 'Estilo de camada / renomear', 1], ['Camadas', 'Ctrl+clique em Nova camada', 'Nova camada abaixo', 1],
     ['Camadas', 'Alt+clique em Adicionar máscara', 'Máscara que esconde', 1],
     ['Menus', 'Shift+Ctrl+N / Ctrl+O / Ctrl+S', 'Novo arquivo / abrir / salvar', 1], ['Menus', 'Shift+Ctrl+S (ou Alt+Ctrl+S)', 'Salvar como (.iknv ou .psd)', 1],

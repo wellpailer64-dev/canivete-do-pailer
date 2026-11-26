@@ -913,7 +913,7 @@ const iePintor = (tipo, nome, tecla, icone) => ({
     nome, tecla, icone, cursorPincel: true,
     cursor: () => (IE.op[tipo].tam * (IE.doc?.zoom || 1) >= 6 ? 'none' : 'crosshair'),
     down(p, ev, doc) { ieTracoIniciar(p, ev, doc, tipo); },
-    move(p) { if (IE_TRACO) ieTracoPara(p); },
+    move(p) { ieTracoPara(p); },
     up() { ieTracoFim(); },
     // Alt + botão direito arrastando para os lados: tamanho (como no Photoshop); o círculo fica parado onde clicou
     rightDown(p, ev) {

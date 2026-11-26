@@ -4,9 +4,9 @@ Vale para arte e vídeo de cliente do Pandalab. Siga na ordem. Cliente com ficha
 
 ## DESTINO OBRIGATÓRIO (regra do Pailer, 2026-11-16)
 Toda arte ou edição nova precisa de destino ANTES do primeiro arquivo: cliente > mês > pasta da peça na sequência > BRUTO/ASSETS/PROJETO/RENDERS.
-Tudo nasce lá (projeto, assets, prévias de aprovação, render). Nunca em `D:/kanivete_testes`, tmp ou raiz.
+Tudo nasce lá (projeto, assets, prévias de aprovação, render). Nunca em `D:/Kanivete/Testes`, tmp ou raiz.
 Sem destino claro: PERGUNTAR ao Pailer, nunca presumir. Ao fechar a tarefa, conferir que a pasta existe e nada ficou solto.
-Falha de origem: entregas da Magnet Us de nov/2026 soltas em `D:/kanivete_testes/pecas`.
+Falha de origem: entregas da Magnet Us de nov/2026 soltas em `D:/Kanivete/Testes/pecas`.
 
 ## Método de pastas (toda demanda, do sistema ou local — 2026-11-12)
 1. Quem é o cliente? Tem pasta? (`mapa_clientes.json` do Pandalab). Abrir a pasta do mês das produções.
@@ -19,7 +19,7 @@ Falha de origem: entregas da Magnet Us de nov/2026 soltas em `D:/kanivete_testes
    Busca das pastas pela palavra (BRUTO/ASSETS/PROJETO/RENDER, com ou sem número): `Functions/pastas_peca.py`.
 
 ## Regras fixas do Pailer
-- Trabalhar dentro da pasta do card, onde a demanda foi baixada. Nada de montar em `D:/kanivete_testes`.
+- Trabalhar dentro da pasta do card, onde a demanda foi baixada. Nada de montar em `D:/Kanivete/Testes`.
 - O programa fica visível do começo ao fim. Ele precisa ver o trabalho acontecendo.
 - Fim do trabalho = salvar e deixar aberto para ele aprovar. Exportar, entregar e mudar o card só depois do ok.
 - Carrossel termina com guia na divisa e uma fatia por página, à vista.

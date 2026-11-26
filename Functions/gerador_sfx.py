@@ -1,5 +1,5 @@
 """Gerar efeitos sonoros por texto (EzAudio XL, licença MIT; OpenSound/EzAudio) — local, sem torch, sem login.
-Os três pedaços do modelo foram convertidos para ONNX 16 bits (D:/kanivete_testes/sfx/ez: exportar.py + enxugar.py):
+Os três pedaços do modelo foram convertidos para ONNX 16 bits (D:/Kanivete/Testes/sfx/ez: exportar.py + enxugar.py):
   t5.onnx (+ .pesos)       leitor de texto (encoder do flan-t5-xl, Apache 2.0)   ~2,3 GB
   dit.onnx (+ .pesos)      gerador (MaskDiT, 28 blocos)                          ~1,6 GB
   vae_dec.onnx (+ .pesos)  decodificador latente → som 24 kHz                    ~0,1 GB

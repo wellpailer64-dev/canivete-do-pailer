@@ -71,7 +71,7 @@ MODELOS = {
         "tamanho_mb": 928,
     },
     # BEN2 (MIT): segmentação rápida e limpa — na GPU ~1 s (BiRefNet Lite ~5 s), objeto sólido sem mancha no vidro.
-    # Usado no recorte de objetos e como "miolo sólido" do recorte de pessoas (2026-10-06, D:/kanivete_testes/recorte2)
+    # Usado no recorte de objetos e como "miolo sólido" do recorte de pessoas (2026-10-06, D:/Kanivete/Testes/recorte2)
     "ben2": {
         "nome": "BEN2 (rápido, objetos)",
         "arquivo": "ben2-base.onnx",

@@ -3,7 +3,7 @@ import os
 import sys
 import win32com.client
 
-SAIDA = sys.argv[1] if len(sys.argv) > 1 else r"D:\kanivete_testes\psd_texto\modelo_ps.psd"
+SAIDA = sys.argv[1] if len(sys.argv) > 1 else r"D:\Kanivete\Testes\psd_texto\modelo_ps.psd"
 os.makedirs(os.path.dirname(SAIDA), exist_ok=True)
 ps = win32com.client.Dispatch("Photoshop.Application")
 ps._FlagAsMethod("DoJavaScript")

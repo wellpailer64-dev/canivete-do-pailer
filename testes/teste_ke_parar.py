@@ -33,7 +33,7 @@ with sync_playwright() as p:
     ok(est == 'cancelado', f'item ficou cancelado em {round(time.time() - t1, 1)} s ({est})')
     time.sleep(2)
     ok(not blender_rodando(), 'Blender fechado')
-    sobra = glob.glob(r'D:\kanivete_testes\cache_teste\Estudio\*_quadros')
+    sobra = glob.glob(r'D:\Kanivete\Testes\cache_teste\Estudio\*_quadros')
     ok(not sobra, f'sem quadros pela metade ({sobra})')
     J("VEFILA.itens = VEFILA.itens.filter(x => !x.tipo); VEFILA.pausar = false; veFilaRender()")
 print('FALHAS:', len(falhas)); sys.exit(1 if falhas else 0)

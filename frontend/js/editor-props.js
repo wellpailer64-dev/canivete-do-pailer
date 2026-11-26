@@ -736,9 +736,7 @@ function vePpSet(k, v) {
         if (!isFinite(v)) return;
         if (n === 'sc') v = Math.max(0.5, Math.min(2000, v));
         if (n === 'op') v = Math.max(0, Math.min(100, v));
-        if (n === 'ax' || n === 'ay') { c.p = { ...veStaticProps(c), [n]: v }; return 'props'; }   // como no Premiere: o objeto anda
-        if (veKfOn(c, n) && !veInClip(c)) { veToast('Leve a agulha para dentro do clipe para criar o quadro-chave'); return; }
-        veApplyProps(c, { [n]: v });
+        if (!vePropsAplicarSelecao(c, { [n]: v })) return;
         if (VEPP.edit) veTxEditarPos();
         return 'props';
     }

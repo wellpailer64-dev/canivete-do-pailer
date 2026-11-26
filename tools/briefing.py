@@ -6,7 +6,7 @@ uso: py -3.13 tools/briefing.py "<pasta do cliente>" [--saida pasta] [--modelo m
              quadros nos momentos em que a pessoa APONTA ("aqui", "esse", "isso", "coloca", "tira"...) com a fala
              embaixo de cada quadro (quadros_<video>.jpg) — junta "o que ele diz" com "onde ele aponta"
   imagens    folha das imagens soltas da pasta (imagens_soltas.jpg)
-Saída (padrão D:/kanivete_testes/briefing/<pasta>): briefing.md (ler primeiro: só texto) e as folhas.
+Saída (padrão D:/Kanivete/Testes/briefing/<pasta>): briefing.md (ler primeiro: só texto) e as folhas.
 Olhe as folhas só quando o texto não bastar. Whisper na CPU: medium ~1 min por minuto de fala (rode em segundo plano)."""
 import argparse, hashlib, json, os, re, subprocess, sys, textwrap
 sys.stdout.reconfigure(encoding="utf-8")
@@ -139,7 +139,7 @@ def main():
     ap.add_argument("--sem-midia", action="store_true", help="pula áudio e vídeo (só PDF e imagens)")
     a = ap.parse_args()
     pasta = os.path.abspath(a.pasta)
-    saida = a.saida or os.path.join("D:/kanivete_testes/briefing", re.sub(r"[^\w\-]+", "_", os.path.basename(pasta))[:40])
+    saida = a.saida or os.path.join("D:/Kanivete/Testes/briefing", re.sub(r"[^\w\-]+", "_", os.path.basename(pasta))[:40])
     os.makedirs(saida, exist_ok=True)
     todos = sorted(os.path.join(r, f) for r, _, fs in os.walk(pasta) for f in fs)
     md = [f"# Briefing: {pasta}", f"{len(todos)} arquivos. Leia o texto primeiro; abra as folhas só se precisar."]

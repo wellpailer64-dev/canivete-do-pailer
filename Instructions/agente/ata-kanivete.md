@@ -24,7 +24,7 @@ Pedido do Pailer em 2026-10-17. Publicada como **Beta** (selo na barra lateral e
    pausa 0,35 s). Com os 20 s das legendas o modelo devolveu trecho VAZIO (perdeu 20 s) e o corte forçado partiu
    "cinco mil" em "cinco anos. Mil". Glossário corrige termos parecidos (`_glossario_aplicar`, ≥ 0,78).
 4. **Vozes**: sherpa-onnx (pyannote segmentation 3.0 + wespeaker resnet34 voxceleb), limiar 0,5. Medido na reunião falsa
-   de 4 vozes (`D:/kanivete_testes/ata/limiar.py`): 0,5 = 8 grupos com 95,6% de pureza; 0,6–0,7 = 5 grupos 84%; 0,8 = 3
+   de 4 vozes (`D:/Kanivete/Testes/ata/limiar.py`): 0,5 = 8 grupos com 95,6% de pureza; 0,6–0,7 = 5 grupos 84%; 0,8 = 3
    grupos 66%. Melhor separar demais e deixar o usuário dar nome (mesmo nome = mesma pessoa; ▶ ouve um trecho).
    Com o indicador de quem fala (simulado) + regra mista: 97,7% das palavras com o nome certo.
 5. **Nomes**: legendas do Meet (região `[role=region][aria-label*=egenda]`, linha que bate com um participante) votam o
@@ -49,7 +49,7 @@ Pedido do Pailer em 2026-10-17. Publicada como **Beta** (selo na barra lateral e
 - **Estilos de ATA** (`ESTILOS`: formal, resumida, detalhada, cliente, equipe, aula) + **pedido livre à Kani** (`doc.pedido`),
   na aba "Falantes e ajustes".
 - **Copiar** em texto (formato WhatsApp) e **Word** (`exportar_docx`, python-docx). **Kani** lê a ATA aberta (`KANI_TELA`).
-- Teste avulso: `D:/kanivete_testes/scripts/teste_ata_r2.py` (app em 9333; só lê, não grava nas reuniões).
+- Teste avulso: `D:/Kanivete/Testes/scripts/teste_ata_r2.py` (app em 9333; só lê, não grava nas reuniões).
 
 ## Medições (2026-10-17, RTX 3050)
 Reunião falsa de 2min17s: importar + transcrever + separar + ATA = 90 s. Transcrição 10× o tempo real; separação ~6×.
@@ -60,7 +60,7 @@ Gravação real do Pailer (72 s, só ele) transcreveu bem; errou só nomes próp
 - `sherpa_onnx/lib` traz um `onnxruntime.dll` próprio: carregar DEPOIS do onnxruntime-directml (a transcrição vem antes
   no `processar`). Ordem invertida não foi testada.
 - Convidados SEM login entrando por janela automática são barrados pelo Meet ("Não é possível participar"), mesmo com
-  acesso Aberto: participantes de teste precisam de contas Google logadas (`D:/kanivete_testes/ata/meet/bots.py --login N`).
+  acesso Aberto: participantes de teste precisam de contas Google logadas (`D:/Kanivete/Testes/ata/meet/bots.py --login N`).
 - Meet usa Trusted Types: nada de `innerHTML` na captura.
 
 ## Pendências (Beta)
@@ -69,4 +69,4 @@ Gravação real do Pailer (72 s, só ele) transcreveu bem; errou só nomes próp
 - Descobrir no DOM do Meet o indicador de quem está falando (melhor que a legenda; precisa de call com 2+ pessoas).
 - Meet aberto em outra aba do Chrome não é capturado (só a aba que o app abriu).
 - Lobby padronizado (`lobby.js`) e ícone de arquivo: não tem (não há arquivo de projeto).
-- Teste automático (`testes/teste_ata.py`) ainda não existe; scripts avulsos em `D:/kanivete_testes/ata`.
+- Teste automático (`testes/teste_ata.py`) ainda não existe; scripts avulsos em `D:/Kanivete/Testes/ata`.

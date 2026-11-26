@@ -3,7 +3,12 @@
     "allow": [
       "Edit(//D:/Kanivete/Plugins/kanicode/**)",
       "Write(//D:/Kanivete/Plugins/kanicode/**)",
-      "Bash(py -3.13 -m unittest:*)"
+      "Bash(py -3.13 -m unittest:*)",
+      "Bash(py -3.13 tools/*)",
+      "Bash(py -3.13 D:/Kanivete/Plugins/*)",
+      "Bash(py -3.13 \"D:/Kanivete/Plugins/*)",
+      "Bash(py -3.13 D:\\Kanivete\\Plugins\\*)",
+      "Bash(py -3.13 \"D:\\Kanivete\\Plugins\\*)"
     ]
   }
 }

@@ -16,7 +16,7 @@ uso: py -3.13 tools/knv.py peca.html [--formato feed] [--salvar peca.iknv] [--pr
               → <peca>_variacoes.jpg (lado a lado; o documento volta ao que era)
   --amostras "texto" [--fontes "Chewy,Gluten" | --estilo caixa-unica] → instala as que faltam e monta uma folha
               (estilos em tools/fontes_estilos.json); --estilos lista os estilos e pares
-  --biblioteca pasta (padrão D:/kanivete_biblioteca ou %KANIVETE_BIBLIOTECA%): <img src="recurso:nome"> lê
+  --biblioteca pasta (padrão D:/Kanivete/Biblioteca ou %KANIVETE_BIBLIOTECA%): <img src="recurso:nome"> lê
               recursos/nome.png; <img data-guardar="nome"> grava lá o recurso recortado (+ nome.json com prompt/semente)
   --guardar-modelo nome [--nota "..."]  copia html, .iknv, receitas, exportados e prévia para modelos/nome (estudo)
   --listar    recursos e modelos da biblioteca
@@ -45,7 +45,7 @@ ap.add_argument("--sem-previa", action="store_true"); ap.add_argument("--ver"); 
 ap.add_argument("--referencia"); ap.add_argument("--comparar", nargs="?", const="tudo"); ap.add_argument("--variacoes")
 ap.add_argument("--gerar"); ap.add_argument("--sementes", default="7,11,23"); ap.add_argument("--proporcao", default="1:1"); ap.add_argument("--inteiro", action="store_true")
 ap.add_argument("--amostras"); ap.add_argument("--fontes"); ap.add_argument("--estilo"); ap.add_argument("--estilos", action="store_true")
-ap.add_argument("--biblioteca", default=os.environ.get("KANIVETE_BIBLIOTECA", r"D:\kanivete_biblioteca"))
+ap.add_argument("--biblioteca", default=os.environ.get("KANIVETE_BIBLIOTECA", r"D:\Kanivete\Biblioteca"))
 ap.add_argument("--revisar", action="store_true", help="revisor (tools/revisor.py): corte, contraste, sombra dura, avatar");
 ap.add_argument("--guardar-modelo"); ap.add_argument("--nota", default=""); ap.add_argument("--listar", action="store_true")
 ap.add_argument("--usuario", action="store_true"); ap.add_argument("--psd"); ap.add_argument("--base")
@@ -172,7 +172,8 @@ with sync_playwright() as p:
         try: b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}"); break
         except Exception: time.sleep(1)
     else: sys.exit(f"app não está aberto em --agente={a.porta}")
-    pg = next((x for c in b.contexts for x in c.pages if "index.html" in x.url), None)
+    _pgs = [x for c in b.contexts for x in c.pages if "index.html" in x.url]
+    pg = next((x for x in _pgs if x.evaluate("document.scripts.length") > 0), _pgs[0] if _pgs else None)  # janela destacada (só a timeline) não tem scripts
     pg.wait_for_function("typeof ieCmd === 'function'", timeout=90000)
     funcs, api = recarga_js()
     if not a.sem_recarga:

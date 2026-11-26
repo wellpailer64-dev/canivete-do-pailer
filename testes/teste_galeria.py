@@ -1,13 +1,13 @@
 """Filtro > Galeria de filtros (app em --agente=9333). Abre a janela, espera as miniaturas, troca de filtro, empilha
 duas camadas de efeito e dá OK; depois aplica cada um dos 47 filtros por automação numa foto, medindo o tempo e
-conferindo que mudou a imagem; por fim num objeto inteligente (vira filtro inteligente). Prints em D:/kanivete_testes/scripts.
+conferindo que mudou a imagem; por fim num objeto inteligente (vira filtro inteligente). Prints em D:/Kanivete/Testes/scripts.
 Uso: python testes/teste_galeria.py [--recarregar]"""
 import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
-FOTO = "D:/kanivete_testes/cena/foto.jpg"
+FOTO = "D:/Kanivete/Testes/cena/foto.jpg"
 falhas = []
 def conferir(ok, nome, extra=""):
     print(("  ok    " if ok else "  FALHOU ") + nome + (f" ({extra})" if extra else ""))
@@ -38,7 +38,7 @@ with sync_playwright() as p:
     conferir(pg.evaluate("IE._gal.pilha[IE._gal.pilha.length - 1].f") == "aquarela", "clicar na miniatura troca o filtro")
     pg.click("[data-p='nova']"); pg.click(".ie-gal-mini[data-f='texturizador']"); time.sleep(1.5)
     conferir(pg.evaluate("IE._gal.pilha.map(x => x.f).join()") == "aquarela,texturizador", "duas camadas de efeito")
-    pg.screenshot(path="D:/kanivete_testes/scripts/galeria_janela.png")
+    pg.screenshot(path="D:/Kanivete/Testes/scripts/galeria_janela.png")
     print("  prévia:", round(pg.evaluate("IE._gal.ultimo().ms")), "ms")
     pg.keyboard.press("Enter")
     pg.wait_for_function("!IE._gal", timeout=60000); time.sleep(0.3)

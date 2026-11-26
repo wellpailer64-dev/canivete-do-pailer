@@ -2,7 +2,7 @@
 
 Base: `D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/06 - MAGNETUS`
 Fluxo geral: `Instructions/agente/fluxo-peca-cliente.md`. Pasta do card: `03 - PAUTAS MENSAIS/<ano>/<pacote>/<nº - peça>`.
-Carrossel de Artigo tem modelo próprio: `D:/kanivete_biblioteca/modelos/magnetus_artigo/LEIA-ME.md`.
+Carrossel de Artigo tem modelo próprio: `D:/Kanivete/Biblioteca/modelos/magnetus_artigo/LEIA-ME.md`.
 
 ## Presets (`PRESSETS/`)
 | Peça | Arquivo | Formato |
@@ -24,7 +24,7 @@ Em Enquete e Imagem do Dia, cada prancheta traz um monitor: `horizontal` (FEED 1
 
 ## Enquete do Dia: comando único
 `py -3.13 tools/peca.py enquete --pasta "<card>" --nome "NOME" --exame IMG [--seta X,Y] [--apagar X,Y,W,H] [--refazer]`
-Escolhe o monitor, deixa só o par certo, cria as fatias, salva e devolve prévias em `D:/kanivete_testes/pecas`. `--seta` = ponto na imagem original; `--apagar` = região de letra clara a remover.
+Escolhe o monitor, deixa só o par certo, cria as fatias, salva e devolve prévias em `D:/Kanivete/Testes/pecas`. `--seta` = ponto na imagem original; `--apagar` = região de letra clara a remover.
 Vídeo do cliente: `peca.py instrucao "<video>"` (fala + folha de quadros). Exportar: `peca.py entregar ... --exportar --saida "<card>/04 - RENDERS"`; entregar: `panda.py entregar <id> --pasta "<card>/04 - RENDERS" --sim`.
 
 ## Normal ou Alterado

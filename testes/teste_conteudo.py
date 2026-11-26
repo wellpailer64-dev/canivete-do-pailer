@@ -2,7 +2,7 @@
 
     py -3.13 testes/teste_conteudo.py
 
-Usa a foto e a máscara de exemplo do LaMa (D:/kanivete_testes/lama: image.jpg, mask.png, output_onnx_fp32.png; baixe
+Usa a foto e a máscara de exemplo do LaMa (D:/Kanivete/Testes/lama: image.jpg, mask.png, output_onnx_fp32.png; baixe
 de huggingface.co/Carve/LaMa-ONNX se faltar). Seleção = a pessoa (máscara cortada em >127, o caso que sem a expansão
 deixava um fantasma). Confere: camada nova com só a área preenchida e a pessoa sumida (perto da saída de referência do
 LaMa), saída na própria camada + Atenuar 0% volta ao original, sem seleção recusa. Sai com 1 se reprovar.
@@ -19,7 +19,7 @@ from playwright.sync_api import sync_playwright
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-P = "D:/kanivete_testes/lama/"
+P = "D:/Kanivete/Testes/lama/"
 erros = []
 
 

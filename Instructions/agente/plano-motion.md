@@ -3,7 +3,7 @@ Código: `frontend/js/editor-motion.js` (+ ganchos em editor.js, editor-fx.js, e
 editor-grafico.js, editor-props.js; `css/editor-motion.css`). API: `window.VEMO_API`. Testes: `py -3.13 testes/teste_motion.py`
 (mouse de verdade, porta 9335) e `py -3.13 testes/teste_export.py --casos motion,fxmotion,curvas [--folha]`.
 
-Origem: desafio 2026-10-10 de refazer a referência do Pinterest (`D:/kanivete_testes/motion_ref/`, análise cena a cena em
+Origem: desafio 2026-10-10 de refazer a referência do Pinterest (`D:/Kanivete/Testes/motion_ref/`, análise cena a cena em
 `ANALISE.md`, folhas em `frames/`) como propaganda do KANIVETE. Regra do Pailer: o que faltar no app, construir antes de
 animar ("trabalhando é que se percebe o que falta").
 
@@ -37,7 +37,7 @@ VEMO_API.pontosEli(x, y, w, h) / pontosRet(...) → caminho para animar a másca
 ```
 
 ## Receita validada (propaganda KANIVETE, 2026-10-10 — o Pailer: "ficou perfeito")
-Arquivos: `D:/kanivete_testes/motion_kanivete/` (roteiro.md, narrar.py, gerar_assets.py, montar.py + montador.js,
+Arquivos: `D:/Kanivete/Testes/motion_kanivete/` (roteiro.md, narrar.py, gerar_assets.py, montar.py + montador.js,
 folha.py, exportar.py). Ordem que funcionou:
 1. **Ler a referência**: folhas de quadros a 6 q/s e 30 q/s nas transições (`motion_ref/frames`), transcrever a fala dela;
    anotar cena a cena (tempo, texto, objeto, movimento, transição) em ANALISE.md.

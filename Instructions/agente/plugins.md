@@ -7,7 +7,7 @@ painéis UXP/CEP não rodam fora da Adobe.
 
 ## VST3 — carregador próprio (Functions/vst3.py)
 Python puro + ctypes, sem compilador e sem GPL (a pedalboard é GPL-3: só na bancada). Interfaces pelos cabeçalhos
-oficiais da Steinberg (vst3_pluginterfaces, MIT; cópia em D:/kanivete_testes/vst/sdk): IID e ordem dos métodos de lá.
+oficiais da Steinberg (vst3_pluginterfaces, MIT; cópia em D:/Kanivete/Testes/vst/sdk): IID e ordem dos métodos de lá.
 - `varrer()`, `Plugin(caminho, cid).carregar(sr)`, `.parametros()`, `.definir(id, 0..1)`, `.processar(audio)` (compensa a
   latência: Goyo 2238 amostras), `.estado()`/`.restaurar()` (bytes; processador + controlador), `.abrir_janela()`.
 - Anfitrião em Python: IHostApplication, IComponentHandler, IBStream, IParameterChanges/IParamValueQueue,
@@ -33,7 +33,7 @@ item no veDockMenu. Clicar abre o plugin num **PAINEL** do editor (aba; encaixar
 - janela solta fechando (encaixar de volta): `_resgatar_plugins` (FormClosing, main.py) passa a subjanela para a principal
   antes de o Windows destruí-la junto; fechar a aba = processo do plugin fecha.
 - Plugin maior que o painel: preso no canto (sem rolagem ainda); `canResize` = ocupa o painel.
-APIs `ve_vst3_painel/_estado/_fechar`, `VEPLG_API.painel(nome)`. Testes: `D:/kanivete_testes/scripts/plugins_sub.py`,
+APIs `ve_vst3_painel/_estado/_fechar`, `VEPLG_API.painel(nome)`. Testes: `D:/Kanivete/Testes/scripts/plugins_sub.py`,
 `plugins_painel.py` (solto, encaixado alinhado ao pixel, menu por cima, outra aba, fechar).
 
 ## VST3 no Rack de efeitos da trilha (Mixer) — 2026-10-18
@@ -55,7 +55,7 @@ APIs `ve_vst3_painel/_estado/_fechar`, `VEPLG_API.painel(nome)`. Testes: `D:/kan
 - Medido (app de teste): prévia = offline (diferença 0,0 depois da pré-rolagem), 4,16 s de som em 4,16 s; 1,3–3 ms por
   bloco de 85 ms; exportação CPU e placa = seco processado (1,2% do nível = ruído do AAC × 250% sem o plugin), +1,5 s em
   8 s; girar o BALANCE do NadIR com o mouse → ajuste no projeto → muda a exportação. Testes:
-  `D:/kanivete_testes/scripts/vst_previa.py`, `vst_export.py [--placa]`, `vst_rack_ui.py`, `D:/kanivete_testes/vst/teste_servir.py`.
+  `D:/Kanivete/Testes/scripts/vst_previa.py`, `vst_export.py [--placa]`, `vst_rack_ui.py`, `D:/Kanivete/Testes/vst/teste_servir.py`.
 
 ## Mixer: Rack da trilha não mudava a prévia (corrigido 2026-10-18)
 EQ/reverb/redução de reverberação leem o PASSADO do som (`tap`); no clipe vem da fonte, mas na SOMA da trilha o tap era
@@ -64,7 +64,7 @@ null → EQ só com os médios, reverb nem rodava (prévia 0%, exportação 221%
 Limiter" do Premiere, que vira o do Kanivete) não era aplicado em lugar nenhum: a trilha vai pela faixa à frente
 (compensa a antecipação) e na exportação pelo `_pre_vst` (`_hard_limiter`). Medido com/sem Rack (prévia/exportação):
 EQ 170/221%, reverb 38/45%, limitador 47/48%, Premiere Bass 780/705, Highpass 100/100, Delay 106/106, Hard Limiter
-81/81; fader −12 dB 75/75, pan −100 50/50. Teste: `D:/kanivete_testes/scripts/mixer_rack.py '<fx json>'`, `mixer_fader.py`.
+81/81; fader −12 dB 75/75, pan −100 50/50. Teste: `D:/Kanivete/Testes/scripts/mixer_rack.py '<fx json>'`, `mixer_fader.py`.
 
 ## Arquivar plugin (2026-10-19)
 Menu Janela › Plugins: ⌫ no item (ao passar o mouse) arquiva — some do menu e do Rack; "Arquivados" no fim restaura.
@@ -79,7 +79,7 @@ O host (nós) entrega "suítes": Property, ImageEffect, Parameter, Memory, Multi
 tela, OpenGL/CUDA = opcionais). Plugins de Premiere/After (.aex/.prm) continuam fora.
 **Arquitetura (igual ao VST3)**: `Functions/ofx.py` (ctypes), sempre num processo à parte (`--ofx varrer|servir|processar`):
 plugin que trava não derruba o app.
-- Etapa 0 (teste barato, ANTES de construir): baixar plugins de teste para `D:/kanivete_testes/ofx` — exemplos do SDK
+- Etapa 0 (teste barato, ANTES de construir): baixar plugins de teste para `D:/Kanivete/Testes/ofx` — exemplos do SDK
   oficial (BSD) e openfx-misc/openfx-io do Natron (GPL: só para TESTE, não vai no app) — e medir: carregar, descrever
   (nome, parâmetros, contextos "filter"/"general"/"transition"), renderizar 1 quadro RGBA de um numpy. Só segue se passar.
 - Etapa 1: varrer + menu (efeitos OFX numa categoria dos Efeitos de vídeo, com Arquivar como no VST3).
@@ -93,9 +93,9 @@ plugin que trava não derruba o app.
 Sapphire, BCC e Neat Video podem recusar um host desconhecido; testar com a versão demo de cada um antes de prometer;
 (2) muitos exigem OpenGL/CUDA para render rápido (CPU é obrigatório no padrão, mas lento); (3) Interact (alças na tela)
 fica para depois.
-**Etapa 0 — FEITA (2026-10-19), passou.** Hospedeiro de teste em ctypes: `D:/kanivete_testes/ofx/host_teste.py`
+**Etapa 0 — FEITA (2026-10-19), passou.** Hospedeiro de teste em ctypes: `D:/Kanivete/Testes/ofx/host_teste.py`
 (`listar <x.ofx>` / `render <x.ofx> <id> entrada.png saida.png [param=v,v]`; plugins do Natron 2.5.0 em
-`D:/kanivete_testes/ofx/dl`, DLLs do MinGW pela variável `OFX_DLLS=<Natron>/bin`). Misc.ofx (133 efeitos) e CImg.ofx
+`D:/Kanivete/Testes/ofx/dl`, DLLs do MinGW pela variável `OFX_DLLS=<Natron>/bin`). Misc.ofx (133 efeitos) e CImg.ofx
 (34) carregam, descrevem (parâmetros e padrões), criam a instância e renderizam 1280×720 RGBA float: Invert 16 ms,
 Grade 34, Blur 84, Bloom 229, GodRays 1,46 s (folha `folha.jpg`). Suítes obrigatórias: Property, ImageEffect, Parameter,
 Memory, MultiThread, Message (Interact/Progress/OpenGL e as da Nuke/Vegas são pedidas mas opcionais).
@@ -106,7 +106,7 @@ contextos), senão o Describe volta 4 (falta recurso do hospedeiro); (3) "..." d
 cada, double em bits (paramSetValue lido como u64); (4) OFX conta linhas de BAIXO para cima (inverter o numpy).
 Falta medir: plugin PAGO checando o hospedeiro (demo do Neat Video/Sapphire) e contexto de transição.
 **Neat Video demo (2026-10-19)**: instalador oficial (assinado NeatLab) extraído sem instalar com innoextract em
-`D:/kanivete_testes/ofx/neatvideo/ext`. A edição "RS" (Resolve) devolve **0 efeitos** em OfxGetNumberOfPlugins, antes
+`D:/Kanivete/Testes/ofx/neatvideo/ext`. A edição "RS" (Resolve) devolve **0 efeitos** em OfxGetNumberOfPlugins, antes
 mesmo do setHost: confere o nome do PROCESSO (strings DaVinciResolve/DaVinciResolveLite/FusionStudio + GetModuleFileName).
 Edição por hospedeiro = trava de licença; NÃO fingir ser outro programa. Para plugins pagos: pedir ao fabricante uma
 edição/licença para o KANIVETE, ou só os que vendem uma edição OFX genérica. O varrer mostra "nenhum efeito: o plugin
@@ -120,7 +120,7 @@ para dentro de cada Win64 — 532 efeitos). Tela: `frontend/js/editor-ofx.js` �
 painel Efeitos (editor-fx.js `veRenderFxList` chama `veOfxItensHtml(q)`), grupos pelo grouping, ⌫ por efeito e por
 grupo (localStorage `ve-ofx-arquivados`), "Arquivados" restaura, ↻ procura de novo; duplo clique = aviso (aplicar é a
 etapa 2). Só aparecem os de contexto filtro/geral/transição/gerador, sem os de estéreo. API `VEOFX_API.lista/arquivar/
-visiveis`. Teste: `py -3.13 D:/kanivete_testes/scripts/teste_ofx_painel.py` (app em --agente=9333, mouse de verdade).
+visiveis`. Teste: `py -3.13 D:/Kanivete/Testes/scripts/teste_ofx_painel.py` (app em --agente=9333, mouse de verdade).
 **Etapa 2 — FEITA (2026-10-19).** `--ofx params <x.ofx> <id>` / API `ve_ofx_params(caminho, id)` (`ofx.parametros`: rótulo,
 dica, padrão, min/max, faixa de exibição, opções, passo, tipo de double) → `veOfxDef(o)` em editor-ofx.js monta o tipo
 `VE_FX['ofx:<id>']`: Double/Integer = número com cronômetro; Boolean = caixinha; Choice = lista (tipo novo `lista` no
@@ -129,7 +129,7 @@ gama) = um controle para os 3 canais (`ofx.rgb`). Escondidos: maskInvert, intera
 descrição vai no efeito (`f.o`, via `junto` no veFxAdd) e `veOfxRegistrarClipes` remonta ao abrir/desfazer/refresh.
 Até a etapa 3–4 o tipo é `neutro: () => true` (não muda a imagem e fica fora do veFxExport) e mostra uma nota.
 Duplo clique ou ARRASTAR do bloco aplica (vale para a seleção, como os outros efeitos). Teste:
-`D:/kanivete_testes/scripts/teste_ofx_clipe.py` (porta 9333).
+`D:/Kanivete/Testes/scripts/teste_ofx_clipe.py` (porta 9333).
 **Arrastar efeito de janela solta (corrigido 2026-10-19)**: com o painel Efeitos numa janela solta (2º monitor), soltar
 num clipe da timeline principal não fazia nada (o movimento morria ao sair da janela e o ponto era lido na janela do
 painel). Agora `setPointerCapture` no item + `veFxAlvoTela` (ponto da tela → janela certa por `vedHitScreen`). Testes:
@@ -143,17 +143,17 @@ transições), BCC/Continuum, FilmConvert Nitrate (película/cor), Dehancer, Uni
 
 ## Substituto do Goyo (2026-10-19)
 O Goyo (Supertone) não funciona mais (servidor desligado em 2023). Comparação em voz da Fran + ruído rosa e grave
-(`D:/kanivete_testes/vst/goyo_sub/comparar.py`, SI-SDR contra a voz limpa, maior = melhor): ruidosa 6,8 dB;
+(`D:/Kanivete/Testes/vst/goyo_sub/comparar.py`, SI-SDR contra a voz limpa, maior = melhor): ruidosa 6,8 dB;
 **RNNoise** (werman, VST3 grátis, GPL) 12,4 dB; **Anti Noise do Kanivete (DeepFilterNet3)** 19,9 dB. O substituto é o
 Anti Noise (efeito de áudio do clipe) + Redução de reverberação, que já vêm no app. O RNNoise ficou em
 `D:\Kanivete\Plugins VST3` (pasta nova do varrer: `vst3.pastas_vst3()`, sem administrador, fora do C) como opção leve
-em tempo real. Vocal Gate (dan-k-k, GPL, VST3) baixado em `D:/kanivete_testes/vst/novos`: o instalador Inno é mais novo que o
+em tempo real. Vocal Gate (dan-k-k, GPL, VST3) baixado em `D:/Kanivete/Testes/vst/novos`: o instalador Inno é mais novo que o
 innoextract 1.9 — só instalando.
 
 **Sound Kanivete** (2026-10-19): plugins VST3 na faixa, prévia por faixa congelada — `Instructions/sound-kanivete.md`
 › "Plugins VST3 na faixa".
 **Tela dos plugins da jhudstudio (corrigido 2026-10-19)**: os 7 (C4-EQ10, Dual-DeSser…) davam access violation
-(ponteiro nulo) no `attached` do painel encaixado. Causa medida (`D:/kanivete_testes/vst/jh_attach.py`, variações):
+(ponteiro nulo) no `attached` do painel encaixado. Causa medida (`D:/Kanivete/Testes/vst/jh_attach.py`, variações):
 no attached eles procuram a janela de CIMA **visível do próprio processo**; no painel a de cima era a do KANIVETE (outro
 processo) → nulo. Não era DPI, COM/OLE, modo tempo real nem o que o main.py carrega. Agora o `_Painel` nasce numa
 janela deste processo visível FORA da tela (`casa`: WS_POPUP|WS_VISIBLE em −32000, ferramenta, sem foco) e `levar()`
@@ -171,7 +171,7 @@ Primeiro plugin: **Pandalab** (`D:\Kanivete\Plugins\pandalab`): modo "Sistema" =
 baixar o material para a pasta certa do cliente (`mapa_clientes.json` + `pastas.py`: cliente/produção/ano/mês/`nn - TIPO -
 TÍTULO`, vídeo com 01 BRUTO…04 RENDERS, BRIEFING.txt), criar demanda (com confirmação). Linha de comando para o agente:
 `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas|demanda|onde|baixar|pastas|criar`. Teste:
-`D:\kanivete_testes\scripts\teste_plugin_pandalab.py 9333`.
+`D:\Kanivete\Testes\scripts\teste_plugin_pandalab.py 9333`.
 Segundo plugin: **KaniBrowser** (`D:\Kanivete\Plugins\kanibrowser`): um Chrome do Kanivete com perfil próprio
 (`D:\Kanivete\KaniBrowser\perfil`, logins guardados) aberto por **canal privado** (`--remote-debugging-pipe` +
 `--remote-debugging-io-pipes=<h_in>,<h_out>`, pipes herdados só pelo Chrome via `STARTUPINFO.lpAttributeList`): SEM porta
@@ -183,7 +183,7 @@ Behance, Instagram, Drive, WhatsApp, Pandalab), abas, prévia, "Pegar imagens da
 — **preferência (2026-10-23): o navegador embutido do KaniCode** (função `painel` abre o 🌐 à vista; a vista vai para a
 aba da Kani 2 s depois do último clique do Pailer; brilho verde-limão em volta da página enquanto ela trabalha, `.trab` em
 `kanicode/ui/navegador.css`); só sem o KaniCode aberto passa pelo app em modo agente (`KPLUG.chamar`); também `instagram @perfil`, `link <url> --demanda ID8` (Drive público direto, resto pelo navegador → 02 - ASSETSMATERIAL), `pesquisar "termo"` (DuckDuckGo: o Google dá captcha). Pinterest pede login. Teste:
-`D:\kanivete_testes\scripts\teste_kanibrowser.py` (porta 9333).
+`D:\Kanivete\Testes\scripts\teste_kanibrowser.py` (porta 9333).
 **Tudo dentro do Kanivete** (2026-10-19, `visao.py`): nenhuma janela do Chrome aparece — todas ficam à esquerda de todos
 os monitores (`_fora`, calculado pela área virtual: o Pailer tem vários monitores), fora da barra de tarefas e do Alt+Tab
 (`_sem_barra`: WS_EX_TOOLWINDOW; a varredura em `estado` empurra para fora qualquer janelinha que caia num monitor), e o
@@ -199,7 +199,7 @@ vista. Esquerda = seu navegador (abas, endereço, ←→⟳, Ctrl+T/W/L, F5, Alt
 largura reduzida; divisória arrastável, ◨ esconde). Aba/janela minimizada ou de fundo não desenha e trava o clique:
 só a aba à vista recebe mouse. Transmissão só com o painel à vista. Sem `--aba`, tudo do agente roda na aba da Kani
 dentro de `trabalho("…")` (uma tarefa por vez; "Pesquisando…" e histórico). Identidade: óculos da Kani com duas lentes
-(seu navegador / visão dela), âmbar `#F0A01C`; fonte em `icone.svg`. Teste: `D:\kanivete_testes\scripts\teste_kb_dentro.py`
+(seu navegador / visão dela), âmbar `#F0A01C`; fonte em `icone.svg`. Teste: `D:\Kanivete\Testes\scripts\teste_kb_dentro.py`
 (porta 9333; 17 itens: nada na tela, foco, nitidez, acento, Ctrl+A, lista, aviso, rolar, nova aba, menu, Kani, parar).
 **Favoritos e logins** (2026-10-19): barra de favoritos (`favoritos.py`, `D:\Kanivete\KaniBrowser\favoritos.json`;
 iniciais ChatGPT, Gemini, WhatsApp, Instagram, Pinterest, Behance, Pandalab): ☆/Ctrl+D no endereço, arrastar
@@ -208,7 +208,7 @@ Google) em `icones/<domínio>.png`, servido pelo servidor da visão (`/<token>/i
 (`D:\Kanivete\KaniBrowser\perfil`) e sobrevivem ao app fechado de repente (cookie de 1 dia conferido). O Chrome abre com
 `--disable-blink-features=AutomationControlled`: sem isso `navigator.webdriver` = true e o login do Google/Microsoft
 recusa "navegador pode não ser seguro". Todos os sites abriram sem verificação de humano; o Pailer entrou em todos menos o Copilot (Microsoft recusou; tirado da lista). Teste:
-`D:\kanivete_testes\scripts\teste_kb_logins.py [persistir|conferir]` (porta 9333).
+`D:\Kanivete\Testes\scripts\teste_kb_logins.py [persistir|conferir]` (porta 9333).
 **ChatGPT pela Kani** (2026-10-19): `kb.chatgpt(pergunta, nova, pasta)` na aba da Kani (conta do Pailer): foca a caixa
 (`_CAIXA`), `Input.insertText`, clica `send-button`; espera o último bloco `data-talvt-turn-state` = "complete" e parado 2
 leituras (layout de 2026-10: NÃO há mais `article`/`data-message-author-role`; imagem em `generated-image-gallery`, URL
@@ -220,7 +220,7 @@ com a imagem pronta e igual por ~8 s entrega mesmo com o turno "em andamento" (a
 tela). **Epidemic Sound** (conta do Pailer, Creator): busca `epidemicsound.com/music/search/?term=...`; linhas têm
 botões `Play <nome>` e `Download`; tocar dispara `audio.src = audiocdn.epidemicsound.com/lqmp3/<id>.mp3` (prévia
 inteira para medir no librosa); Download abre diálogo (Full mix/MP3) → botão "Download" → `D:\Kanivete\KaniBrowser\downloads`.
-Script de coleta: `D:/kanivete_testes/bf_carlinhos/es_coleta.js`.
+Script de coleta: `D:/Kanivete/Testes/bf_carlinhos/es_coleta.js`.
 **Recarregar o plugin não fecha mais o navegador** (`_persistir`: estado em `sys`, adota a versão antiga viva): editar
 o .py e `plugin_pessoal_recarregar('kanibrowser')` vale na hora, até no app do Pailer. `plugin_pessoal_recarregar` também esquece os módulos
 que o plugin importou (fechar o navegador antes: o canal mora no módulo).

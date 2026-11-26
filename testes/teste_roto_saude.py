@@ -1,7 +1,7 @@
 """Pincel Roto enxuto (3 s em 720p): VEROTO_API.auto (Selecionar assunto + Freeze num comando) e o autorreparo da
 prévia: apaga máscaras da prévia, perde o trabalho no Python e confere que a saúde conserta sozinha.
 
-    py -3.13 testes/teste_roto_saude.py --porta 9334 [--video D:/kanivete_testes/roto_mini/mini.mp4] [--sem-abrir]
+    py -3.13 testes/teste_roto_saude.py --porta 9334 [--video D:/Kanivete/Testes/roto_mini/mini.mp4] [--sem-abrir]
 Ambiente do app de teste (APPDATA etc.) vem do chamador (vaga). Saída 0 = passou.
 """
 import argparse, glob, json, os, subprocess, sys, time, urllib.request
@@ -10,7 +10,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 ap = argparse.ArgumentParser()
 ap.add_argument("--porta", type=int, default=9334)
-ap.add_argument("--video", default="D:/kanivete_testes/roto_mini/mini.mp4")
+ap.add_argument("--video", default="D:/Kanivete/Testes/roto_mini/mini.mp4")
 ap.add_argument("--sem-abrir", action="store_true")
 a = ap.parse_args()
 erros = []

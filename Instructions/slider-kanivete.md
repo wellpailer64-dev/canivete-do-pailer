@@ -18,7 +18,7 @@ manual e por agente pelos MESMOS comandos, leve e fiel na exportação. Criado e
 | Kani: roteiro de palestra, notas, reescrever (ficha travada; o código monta) | `Functions/slider_kani.py` + `frontend/js/slider-kani.js` |
 | Ponte | `main.py` › `sd_salvar`, `sd_abrir`, `sd_url`, `sd_quadro`, `sd_exportar`, `sd_importar_pptx`, `sd_gravar_midia` |
 | Encaixe no app | `index.html` (barra › Apresentação, Home, `#page-slider-kanivete`), `app.js` (`sdAoTrocar`, `.dknv` em `abrirProjetoExterno`), `lobby.js` (`#sd-inicio`), `home-banners.js` (`sd`), `Functions/projeto.py` (`.dknv`), `tools/icones_arquivos.py` (`sd`) |
-| Arte | `img/home/banner-sd.webp`, `img/tools/slider-kanivete.webp` (Z-Image, `D:/kanivete_testes/scripts/gerar_banners.py sd`), `video/lobby-sd.webm` (home-bg tingido) |
+| Arte | `img/home/banner-sd.webp`, `img/tools/slider-kanivete.webp` (Z-Image, `D:/Kanivete/Testes/scripts/gerar_banners.py sd`), `video/lobby-sd.webm` (home-bg tingido) |
 | Teste | `py -3.13 testes/teste_slider.py [--sem-mp4]` (núcleo, ~2 min) e `py -3.13 testes/teste_slider_extra.py` (gráficos, paletas, animações, agente, leveza e TODOS os atalhos com teclado de verdade, ~1 min) — app em --agente=9333 |
 
 ## Modelo
@@ -28,7 +28,7 @@ Arquivo › "Novo documento A4") = página de 1191 × 1684 px (`SD_FORMATOS`); o
 pesquisável); layouts de slide são adaptados pela largura; `cena` no tamanho da página; o revisor usa mínimo de 13 px
 (papel) em vez do de telão. Modelo de orçamento Pandalab (barra preta lateral, "Orçamento" vertical laranja, tabela,
 caixas subtotal/desconto/total): `01 - PANDA LAB/00 - PANDA THINGS/MODELOS DE DOCUMENTO/Modelo_Orcamento_Pandalab_A4.dknv`;
-HTML de partida em `D:/kanivete_testes/orc_a4/modelo.html` (`sd.py cena … --substituir 1`).
+HTML de partida em `D:/Kanivete/Testes/orc_a4/modelo.html` (`sd.py cena … --substituir 1`).
 `slide = {id, fundo: {tipo: cor|degrade|imagem, cor, cor2, angulo, img, ajuste, escurecer}, transicao: {tipo, dur}, dur (s no MP4), notas, oculto, camadas}`
 `camada = {id, tipo: texto|forma|imagem|video|grafico, nome, x, y, w, h, rot, opac, mescla, sombra {x,y,desf,cor}, desfoque, oculto, trava, grupo, anim {tipo, dur, atraso, clique}}`
 - gráfico: `grafico` colunas|barras|empilhadas|linha|area|pizza|rosca|progresso|trilhas|waffle|funil, `rotulos [..]`, `series [{nome, valores, cor?}]`,
@@ -95,7 +95,7 @@ não abre em celular).
   iPhone mostra a prévia sem JS → "Abrir no Safari" (o `<noscript>` explica); arquivo > 150 MB avisa (vídeo pesa).
 - Teste: `py -3.13 testes/teste_slider_html.py` (app em 9333; abre o .html no Edge como PC e como iPhone deitado).
 
-## Arquivos (conferidos em `testes/teste_slider_arquivos.py`, com o LibreOffice de `D:/kanivete_testes/libreoffice` como leitor externo)
+## Arquivos (conferidos em `testes/teste_slider_arquivos.py`, com o LibreOffice de `D:/Kanivete/Testes/libreoffice` como leitor externo)
 - **PowerPoint editável**: transição de cada slide (`<p:transition>` com `p14:dur`), animações de entrada como o PowerPoint
   grava (comportamentos set/animEffect/anim em `<p:timing>`; automáticas no grupo "ao abrir o slide", cada "esperar o
   clique" é um passo), vídeo tocando sozinho (`mediacall playFrom`), repetindo (`repeatCount`) e mudo (`cMediaNode mute`);

@@ -9,7 +9,7 @@ sys.path.insert(0, RAIZ); sys.path.insert(0, os.path.dirname(os.path.abspath(__f
 sys.stdout.reconfigure(encoding="utf-8")
 from Functions import estabilizador as E
 
-O = "D:/kanivete_testes/estab/saida"
+O = "D:/Kanivete/Testes/estab/saida"
 TRECHOS = [int(x) for x in os.environ.get("TRECHOS", "3068,3094,1159,3058").split(",")]
 SUAV = float(sys.argv[1]) if len(sys.argv) > 1 else 50
 ZMAX = float(sys.argv[2]) if len(sys.argv) > 2 else 1.10

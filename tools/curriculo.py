@@ -21,7 +21,7 @@ import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa
 import argparse, json, html, os, re, subprocess, sys, tempfile, urllib.request
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ICONES = "D:/kanivete_biblioteca/recursos/curriculo_icones"
+ICONES = "D:/Kanivete/Biblioteca/recursos/curriculo_icones"
 ICONIFY = {"word": "vscode-icons:file-type-word", "excel": "vscode-icons:file-type-excel", "powerpoint": "vscode-icons:file-type-powerpoint",
            "onenote": "vscode-icons:file-type-onenote", "copilot": "ri:copilot-fill", "photoshop": "logos:adobe-photoshop", "python": "logos:python",
            "microsoft": "logos:microsoft-icon", "sap": "logos:sap", "totvs": "simple-icons:totvs", "documento": "mdi:file-account", "saude": "mdi:heart-pulse",

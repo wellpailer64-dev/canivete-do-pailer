@@ -77,4 +77,4 @@ Formato: **nosso nome** → termo de mercado · como fazer aqui · onde está.
 - Trocar cor/tipografia/textos: editar as constantes do topo de `montar.py` e remontar (segundos).
 - Reaproveitar uma técnica: copiar o ajudante (`selecao()`, `orbita()`, `revela()`, `caminho()`, `cur_vai`) para a peça
   nova; os parâmetros estão nas linhas do mapa (Peça Ref 01).
-- Projeto da ref 01: `D:/kanivete_testes/repertorio/01_shortcuts/` (montar.py, montador.js, plano.json, .vknv).
+- Projeto da ref 01: `D:/Kanivete/Testes/repertorio/01_shortcuts/` (montar.py, montador.js, plano.json, .vknv).

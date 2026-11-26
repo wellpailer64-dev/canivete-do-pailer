@@ -75,7 +75,7 @@ def servidor():
     s.serve_forever()
 
 
-PASTA = r"D:\kanivete_testes\ponte_premiere"
+PASTA = r"D:\Kanivete\Testes\ponte_premiere"
 
 
 def enviar(cmd, args=None, espera=120):
@@ -136,7 +136,7 @@ const XML = __PARTES__.join(B);
 const EF = __EF__;
 const projeto = await ppro.Project.getActiveProject();
 if (!projeto) throw new Error('nenhum projeto aberto no Premiere');
-if (__SO_TESTE__ && !projeto.path.includes('kanivete_testes')) throw new Error('projeto errado (teste): ' + projeto.path);
+if (__SO_TESTE__ && !/kanivete[\\/]testes/i.test(projeto.path)) throw new Error('projeto errado (teste): ' + projeto.path);
 const antes = new Set((await projeto.getSequences()).map(s => s.guid ? String(s.guid) : s.name));
 const ok = await projeto.importFiles([XML], true);
 const novas = (await projeto.getSequences()).filter(s => !antes.has(s.guid ? String(s.guid) : s.name));
@@ -212,7 +212,7 @@ def marcar_ajustes_no_aberto(espera=300):
 
 def importar(xml, so_teste=False, espera=600):
     """Importa no Premiere o XML exportado pelo Kanivete (Arquivo › Exportar para o Premiere) e aplica os efeitos de
-    áudio do .kanivete-efeitos.json ao lado. so_teste: recusa se o projeto ativo não for de D:/kanivete_testes."""
+    áudio do .kanivete-efeitos.json ao lado. so_teste: recusa se o projeto ativo não for de D:/Kanivete/Testes."""
     import os
     xml = os.path.abspath(xml)
     lado = os.path.splitext(xml)[0] + ".kanivete-efeitos.json"

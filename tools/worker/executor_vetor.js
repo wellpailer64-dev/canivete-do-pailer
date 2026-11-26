@@ -34,15 +34,15 @@
         faca_caixa: a => C('faca_caixa', a), grade_perspectiva: a => C('grade_perspectiva', a), perspectiva_caixa: a => C('perspectiva_caixa', a),
         perspectiva_colocar: a => C('perspectiva_colocar', { ...a, ...ids(a) }), criar_pincel: a => C('criar_pincel', { ...a, arte: [].concat(a.arte || []).map(n => achar(n).id) }),
         pincel: a => C('pincel', { ...a, ...ids(a) }), desvio_texto: a => C('desvio_texto', { ...a, ...ids(a) }), colunas: a => C('colunas', { ...a, ...ids(a) }),
-        exportar_ai: (a, ctx = {}) => C('exportar_ai', { caminho: (ctx.pasta || 'D:\\kanivete_testes\\vetor\\saida') + '\\' + String(a.nome || 'arte').replace(/\.ai$/i, '') + '.ai' }),
-        exportar_ativos: (a, ctx = {}) => C('exportar_ativos', { pasta: ctx.pasta || 'D:\\kanivete_testes\\vetor\\saida', formatos: a.formatos }), revincular: a => C('revincular', a), atualizar_vinculo: a => C('atualizar_vinculo', a), contornos: a => C('contornos', ids(a)), mascara: a => C('mascara', ids(a)),
+        exportar_ai: (a, ctx = {}) => C('exportar_ai', { caminho: (ctx.pasta || 'D:\\Kanivete\\Testes\\vetor\\saida') + '\\' + String(a.nome || 'arte').replace(/\.ai$/i, '') + '.ai' }),
+        exportar_ativos: (a, ctx = {}) => C('exportar_ativos', { pasta: ctx.pasta || 'D:\\Kanivete\\Testes\\vetor\\saida', formatos: a.formatos }), revincular: a => C('revincular', a), atualizar_vinculo: a => C('atualizar_vinculo', a), contornos: a => C('contornos', ids(a)), mascara: a => C('mascara', ids(a)),
         fechamento: a => {
             const r = VKN.fechamento({ padrao: a.padrao || 'x4' });
             return { ok: r.ok, erros: r.erros.map(e => `${e.cod}: ${e.msg}${e.corrigir ? ' (corrigir: ' + e.corrigir + ')' : ''}`), avisos: r.avisos.map(e => `${e.cod}${e.corrigir ? ' (corrigir: ' + e.corrigir + ')' : ''}`) };
         },
         corrigir: a => C(a.correcao, {}),
         exportar_pdf: async (a, ctx) => {
-            const r = await VKN.exportarPdf((ctx.pasta || 'D:\\kanivete_testes\\vetor\\saida') + '\\' + String(a.nome || VK.doc.nome || 'arte').replace(/\.pdf$/i, '') + '.pdf', { padrao: a.padrao || 'x4' });
+            const r = await VKN.exportarPdf((ctx.pasta || 'D:\\Kanivete\\Testes\\vetor\\saida') + '\\' + String(a.nome || VK.doc.nome || 'arte').replace(/\.pdf$/i, '') + '.pdf', { padrao: a.padrao || 'x4' });
             window.__vkwExportado = r.verificado; return { verificado: r.verificado, problemas: r.problemas };
         },
     };

@@ -89,6 +89,10 @@ for q in seqs:
             relato("REPROVADO", "legenda", "em maiúsculas")
         if e and not (e.get("sOn") and int(e.get("sOp", 0)) == 100):
             relato("REPROVADO", "legenda", "sombra precisa de opacidade 100")
+        ls = sorted(legs, key=lambda l: l["st"])
+        minusc = [l for i, l in enumerate(ls) if l["texto"][:1].islower() and (i == 0 or ls[i - 1]["texto"].rstrip()[-1:] in ".?!")]
+        if minusc:
+            relato("REPROVADO", "legenda começa em minúscula (início do vídeo ou depois de . ? !)", "; ".join(f"{l['st']:.1f} '{l['texto']}'" for l in minusc[:5]))
         bases = sorted(c["st"] for c in cs if c["tr"] == 0 and c.get("x") != "v")
         cruz = [l for l in legs for t in bases if l["st"] + 0.05 < t < l["en"] - 0.05]
         # troca de enquadramento no mesmo trecho da fonte não é troca de cena; só avisa

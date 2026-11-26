@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
-P = os.path.join(os.environ.get("TEMP") or "D:/kanivete_testes/tmp", "canivete_teste_psd_deg") + "/"
+P = os.path.join(os.environ.get("TEMP") or "D:/Kanivete/Testes/tmp", "canivete_teste_psd_deg") + "/"
 os.makedirs(P, exist_ok=True)
 G3 = {"cores": [[0, "#1e78dc"], [0.5, "#fac828"], [1, "#dc1e1e"]], "ops": [[0, 100], [1, 100]]}
 GT = {"cores": [[0, "#ffffff"], [1, "#28a05a"]], "ops": [[0, 100], [1, 0]]}

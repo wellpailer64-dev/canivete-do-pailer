@@ -1,7 +1,7 @@
 """J-cut após o corte de respiros, no app de teste.
 
 py -3.13 testes/teste_jcut.py [--porta 9340] [--sem-abrir]
-Usa D:/kanivete_testes/respiros/fala_pausas.mp4 e mantém temporários em D:/kanivete_testes/jcut/.
+Usa D:/Kanivete/Testes/respiros/fala_pausas.mp4 e mantém temporários em D:/Kanivete/Testes/jcut/.
 """
 import argparse, os, subprocess, sys, time, urllib.request
 
@@ -9,8 +9,8 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-BASE = "D:/kanivete_testes/jcut/"
-VIDEO = "D:/kanivete_testes/respiros/fala_pausas.mp4"
+BASE = "D:/Kanivete/Testes/jcut/"
+VIDEO = "D:/Kanivete/Testes/respiros/fala_pausas.mp4"
 JS = os.path.join(RAIZ, "frontend", "js", "editor-jcut.js")
 erros = []
 

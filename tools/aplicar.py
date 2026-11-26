@@ -18,7 +18,7 @@ import argparse, json, os, re, subprocess, sys
 from playwright.sync_api import sync_playwright
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CACHE = r"D:\kanivete_testes\aplicar_cache"
+CACHE = r"D:\Kanivete\Testes\aplicar_cache"
 
 
 def _crases(linhas):

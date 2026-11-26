@@ -179,7 +179,7 @@ def testar_timeline(pagina, prefixo, tempos):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--porta', type=int, default=_porta_agente(9333))
-    parser.add_argument('--projeto', default=r'D:\kanivete_testes\comp_cenas\reels_bf_carlinhos.vknv')
+    parser.add_argument('--projeto', default=r'D:\Kanivete\Testes\comp_cenas\reels_bf_carlinhos.vknv')
     parser.add_argument('--timelines', default='Reel A,Reel B', help='prefixos separados por vírgula')
     parser.add_argument('--tempos', default='0.5,2.6,5,7.6,12.5,17.5,21', help='segundos separados por vírgula')
     args = parser.parse_args()

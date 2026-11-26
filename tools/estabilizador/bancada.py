@@ -6,7 +6,7 @@ import numpy as np, cv2
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # arqs.py: caminhos dos brutos de teste (CULTSP)
 from arqs import arq, FF
 sys.stdout.reconfigure(encoding="utf-8")
-O = "D:/kanivete_testes/estab/saida"; os.makedirs(O, exist_ok=True)
+O = "D:/Kanivete/Testes/estab/saida"; os.makedirs(O, exist_ok=True)
 TRECHOS = [(3068, 0.0, 6.0), (3094, 4.0, 6.0), (1159, 0.0, 6.0), (3058, 4.0, 6.0)]
 W, H = 1920, 1080
 ZLIM = float(os.environ.get("ZLIM", "1.10"))

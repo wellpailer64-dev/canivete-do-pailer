@@ -1,6 +1,6 @@
 """Gera no Photoshop um PSD com um PNG colocado como objeto inteligente incorporado (escalado e girado): molde do SoLd."""
 import sys, win32com.client
-SAIDA = "D:/kanivete_testes/psd_so/modelo_so.psd"; PNG = "D:/kanivete_testes/psd_so/conteudo.png"
+SAIDA = "D:/Kanivete/Testes/psd_so/modelo_so.psd"; PNG = "D:/Kanivete/Testes/psd_so/conteudo.png"
 ps = win32com.client.Dispatch("Photoshop.Application"); ps._FlagAsMethod("DoJavaScript")
 jsx = r'''
 app.displayDialogs = DialogModes.NO; app.preferences.rulerUnits = Units.PIXELS;

@@ -5,7 +5,18 @@
 // A setinha ▾ abre as opções das prévias (as mesmas de Preferências › cache), num lugar só.
 const VEPROXY = { quadros: new Map(), pedido: null, timer: null, aberto: false };
 
-function veProxyLigado() { return vePrPrefs().proxy !== false; }
+// Projeto curto (vídeos somando até 10 min) abre com o PROXY desligado: o original aguenta e o Pailer prefere a imagem
+// cheia (2026-11-25). Clicar no botão vale para o projeto aberto (VE.proxyManual); a preferência global só desliga sempre.
+function veProxyCurto() {
+    const ms = (VE.media || []).filter(m => m && m.kind === 'video');
+    const tot = ms.reduce((a, m) => a + (+((m.info && m.info.duration) || m.duration || m.dur || 0)), 0);
+    return tot <= 600;
+}
+function veProxyLigado() {
+    if (VE.proxyManual && VE.proxyManual.de === (VE.projectPath || '')) return VE.proxyManual.on;
+    if (vePrPrefs().proxy === false) return false;
+    return !veProxyCurto();
+}
 
 // A mídia está tocando uma prévia (e não o original)? O vídeo aberto não recebe m.proxy: pelo arquivo que o player toca
 function veProxyEmUso(m, src) {
@@ -59,7 +70,7 @@ function veProxyRedesenhar() {
 
 function veProxyAlternar() {
     const on = !veProxyLigado();
-    vePrefsCacheSalvar({ proxy: on });
+    VE.proxyManual = { on, de: VE.projectPath || '' };   // só este projeto: outro projeto volta à regra
     veProxyUi();
     veToast(on ? veT('Proxy ligado: o monitor usa as prévias leves')
         : veT('Proxy desligado: parado, o monitor mostra o arquivo original em qualidade cheia'));

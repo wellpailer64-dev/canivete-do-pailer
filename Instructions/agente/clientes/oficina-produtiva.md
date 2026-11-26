@@ -15,3 +15,6 @@ Aplicar junto das regras gerais de `Instructions/agente/metodo-edicao-video.md`.
 
 ## Origem
 `Instructions/agente/guia-edicao.md`, CALIBRACAO de 07/10/2026 e seção de cortes de entrevista.
+
+## Merchant (parceiro, ex.: Capricho Imports) — 26/11/2026
+- A arte final do parceiro (CAPRICHO_FINAL.png etc.) É a finalização: 3,5 s, entrada nativa; sem LOGO OP FIM.

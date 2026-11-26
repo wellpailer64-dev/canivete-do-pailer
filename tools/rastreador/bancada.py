@@ -1,5 +1,5 @@
 """Bancada do rastreador: gabarito sintético. Tomadas de tripé tremidas com tremor CONHECIDO (bancada3 do
-estabilizador: D:/kanivete_testes/estab/sint/<n>_tremido.mp4). Um ponto do fundo parado vai, no quadro t, para S_t(p0).
+estabilizador: D:/Kanivete/Testes/estab/sint/<n>_tremido.mp4). Um ponto do fundo parado vai, no quadro t, para S_t(p0).
 Escolhe 5 caixas em cantos fortes do fundo que não mudam na tomada parada, rastreia 8 s e mede o erro (px a 1080p).
 uso: py -3.13 tools/rastreador/bancada.py [modo pos|rot|esc] [lado da caixa]"""
 import os, sys, time
@@ -13,7 +13,7 @@ import importlib.util
 spec = importlib.util.spec_from_file_location("b3", os.path.join(RAIZ, "tools/estabilizador/bancada3.py"))
 src = open(spec.origin, encoding="utf-8").read().split("\nres = []")[0]
 B3 = {"__file__": spec.origin}; sys_argv = sys.argv; sys.argv = [sys.argv[0]]; exec(src, B3); sys.argv = sys_argv
-O = "D:/kanivete_testes/estab/sint"
+O = "D:/Kanivete/Testes/estab/sint"
 MODO = sys.argv[1] if len(sys.argv) > 1 else "pos"
 LADO = int(sys.argv[2]) if len(sys.argv) > 2 else 60
 

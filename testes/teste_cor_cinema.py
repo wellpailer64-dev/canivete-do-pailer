@@ -18,13 +18,13 @@ from pathlib import Path
 import numpy as np
 
 RAIZ = Path(__file__).resolve().parents[1]
-SAIDA = Path("D:/kanivete_testes/cor_cinema_136/teste")
+SAIDA = Path("D:/Kanivete/Testes/cor_cinema_136/teste")
 SAIDA.mkdir(parents=True, exist_ok=True)
 for nome in ("TEMP", "TMP", "APPDATA", "LOCALAPPDATA"):
     pasta = SAIDA / nome.lower()
     pasta.mkdir(exist_ok=True)
     os.environ[nome] = str(pasta)
-sys.pycache_prefix = "D:/kanivete_testes/pycache"
+sys.pycache_prefix = "D:/Kanivete/Testes/pycache"
 sys.path.insert(0, str(RAIZ))
 from Functions import export_placa as ep, video_cutter as vc  # noqa: E402
 

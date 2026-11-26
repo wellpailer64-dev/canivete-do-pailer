@@ -9,7 +9,7 @@ nativa (ONNX). Por isso o Rust entra principalmente como **WebAssembly** chamado
 também com a placa de vídeo (WebGL).
 
 ## Etapas
-1. **Medir** (em andamento): `D:/kanivete_testes/bench/js_medir.py` → `js.json` (lado JS, app de teste 9333) e
+1. **Medir** (em andamento): `D:/Kanivete/Testes/bench/js_medir.py` → `js.json` (lado JS, app de teste 9333) e
    `py_medir.py` → `python.json` (lado Python). Primeiros números em 1080x1440: Galeria de filtros 2,3 s, Correção de lente 1,6 s, Média 1,5 s.
 2. **Piloto**: pegar o pior gargalo, refazer em Rust (WASM ou extensão Python), conferir que a saída é idêntica com
    `testes/teste_imagem.py` / `teste_filtros.py` e comparar o tempo.
@@ -21,7 +21,7 @@ também com a placa de vídeo (WebGL).
 - Trabalho em dupla: aba 29 (Claude, coordena) + aba 28 (Codex) pelo Colab do KaniCode.
 
 ## Resultado das medições (rodadas 1 e 2, 2026-11-11) — ranking para decidir
-Dados em `D:/kanivete_testes/bench/` (`js.json`, `python.json`, `vetor.json`, `interativo.json`, `vetor_perfil.txt`).
+Dados em `D:/Kanivete/Testes/bench/` (`js.json`, `python.json`, `vetor.json`, `interativo.json`, `vetor_perfil.txt`).
 
 | # | Gargalo | Medido | Rust? |
 |---|---|---|---|
@@ -52,7 +52,7 @@ Vetor (`vetor.json`):
 Criar 1000 formas: 17,6 s → 2,2 s sem lote, 0,03 s com lote; 5000 formas: 205 s → 0,35 s com lote. `teste_vetor.py` ganhou o caso do lote (passa).
 
 **Camera Raw ao vivo:** o custo do slider é `ieCrLut3d` (LUT 3D trilinear): 54 ms em 1080x1440, 414 ms em 4000x3000 (~35 ns/pixel; o resto do Camera Raw é ~15 ms).
-Bancada em `D:/kanivete_testes/bench/` (`cr_micro.py`, `cr_wasm.py`, `cr_gl.py`); crate Rust em `D:/kanivete_rust/kanivete_wasm` (Rust 1.99 instalado em `D:/kanivete_rust`, nada no PATH).
+Bancada em `D:/Kanivete/Testes/bench/` (`cr_micro.py`, `cr_wasm.py`, `cr_gl.py`); crate Rust em `D:/Kanivete/Rust/kanivete_wasm` (Rust 1.99 instalado em `D:/Kanivete/Rust`, nada no PATH).
 
 | Variante | 1080x1440 | 4000x3000 | Saída |
 |---|---|---|---|
@@ -136,7 +136,7 @@ Timeline 36,8 s, 1080x1920 60 fps, 177 clipes (73 texto, 30 transições de sobr
 - Transições de sobreposição (30): 0,2–5,5 s cada (a primeira mais lenta, pelo aquecimento).
 - Não é a placa: a fase de preparo não usa GPU (encoder 0%); o gargalo é canvas 2D + PNG + ponte.
 - Próximos passos a decidir: (1) cache de `veTxPngs` por assinatura do clipe + resolução (corta ~13 s sem mudar a saída); (2) quadros animados sem PNG (bruto ou transformação no ffmpeg/shader) — maior ganho, mais trabalho.
-- Scripts de medição: `D:/kanivete_testes/scripts/prep_medir.py` e `prep_textos.py`; resultados em `D:/kanivete_testes/bench/prep_reels*.json`.
+- Scripts de medição: `D:/Kanivete/Testes/scripts/prep_medir.py` e `prep_textos.py`; resultados em `D:/Kanivete/Testes/bench/prep_reels*.json`.
 
 ## Cache de textos no preparo (2026-11-12, feito)
 - `veTxPngs` (`editor-props.js`) guarda cada texto por `veTxCacheKey` (texto + escala + animação e duração, se animado) em `VE._txCache`, só durante `veFilaAdicionarPreparando`. A chave não inclui posição nem corte, porque a transição usa cópias cortadas.

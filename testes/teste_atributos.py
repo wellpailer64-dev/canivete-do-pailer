@@ -1,5 +1,5 @@
 """Remover atributos e ajuste em grupo (editor-atributos.js) — abre um app próprio (porta 9334, dados em
-D:/kanivete_testes/fila), monta 3 clipes com efeitos diferentes e confere: lista com contagem, menu do botão direito,
+D:/Kanivete/Testes/fila), monta 3 clipes com efeitos diferentes e confere: lista com contagem, menu do botão direito,
 janela com caixinhas, remover só o marcado de todos, Ctrl+Z, e mudar um efeito com vários selecionados.
 
     py -3.13 testes/teste_atributos.py
@@ -16,7 +16,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from Functions.midia import ffmpeg  # noqa: E402
 
-BASE = "D:/kanivete_testes/fila/"
+BASE = "D:/Kanivete/Testes/fila/"
 PORTA = 9334
 erros = []
 

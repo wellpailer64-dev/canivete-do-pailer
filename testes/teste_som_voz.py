@@ -16,7 +16,7 @@ from Functions.midia import ffmpeg
 INTERFACE = "--interface" in sys.argv
 if INTERFACE:
     sys.argv.remove("--interface")
-PASTA = Path("D:/kanivete_testes/sound_voz")
+PASTA = Path("D:/Kanivete/Testes/sound_voz")
 
 
 def preparar():

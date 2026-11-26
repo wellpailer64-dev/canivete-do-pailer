@@ -2,7 +2,7 @@
 
     py -3.13 testes/teste_ceu.py [--ia]
 
-Fotos de teste em D:/kanivete_testes/ceu (carro.jpg: céu com nuvens e árvores; janela.jpg: céu cercado de parede).
+Fotos de teste em D:/Kanivete/Testes/ceu (carro.jpg: céu com nuvens e árvores; janela.jpg: céu cercado de parede).
 Confere: grupo "Substituição de céu" com Iluminação + Céu; o céu velho vira o novo, o carro e a estrada ficam; a foto
 sem céu achável recusa, e com a seleção do céu funciona; no PSD o céu volta objeto inteligente com máscara e a
 iluminação preenchimento de cor em modo Cor. --ia também gera um céu com a IA local (~40 s). Sai com 1 se reprovar.
@@ -20,7 +20,7 @@ from playwright.sync_api import sync_playwright
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-P = "D:/kanivete_testes/ceu/"
+P = "D:/Kanivete/Testes/ceu/"
 erros = []
 
 
@@ -82,7 +82,7 @@ with sync_playwright() as p:
     Image.fromarray(np.concatenate([foto, a], 1).astype(np.uint8)).resize((W, H // 2)).save(P + "teste_ceu.jpg")
 
     # 2. PSD
-    psd = os.path.join(os.environ.get("TEMP", "D:/kanivete_testes/tmp"), "teste_ceu.psd").replace("\\", "/")
+    psd = os.path.join(os.environ.get("TEMP", "D:/Kanivete/Testes/tmp"), "teste_ceu.psd").replace("\\", "/")
     ok = pg.evaluate("async (s) => { KNV.automacao(true, {padrao: 'primario'}); const ok = await ieSalvar(false, s); KNV.automacao(false); return ok; }", psd)
     from psd_tools import PSDImage
     g = [l for l in PSDImage.open(psd) if l.is_group()]

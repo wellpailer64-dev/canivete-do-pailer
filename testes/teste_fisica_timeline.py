@@ -19,7 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from Functions.midia import ffmpeg  # noqa: E402
 
-BASE = "D:/kanivete_testes/fisica/"
+BASE = "D:/Kanivete/Testes/fisica/"
 
 
 def main():

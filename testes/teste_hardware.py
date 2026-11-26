@@ -24,7 +24,7 @@ def ok(c, nome, det=""):
 
 def com_sim(perfil, codigo):
     """Roda `codigo` num Python novo com CANIVETE_HW_SIMULAR=perfil e devolve o JSON que ele imprime."""
-    env = dict(os.environ, CANIVETE_HW_SIMULAR=perfil, APPDATA=tempfile.mkdtemp(dir="D:/kanivete_testes/tmp"))
+    env = dict(os.environ, CANIVETE_HW_SIMULAR=perfil, APPDATA=tempfile.mkdtemp(dir="D:/Kanivete/Testes/tmp"))
     r = subprocess.run([sys.executable, "-c", "import sys,json;sys.path.insert(0,r'%s');from Functions import hardware as h\n%s" % (RAIZ, codigo)],
                        env=env, capture_output=True, text=True)
     return json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 else {"erro": r.stderr[-400:]}
@@ -70,7 +70,7 @@ print(json.dumps(venc))""")
 
 
 def app():
-    sonda = os.path.join(tempfile.mkdtemp(dir="D:/kanivete_testes/tmp"), "sonda.py")
+    sonda = os.path.join(tempfile.mkdtemp(dir="D:/Kanivete/Testes/tmp"), "sonda.py")
     open(sonda, "w", encoding="utf-8").write("""import json, sys
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
