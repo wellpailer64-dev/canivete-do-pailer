@@ -113,16 +113,16 @@ function ieToast(msg, tipo) {
 // ─────────────────────────── modos de mesclagem ───────────────────────────
 // chave do Photoshop → operação do canvas; as sem equivalente usam a mais parecida (e ficam marcadas no painel)
 const IE_BM = [
-    ['NORMAL', 'Normal', 'source-over'], ['DISSOLVE', 'Dissolver', 'source-over', 1], null,
+    ['NORMAL', 'Normal', 'source-over'], ['DISSOLVE', 'Dissolver', 'source-over'], null,
     ['DARKEN', 'Escurecer', 'darken'], ['MULTIPLY', 'Multiplicação', 'multiply'], ['COLOR_BURN', 'Superexposição de cores', 'color-burn'],
-    ['LINEAR_BURN', 'Superexposição linear', 'multiply', 1], ['DARKER_COLOR', 'Cor mais escura', 'darken', 1], null,
-    ['LIGHTEN', 'Clarear', 'lighten'], ['SCREEN', 'Divisão', 'screen'], ['COLOR_DODGE', 'Subexposição de cores', 'color-dodge'],
-    ['LINEAR_DODGE', 'Subexposição linear (Adicionar)', 'lighter'], ['LIGHTER_COLOR', 'Cor mais clara', 'lighten', 1], null,
+    ['LINEAR_BURN', 'Superexposição linear', 'multiply'], ['DARKER_COLOR', 'Cor mais escura', 'darken'], null,
+    ['LIGHTEN', 'Clarear', 'lighten'], ['SCREEN', 'Tela', 'screen'], ['COLOR_DODGE', 'Subexposição de cores', 'color-dodge'],
+    ['LINEAR_DODGE', 'Subexposição linear (Adicionar)', 'lighter'], ['LIGHTER_COLOR', 'Cor mais clara', 'lighten'], null,
     ['OVERLAY', 'Sobreposição', 'overlay'], ['SOFT_LIGHT', 'Luz suave', 'soft-light'], ['HARD_LIGHT', 'Luz direta', 'hard-light'],
-    ['VIVID_LIGHT', 'Luz brilhante', 'hard-light', 1], ['LINEAR_LIGHT', 'Luz linear', 'hard-light', 1], ['PIN_LIGHT', 'Luz do pino', 'hard-light', 1],
-    ['HARD_MIX', 'Mistura sólida', 'hard-light', 1], null,
-    ['DIFFERENCE', 'Diferença', 'difference'], ['EXCLUSION', 'Exclusão', 'exclusion'], ['SUBTRACT', 'Subtrair', 'difference', 1],
-    ['DIVIDE', 'Dividir', 'color-dodge', 1], null,
+    ['VIVID_LIGHT', 'Luz brilhante', 'hard-light'], ['LINEAR_LIGHT', 'Luz linear', 'hard-light'], ['PIN_LIGHT', 'Luz do pino', 'hard-light'],
+    ['HARD_MIX', 'Mistura sólida', 'hard-light'], null,
+    ['DIFFERENCE', 'Diferença', 'difference'], ['EXCLUSION', 'Exclusão', 'exclusion'], ['SUBTRACT', 'Subtrair', 'difference'],
+    ['DIVIDE', 'Dividir', 'color-dodge'], null,
     ['HUE', 'Matiz', 'hue'], ['SATURATION', 'Saturação', 'saturation'], ['COLOR', 'Cor', 'color'], ['LUMINOSITY', 'Luminosidade', 'luminosity'],
 ];
 const IE_BM_MAP = Object.fromEntries(IE_BM.filter(Boolean).map(b => [b[0], b]));
@@ -723,6 +723,62 @@ function ieDesenhar(ctx, c, sx, sy, sw, sh, dx, dy, alfa, gco) {
     ctx.restore();
 }
 
+// Modos que o canvas não tem: fórmulas do Photoshop por pixel (b = fundo, s = camada, 0..1). Antes usavam o modo CSS mais
+// parecido (Superexposição linear = multiplicar, Luz linear = luz direta...), e por isso o resultado ficava longe do PS.
+const IE_BM_PX = {
+    LINEAR_BURN: (b, s) => Math.max(0, b + s - 1),
+    VIVID_LIGHT: (b, s) => s <= 0.5
+        ? (s <= 0 ? 0 : Math.max(0, 1 - (1 - b) / (2 * s)))
+        : (s >= 1 ? 1 : Math.min(1, b / (2 * (1 - s)))),
+    LINEAR_LIGHT: (b, s) => Math.min(1, Math.max(0, b + 2 * s - 1)),
+    PIN_LIGHT: (b, s) => s < 0.5 ? Math.min(b, 2 * s) : Math.max(b, 2 * s - 1),
+    HARD_MIX: (b, s) => b + s >= 1 ? 1 : 0,
+    SUBTRACT: (b, s) => Math.max(0, b - s),
+    DIVIDE: (b, s) => s <= 0 ? 1 : Math.min(1, b / s),
+};
+const ieBmPx = bm => !!bm && (!!IE_BM_PX[bm] || bm === 'DARKER_COLOR' || bm === 'LIGHTER_COLOR' || bm === 'DISSOLVE');
+
+// camada c (posição x0,y0 no documento) sobre o que já está em ctx, com o modo bm do Photoshop; alfa = opacidade
+function ieMesclarPx(ctx, c, x0, y0, R, o, alfa, bm) {
+    const Ri = ieRInter(ieRInt({ x: x0, y: y0, w: c.width, h: c.height }), R);
+    if (!Ri) return;
+    const ix = Ri.x - o.x, iy = Ri.y - o.y;
+    let fundo;
+    try { fundo = ctx.getImageData(ix, iy, Ri.w, Ri.h); } catch (e) { return; }
+    const T = ieCanvas(Ri.w, Ri.h), tx = ieCtx(T);
+    tx.drawImage(c, Ri.x - x0, Ri.y - y0, Ri.w, Ri.h, 0, 0, Ri.w, Ri.h);
+    const s = tx.getImageData(0, 0, Ri.w, Ri.h).data, f = fundo.data;
+    const fn = IE_BM_PX[bm];
+    for (let k = 0, p = 0; k < s.length; k += 4, p++) {
+        let as = s[k + 3];
+        if (!as) continue;
+        as = as / 255 * alfa;
+        if (bm === 'DISSOLVE') {   // cada pixel fica inteiro ou some, conforme a opacidade (ruído fixo por posição)
+            const px = Ri.x + (p % Ri.w), py = Ri.y + ((p / Ri.w) | 0);
+            let h = (Math.imul(px, 374761393) + Math.imul(py, 668265263)) | 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+            if ((h >>> 0) / 4294967296 >= as) continue;
+            as = 1;
+        }
+        const ab = f[k + 3] / 255;
+        const ao = as + ab - as * ab;
+        if (ao <= 0) continue;
+        const cb = [f[k] / 255, f[k + 1] / 255, f[k + 2] / 255], cs = [s[k] / 255, s[k + 1] / 255, s[k + 2] / 255];
+        let B;
+        if (bm === 'DARKER_COLOR' || bm === 'LIGHTER_COLOR') {
+            const sb = cb[0] + cb[1] + cb[2], ss = cs[0] + cs[1] + cs[2];
+            B = (bm === 'DARKER_COLOR' ? ss < sb : ss > sb) ? cs : cb;
+        } else if (bm === 'DISSOLVE') B = cs;
+        else B = [fn(cb[0], cs[0]), fn(cb[1], cs[1]), fn(cb[2], cs[2])];
+        for (let q = 0; q < 3; q++) {
+            const co = as * (1 - ab) * cs[q] + as * ab * B[q] + (1 - as) * ab * cb[q];
+            f[k + q] = Math.round(Math.min(1, Math.max(0, co / ao)) * 255);
+        }
+        f[k + 3] = Math.round(ao * 255);
+    }
+    ctx.putImageData(fundo, ix, iy);
+}
+
 // Misturar se (Blend If): quanto da camada fica, pelo valor dela e pelo de baixo. faixa = [preto0, preto1, branco0, branco1]
 function ieFaixaMescSe(v, f) {
     if (!f) return 1;
@@ -839,7 +895,8 @@ function ieComporCamada(ctx, L, R, o, prof, forcarNormal, semExt) {
             tc.drawImage(ieMascaraRegiao(mask, R, ieTemp(prof + 2, R.w, R.h)), 0, 0, R.w, R.h, 0, 0, R.w, R.h);
             tc.globalCompositeOperation = 'source-over';
         }
-        ieDesenhar(ctx, t, 0, 0, R.w, R.h, R.x, R.y, forcarNormal ? 1 : L.op, forcarNormal ? 'source-over' : ieGco(L.bm));
+        if (!forcarNormal && ieBmPx(L.bm)) ieMesclarPx(ctx, t, R.x, R.y, R, o, L.op, L.bm);
+        else ieDesenhar(ctx, t, 0, 0, R.w, R.h, R.x, R.y, forcarNormal ? 1 : L.op, forcarNormal ? 'source-over' : ieGco(L.bm));
         return;
     }
     if (L.tipo === 'ajuste') return ieComporAjuste(ctx, L, R, o, prof);
@@ -850,6 +907,7 @@ function ieComporCamada(ctx, L, R, o, prof, forcarNormal, semExt) {
     if (!forcarNormal && L.vazamento && L.vazamento !== 'nenhum') ieVazar(ctx, L, r, o);
     if (!semExt) extra(r.ext);
     if (!ieMescSeNeutro(L.mescSe) || !ieCanaisTodos(L.canais)) ieDesenharEspecial(ctx, L, r.c, r.x, r.y, R, o, op, gco);
+    else if (!forcarNormal && ieBmPx(L.bm)) ieMesclarPx(ctx, r.c, r.x, r.y, R, o, op, L.bm);
     else { ctx.save(); ctx.globalAlpha = op; ctx.globalCompositeOperation = gco; ctx.drawImage(r.c, r.x, r.y); ctx.restore(); }
     extra(r.acima);
 }
