@@ -362,7 +362,7 @@ function ieCrAutoBalanco(c) {
 }
 function ieCrProc(v0) { const v = ieCrNorm(v0); return c => ieCrProcessar(c, v, 1, 0, 0, c.width, c.height, v.nevoa ? ieCrAtmosfera(c) : null); }
 // ─────────────────────────── barra fina com resistência ───────────────────────────
-// el = .ie-cr-sl; aoMudar(v); arrastar = metade do mouse (Shift: 1/6); clique sem arrastar pula; duplo clique zera
+// el = .ie-cr-sl; aoMudar(v); arrastar = acompanha o mouse (Shift: 1/6); clique sem arrastar pula; duplo clique zera
 function ieCrBarra(el, c, valor, aoMudar) {
     const [id, , min, max, padrao, passo = 1] = c, trilho = el.querySelector('.ie-cr-tr'), bola = el.querySelector('.ie-cr-bola'), num = el.querySelector('input');
     let v = valor;
@@ -387,7 +387,7 @@ function ieCrBarra(el, c, valor, aoMudar) {
         const dx = ev.clientX - arr.x;
         if (!arr.mexeu && Math.abs(dx) < 3) return;
         if (!arr.mexeu) { arr.mexeu = true; arr.x = ev.clientX; return; }
-        const k = ev.shiftKey ? 1 / 6 : 0.5;
+        const k = ev.shiftKey ? 1 / 6 : 1;   // 1:1 com o mouse (antes 0,5: a bolinha ficava para trás)
         definir(arr.v0 + dx / arr.w * (max - min) * k);
     });
     const soltar = ev => {
@@ -480,7 +480,9 @@ function ieCrJanela(fonte, atual) {
             g.globalCompositeOperation = 'source-over';
         };
         const calcular = () => {
-            const e = Math.min(1, V.esc), M = 8 / e;
+            // arrastando uma barra: prévia em meia resolução (fluida); ao soltar, refaz em qualidade cheia
+            V.rapido = !!box.querySelector('.ie-cr-sl.arr');
+            const e = Math.min(1, V.esc) * (V.rapido ? 0.5 : 1), M = 8 / e;
             const x0 = Math.max(0, Math.floor(-V.ox / V.esc - M)), y0 = Math.max(0, Math.floor(-V.oy / V.esc - M));
             const x1 = Math.min(W, Math.ceil((cv.width - V.ox) / V.esc + M)), y1 = Math.min(H, Math.ceil((cv.height - V.oy) / V.esc + M));
             if (x1 <= x0 || y1 <= y0) return;
@@ -492,6 +494,8 @@ function ieCrJanela(fonte, atual) {
             calc.hidden = true; pintar(); histograma(c);
         };
         let tm = 0;
+        const fimArraste = () => { if (V.rapido) setTimeout(() => agendar(false), 30); };
+        box.addEventListener('pointerup', fimArraste, true); box.addEventListener('pointercancel', fimArraste, true);
         const agendar = (lento) => {   // ajuste: no próximo quadro; mexer na vista: espera parar
             sujo = true; clearTimeout(tm);
             if (lento) { calc.hidden = false; tm = setTimeout(() => agendar(false), 120); return; }
