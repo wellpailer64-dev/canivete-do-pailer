@@ -1311,7 +1311,9 @@ function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
         box.querySelector('[data-r="0"]').onclick = () => fim(null);
         box.querySelector('[data-r="1"]').onclick = () => fim({ ...vals });
         if (previa) atualizar();
-        box.querySelector('input, select')?.focus();
+        campos.forEach(c => { if (c.tab) box.querySelector(`[data-id="${c.id}"]`)?.setAttribute('tabindex', c.tab); });   // ordem do Tab própria (Novo documento)
+        const f0 = (campos.find(c => c.foco) && box.querySelector(`[data-id="${campos.find(c => c.foco).id}"]`)) || box.querySelector('input, select');
+        f0?.focus(); if (campos.some(c => c.foco) && f0?.select) f0.select();
     });
 }
 

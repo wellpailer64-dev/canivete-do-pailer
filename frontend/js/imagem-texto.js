@@ -762,7 +762,7 @@ function ieCaractereHtml(t, run) {
         <div class="ie-car-l2"><button class="ie-fonte-btn" data-tx="famPick" title="${ieT('Fonte')}"><span style="${css}">${ieEsc(V.fam)}</span>${ieIco('chev')}</button>
             <select data-tx="estilo" title="${ieT('Estilo da fonte')}">${(estilos.length ? estilos : [V.estilo || 'Regular']).map(e => `<option ${e === V.estilo ? 'selected' : ''}>${ieEsc(e)}</option>`).join('')}</select></div>
         <div class="ie-car-l2">${num('tam', 'Tamanho da fonte (px)', 'min="0.5" step="0.5"')}
-            <label class="ie-car-c" title="${ieT('Entrelinha (0 = automática)')}"><i>${IE_TX_ICO.ent}</i><input type="number" data-tx="ent" min="0" value="${V.ent}" placeholder="${ieT('(Auto)')}"></label></div>
+            <label class="ie-car-c" title="${ieT('Entrelinha (0 = automática)')}"><i>${IE_TX_ICO.ent}</i><input type="number" data-tx="ent" min="0" value="${V.ent || ''}" placeholder="${V.ent ? '' : Math.round(V.tam * 1.2) + ' ' + ieT('(Auto)')}"></label></div>
         <div class="ie-car-l2"><label class="ie-car-c" title="${ieT('Kerning entre dois caracteres')}"><i>${IE_TX_ICO.kern}</i><select data-tx="kern">
                 <option value="metricas" ${V.kern === 'metricas' ? 'selected' : ''}>${ieT('Métricas')}</option><option value="optico" ${V.kern === 'optico' ? 'selected' : ''}>${ieT('Óptico')}</option><option value="0" ${V.kern === 0 || V.kern === '0' ? 'selected' : ''}>0</option></select></label>
             ${num('esp', 'Espaçamento entre letras (milésimos de eme)', 'step="10"')}</div>

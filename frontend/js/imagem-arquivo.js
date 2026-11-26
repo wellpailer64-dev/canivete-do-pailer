@@ -199,10 +199,10 @@ async function ieNovoDialogo() {
     const v = await ieDialogo({
         titulo: 'Novo documento', ok: 'Criar',
         campos: [
-            { id: 'nome', rotulo: 'Nome', tipo: 'texto', valor: ieT('Sem título') + '-' + (IE.seqDoc + 1) },
+            { id: 'nome', rotulo: 'Nome', tipo: 'texto', valor: ieT('Sem título') + '-' + (IE.seqDoc + 1), tab: 3 },
             { id: 'pre', rotulo: 'Predefinição', tipo: 'select', valor: '', opcoes: [['', 'Personalizado'], ...IE_PREDEF.map((p, i) => [String(i), p[0]])] },
-            { id: 'w', rotulo: 'Largura (px)', tipo: 'numero', min: 1, max: 30000, valor: IE.ultNovo?.w || 1080 },
-            { id: 'h', rotulo: 'Altura (px)', tipo: 'numero', min: 1, max: 30000, valor: IE.ultNovo?.h || 1080 },
+            { id: 'w', rotulo: 'Largura (px)', tipo: 'numero', min: 1, max: 30000, valor: IE.ultNovo?.w || 1080, foco: true, tab: 1 },
+            { id: 'h', rotulo: 'Altura (px)', tipo: 'numero', min: 1, max: 30000, valor: IE.ultNovo?.h || 1080, tab: 2 },
             { id: 'dpi', rotulo: 'Resolução (ppi)', tipo: 'numero', min: 1, max: 2400, valor: IE.ultNovo?.dpi || 72 },
             { id: 'pag', rotulo: 'Páginas (carrossel)', tipo: 'numero', min: 1, max: 20, valor: IE.ultNovo?.pag || 3 },
             { id: 'fundo', rotulo: 'Conteúdo do fundo', tipo: 'select', valor: 'branco', opcoes: [['branco', 'Branco'], ['preto', 'Preto'], ['frente', 'Cor de frente'], ['fundo', 'Cor de fundo'], ['transp', 'Transparente']] },
