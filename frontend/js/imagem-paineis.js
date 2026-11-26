@@ -374,7 +374,7 @@ function ieUiCamadas() {
             : X.tipo === 'ajuste' ? `<span class="ie-cam-mini ie-cam-mini-aj ${doc.mascaraAlvo && X.id === doc.ativa ? '' : 'alvo'}" data-alvo="px">${ieIco('adj')}</span>`
             : `<span class="ie-cam-mini-box"><canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>${X.tipo === 'inteligente' ? `<i class="ie-cam-selo" title="${ieT('Objeto inteligente')}">${ieIco('smart')}</i>` : ''}</span>`;
         const masc = X.m ? `<button class="ie-cam-elo ${X.m.solta ? 'off' : ''}" data-elo="${X.id}" title="${ieT(X.m.solta ? 'Máscara solta: move separado da imagem (clique: prender)' : 'Máscara presa à camada: movem juntas (clique: soltar)')}">${ieIco('elo')}</button><canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
-        return `<div class="ie-cam ${X.prancheta ? 'ie-cam-prancheta' : ''} ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" tabindex="0" draggable="true" style="--nivel:${nivel}">
+        return `<div class="ie-cam ${X.prancheta ? 'ie-cam-prancheta' : ''} ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" tabindex="0" draggable="true" ${X.rotulo ? `data-rot="1" ` : ''}style="--nivel:${nivel}${X.rotulo ? `;--rot:${X.rotulo}` : ''}">
             <button class="ie-cam-olho ${X.visivel ? 'on' : ''}" data-olho="${X.id}" title="${ieT('Mostrar/ocultar (Alt+clique: só esta)')}">${X.visivel ? ieIco('eye') : ''}</button>
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
             ${miniatura}${masc}
@@ -676,6 +676,7 @@ function ieCamadasInstalar() {
         if (!linha) return;
         ev.preventDefault();
         const doc = IE.doc;
+        if (ev.target.closest('[data-olho]')) { ieMenuOlho(ev, doc, +linha.dataset.id); return; }   // botão direito no olho: visibilidade e cor da camada
         if (!doc.selIds.includes(+linha.dataset.id)) ieAtivar(+linha.dataset.id, doc);
         ieMenuContexto(ev, true);
     });
@@ -1519,11 +1520,12 @@ function ieDigitando(ev) {
 function ieTecla(ev) {
     if (!ieAtivoVisivel()) return;
     if (!ieEl('ie-modal').hidden) return;
-    // Alt com o mouse em cima da tela e o foco esquecido num campo numérico/lista/caixa da barra (depois de mudar o
-    // tamanho ou a opacidade): o campo solta o foco e o Alt vira conta-gotas, como no Photoshop
-    const t = ev.target, altTela = ev.key === 'Alt' && !!IE.mouse && ieDigitando(ev) && !t.isContentEditable &&
+    // Alt ou I com o mouse em cima da tela e o foco esquecido num campo numérico/lista/caixa da barra (depois de mudar o
+    // tamanho ou a opacidade): o campo solta o foco e o conta-gotas pode ser ativado, como no Photoshop
+    const t = ev.target, atalhoTela = (ev.key === 'Alt' || (!ev.ctrlKey && !ev.metaKey && !ev.altKey && ev.key.toUpperCase() === 'I')) &&
+        !!IE.mouse && ieDigitando(ev) && !t.isContentEditable &&
         (t.tagName === 'SELECT' || (t.tagName === 'INPUT' && ['number', 'range', 'checkbox', 'radio', 'color', 'button'].includes(t.type)));
-    if (altTela) { t.blur(); ieEl('ie')?.focus({ preventScroll: true }); }
+    if (atalhoTela) { t.blur(); ieEl('ie')?.focus({ preventScroll: true }); }
     else if (ieDigitando(ev)) return;
     if (IE.edTexto) return;
     const doc = IE.doc;
@@ -1644,3 +1646,26 @@ async function ieCmd(c) {
 }
 
 function ieUiTudo() { ieUiCamadas(); ieHistRender(); ieStatusRender(); ieAbasRender(); }
+
+// botão direito no olho da camada (como no Photoshop): mostrar/ocultar e cor do rótulo da camada
+const IE_ROTULOS = [['', 'Nenhuma'], ['#e0524d', 'Vermelho'], ['#e8913a', 'Laranja'], ['#e5c93b', 'Amarelo'], ['#5cb85c', 'Verde'], ['#4a9be0', 'Azul'], ['#9a6bd6', 'Violeta'], ['#8a8a8a', 'Cinza']];
+function ieMenuOlho(ev, doc, id) {
+    const L = ieAchar(doc, id)?.L;
+    if (!L) return;
+    const pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect();
+    pop.innerHTML = `<div class="ie-menu"><button class="ie-menu-item" data-olhomenu="vis"><i class="ie-menu-chk"></i><span>${ieT(L.visivel ? 'Ocultar camada' : 'Mostrar camada')}</span><kbd></kbd></button><i class="ie-menu-sep"></i>${IE_ROTULOS.map(([c, n]) => `<button class="ie-menu-item" data-olhomenu="${c || 'nenhuma'}"><i class="ie-menu-chk">${(L.rotulo || '') === c ? '✓' : ''}</i><span style="display:flex;align-items:center;gap:8px"><b style="width:12px;height:12px;border-radius:2px;display:inline-block;background:${c || 'transparent'};border:1px solid var(--ie-linha)"></b>${ieT(n)}</span><kbd></kbd></button>`).join('')}</div>`;
+    pop.hidden = false;
+    pop.style.left = Math.min(rb.width - 200, ev.clientX - rb.left) + 'px';
+    pop.style.top = Math.min(rb.height - 300, ev.clientY - rb.top) + 'px';
+    const fechar = () => { pop.hidden = true; document.removeEventListener('pointerdown', fora, true); };
+    const fora = e => { if (!pop.contains(e.target)) fechar(); };
+    pop.onclick = e => {
+        const b = e.target.closest('[data-olhomenu]');
+        if (!b) return;
+        e._ieCmdFeito = true; fechar();
+        const v = b.dataset.olhomenu;
+        if (v === 'vis') document.querySelector(`#ie-camadas [data-olho="${id}"], .ie-cam[data-id="${id}"] [data-olho]`)?.click();
+        else { L.rotulo = v === 'nenhuma' ? '' : v; ieMudouDoc(doc); ieUiCamadas(); ieHist(ieT('Cor da camada')); }
+    };
+    setTimeout(() => document.addEventListener('pointerdown', fora, true), 0);
+}
