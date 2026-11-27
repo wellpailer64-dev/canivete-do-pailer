@@ -182,8 +182,11 @@ for q in seqs:
         else:
             print(f"  {'ok':10} voz: {txt_}")
     # legenda larga encosta na borda; brasão não cobre o texto da tarja
-    tam = float(e.get("tam") or 3.5) * 19.2
-    largas = [l for l in legs if largura(l["texto"], tam) > 880]
+    # tam <= 10 é % da altura (vertical 1920); maior já é px. Limite = 81% da largura da sequência (880 de 1080)
+    lado_ = float(q.get("w") or d.get("w") or 1080)
+    tam = float(e.get("tam") or 3.5)
+    tam = tam * float(q.get("h") or d.get("h") or 1920) / 100 if tam <= 10 else tam
+    largas = [l for l in legs if largura(l["texto"], tam) > lado_ * 880 / 1080]
     if largas:
         relato("REPROVADO", "legenda encosta na borda", "; ".join(f"{l['st']:.1f} '{l['texto']}'" for l in largas[:5]))
     for t_ in [c for c in cs if c.get("tx", {}).get("fOn")]:
