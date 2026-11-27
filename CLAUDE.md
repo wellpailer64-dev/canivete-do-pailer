@@ -19,6 +19,7 @@ Ferramenta separada = aba e página próprias (`#page-<id>`), sem abrir outra po
 Comece em `Instructions/agente/fluxo-peca-cliente.md`; fichas em `Instructions/agente/clientes/<cliente>.md`.
 
 ## Trabalhar barato
+- Lições do harness (erro repetido → caminho mais barato, por categoria): `D:\Kanivete\Plugins\kanicode\docs\LICOES.md`; nova: `licoes.py nova CATEGORIA "lição" "caminho" "palavras"`.
 - Antes de escrever script: `Instructions/agente/ferramentas-repetitivas.md` (gatilho → comando). Assistir vídeo, ler e baixar do WhatsApp, ajustar e conferir já têm ferramenta.
 - Editar: `py -3.13 tools/patch.py mudancas.patch` (`@@ arquivo`, `<<<` velho `===` novo `>>>`; um @@ por bloco).
 - Achar: `py -3.13 tools/mapa_codigo.py vetor|imagem|editor --busca termo` antes de grep ou ler arquivo.

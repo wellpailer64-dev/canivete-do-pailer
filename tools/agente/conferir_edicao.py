@@ -24,7 +24,21 @@ ap.add_argument("projeto")
 ap.add_argument("--timeline", default="")
 ap.add_argument("--render", default="")
 ap.add_argument("--sem-ouvir", action="store_true")
+ap.add_argument("--forcar", action="store_true", help="reconferir mesmo sem o projeto ter mudado desde o último REPROVADO")
 a = ap.parse_args()
+
+# Guarda anti-repetição (lição do harness, 2026-11-27): reconferir um projeto que não mudou desde o último REPROVADO só gasta chamada.
+_ULTIMA = "D:/Kanivete/Cache/vigia_falhas/conferir_ultima.json"
+_chave = os.path.abspath(a.projeto).lower() + "|" + a.timeline + "|" + str(a.sem_ouvir)
+try:
+    _mem = json.load(open(_ULTIMA, encoding="utf-8"))
+except Exception:
+    _mem = {}
+_mtime = os.path.getmtime(a.projeto)
+if not a.forcar and _mem.get(_chave, {}).get("mtime") == _mtime and _mem[_chave].get("reprovados"):
+    print(f"PARADO: o projeto não mudou desde a última conferência, que reprovou {_mem[_chave]['reprovados']} regra(s): "
+          f"{', '.join(_mem[_chave]['regras'])}. Corrija e SALVE o projeto, depois confira de novo (ou use --forcar).")
+    sys.exit(1)
 d = json.load(open(a.projeto, encoding="utf-8"))
 M = {m["id"]: m for m in d["media"] if m}
 seqs = [s for s in d["sequences"] if not s.get("comp") and M.get(next((m["id"] for m in d["media"] if m and m.get("sequenceId") == s["id"]), None), {}).get("kind") == "timeline"]
@@ -35,10 +49,38 @@ if a.timeline:
 ruins = 0
 
 
+# regra -> conserto exato (ferramenta/API), impresso uma vez por regra reprovada
+CONSERTOS = (
+    ("legenda começa em minúscula", "tools/agente/legenda_caixa.py (ou reel_fala.py já aplica) e regravar a legenda"),
+    ("legenda", "estilo da legenda: sem caixa, sem maiúsculas, sombra opacidade 100 (metodo-edicao-video.md, seção Legenda)"),
+    ("voz repetida", "tools/agente/fechar_emenda.py projeto TEMPO --aplicar"),
+    ("mídia offline", "tools/agente/trocar_midia.py projeto \"nome antigo\" novo.mp4 --aplicar"),
+    ("início de corte", "tools/agente/checar_cortes.py projeto --timeline NOME (ver a borda) e recuar/avançar o corte; fade cp 0,04 s"),
+    ("fim de corte", "tools/agente/checar_cortes.py projeto --timeline NOME (ver a borda) e recuar/avançar o corte; fade cp 0,04 s"),
+    ("voz desigual", "igualar o ganho dos cortes (reel_fala.py nivela sozinho)"),
+    ("buraco preto", "fechar o espaço (ripple) ou cobrir com B-roll; conferir por (tr,x)"),
+    ("zoom no clipe", "tirar o movimento do clipe e usar camada de ajuste com zoom"),
+    ("trilha dividida", "unir os clipes na mesma trilha sem sobreposição (par v/a pelo lk)"),
+    ("volume", "normalizar para -14 a -16 LUFS (melhorar_audio / ganho da trilha)"),
+    ("pico", "limitar o pico a -1 dB (limiter na trilha mestra)"),
+    ("taxa", "câmera constante fica fora da inteira; só mudar com decisão do método"),
+    ("texto passa da margem", "diminuir o texto ou quebrar a linha"),
+    ("legenda encosta na borda", "quebrar a linha da legenda (safe zone)"),
+    ("brasão cobre tarja", "mover o brasão para o x sugerido"),
+    ("nada conferido", "passar --timeline com o nome certo ou montar a timeline no projeto"),
+)
+_regras = []
+
+
 def relato(grau, regra, texto):
     global ruins
     ruins += grau == "REPROVADO"
     print(f"  {grau:10} {regra}: {texto}")
+    if grau == "REPROVADO" and regra not in _regras:
+        _regras.append(regra)
+        c = next((c for k, c in CONSERTOS if regra.startswith(k)), None) or ("pessoas_repetidas.py: trocar um dos clipes" if "pessoa" in regra else "")
+        if c:
+            print(f"             conserto: {c}")
 
 
 SONS = {}
@@ -191,4 +233,10 @@ if a.render:
 if not seqs:
     relato("REPROVADO", "nada conferido", "nenhuma timeline achada" + (f" com o nome '{a.timeline}'" if a.timeline else ""))
 print("RESULTADO:", f"REPROVADO ({ruins})" if ruins else "sem reprovação; ouça o que veio marcado")
+try:
+    os.makedirs(os.path.dirname(_ULTIMA), exist_ok=True)
+    _mem[_chave] = {"mtime": _mtime, "reprovados": ruins, "regras": _regras}
+    json.dump(_mem, open(_ULTIMA, "w", encoding="utf-8"), ensure_ascii=False)
+except Exception:
+    pass
 sys.exit(1 if ruins else 0)
