@@ -511,6 +511,30 @@ function _abrirAba(tool) {
     renderTabs();
 }
 
+// Documento aberto por API/MCP/CLI (sem switchTool) também ganha a aba do programa, sem roubar a tela.
+// Só reage a documento NOVO: fechar a aba com o documento ainda carregado não a reabre sozinha.
+const _abaDocsVistos = new WeakSet(), _abaPathsVistos = new Set();
+function _abaDocsAbertos() {
+    const out = [];
+    try { if (typeof IE !== 'undefined' && IE.docs) for (const d of IE.docs) out.push(['editor-imagem', d]); } catch (e) {}
+    try { if (typeof VK !== 'undefined' && VK.doc) out.push(['vetor-kanivete', VK.doc]); } catch (e) {}
+    try { if (typeof SD !== 'undefined' && SD.doc) out.push(['slider-kanivete', SD.doc]); } catch (e) {}
+    try { if (typeof VE !== 'undefined' && VE.projectPath) out.push(['video-cutter', 'vd:' + VE.projectPath]); } catch (e) {}
+    return out;
+}
+function appSincronizarAbas() {
+    let mudou = false;
+    for (const [tool, d] of _abaDocsAbertos()) {
+        const visto = typeof d === 'string' ? _abaPathsVistos.has(d) : _abaDocsVistos.has(d);
+        if (visto) continue;
+        if (typeof d === 'string') _abaPathsVistos.add(d); else _abaDocsVistos.add(d);
+        if (!appTabs.includes(tool) && _el(`page-${tool}`)) { appTabs.push(tool); mudou = true; }
+    }
+    if (mudou) renderTabs();
+}
+window.appSincronizarAbas = appSincronizarAbas;
+setInterval(appSincronizarAbas, 1000);
+
 // Confirmação dentro do app. botoes: [{rotulo, valor, tipo: 'primario'|'perigo'|'secundario'}]
 function appConfirm({ titulo, texto, botoes }) {
     return new Promise(resolve => {
