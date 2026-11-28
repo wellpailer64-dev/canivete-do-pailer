@@ -309,6 +309,10 @@ def correcoes(Ms, P, W, H):
 
 
 def _zoom_preciso(Ms, P, W, H, zoom_max):
+    return _zoom_de(correcoes(Ms, P, W, H), W, H, zoom_max)
+
+
+def _zoom_de(Wts, W, H, zoom_max):
     """menor zoom no centro que esconde todas as bordas (conta exata, não a linearizada), no máximo zoom_max.
     Canto da saída com zoom z: c + v/z; volta pela inversa de W_t: A(c + v/z) + b → base + dir·u (u = 1/z) dentro
     de [0, W]×[0, H] ⇒ maior u possível = mínimo das razões."""
@@ -316,7 +320,7 @@ def _zoom_preciso(Ms, P, W, H, zoom_max):
     vs = np.array([[-cx, -cy], [cx, -cy], [cx, cy], [-cx, cy]])
     lim = np.array([W, H], float)
     u = 1.0
-    for Wt in correcoes(Ms, P, W, H):
+    for Wt in Wts:
         inv = np.linalg.inv(Wt)
         A, b = inv[:2, :2], inv[:2, 2]
         base = A @ np.array([cx, cy]) + b
@@ -328,6 +332,66 @@ def _zoom_preciso(Ms, P, W, H, zoom_max):
                 elif d[e] < -1e-9:
                     u = min(u, (base[e] + 0.5) / -d[e])
     return min(1.0 / max(u, 1e-3), zoom_max)
+
+
+# ---------------------------------------------------------------- modo tripé (micro-trepidação de câmera parada)
+LARG_TRIPE = 960
+TRIPE_CRIT = (30, 1e-4)   # medido: 0,08 px e 1,7 s por s de vídeo; (60, 1e-5) é 20× mais lento sem ganho
+TRIPE_VERSAO = 2
+
+
+def _mascara_fundo(path, a, b, taxa, stop=None):
+    """onde nada se mexe: desvio do brilho em ~60 quadros espalhados; 70% mais parado dos 40% de cima (medido no
+    podcast: 0,09 px contra 1,45 px; máscara rala só com textura não corrigia)"""
+    n_tot = max(1, int((b - a) * taxa))
+    passo = max(1, n_tot // 60)
+    amostras = []
+    for i, g in enumerate(_ler_cinza(path, a, b, taxa, LARG_TRIPE)):
+        if stop is not None and stop.is_set():
+            raise InterruptedError("Cancelado.")
+        if i % passo == 0:
+            amostras.append(cv2.GaussianBlur(g, (5, 5), 0).astype(np.float32))
+    if len(amostras) < 3:
+        return None, (amostras[0] if amostras else None)
+    pilha = np.stack(amostras)
+    dp = cv2.dilate(pilha.std(0), np.ones((41, 41), np.uint8))   # margem larga em volta de quem se mexe
+    h = dp.shape[0]
+    alto = int(h * 0.4)   # parede e teto; chão e mesa tremem diferente. Máscara cheia (ECC precisa de área)
+    m = dp <= np.percentile(dp[:alto], 70)
+    m[alto:] = False
+    m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_OPEN, np.ones((9, 9), np.uint8)) > 0
+    return (m * 255).astype(np.uint8), np.median(pilha, 0).astype(np.float32)
+
+
+def tripe(path, a, b, taxa, W, H, on_pct=None, stop=None):
+    """trava cada quadro numa referência pelo FUNDO (ECC euclidiano subpixel com máscara automática); deriva lenta
+    (média de ~4 s) fica. Devolve (Wts frame→saída sem zoom, tremor_antes_px)."""
+    s = min(LARG_TRIPE, W) / W
+    mask, ref = _mascara_fundo(path, a, b, taxa, stop)
+    if ref is None:
+        return [np.eye(3)], 0.0
+    crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, *TRIPE_CRIT)
+    M = np.eye(2, 3, dtype=np.float32)
+    par, n_tot = [], max(1, int((b - a) * taxa))
+    for k, g in enumerate(_ler_cinza(path, a, b, taxa, LARG_TRIPE)):
+        if stop is not None and stop.is_set():
+            raise InterruptedError("Cancelado.")
+        try:
+            _, M = cv2.findTransformECC(ref, cv2.GaussianBlur(g, (3, 3), 0).astype(np.float32), M,
+                                        cv2.MOTION_EUCLIDEAN, crit, mask, 3)
+        except cv2.error:
+            pass
+        par.append([M[0, 2] / s, M[1, 2] / s, math.atan2(M[1, 0], M[0, 0])])
+        if on_pct and k % 25 == 0:
+            on_pct(min(99, int(k * 100 / n_tot)))
+    par = np.array(par)
+    jan = int(max(3, round(taxa * 4)) // 2 * 2 + 1)
+    lent = np.stack([np.convolve(np.pad(par[:, i], jan // 2, mode="edge"), np.ones(jan) / jan, "valid")
+                     for i in range(3)], 1)
+    mat = lambda dx, dy, th: np.array([[math.cos(th), -math.sin(th), dx], [math.sin(th), math.cos(th), dy], [0, 0, 1.0]])
+    Wts = [mat(*l) @ np.linalg.inv(mat(*p)) for p, l in zip(par, lent)]
+    d = np.diff(par[:, :2], axis=0)
+    return Wts, float(np.sqrt((d ** 2).sum(1).mean())) if len(d) else 0.0
 
 
 # ---------------------------------------------------------------- 3. renderização
@@ -483,6 +547,8 @@ def estabilizar(path, a, b, cfg=None, on_pct=None, stop=None):
     if b - a < 0.2:
         return {"success": False, "error": "Trecho curto demais para estabilizar."}
     work = _pasta_midia(path)
+    if cfg["modo"] == "tripe":
+        cfg["v_tripe"] = TRIPE_VERSAO   # mudou o algoritmo: não reaproveita cópia antiga
     ch = chave(path, a, b, cfg)
     out = os.path.join(work, f"estab_{a:.3f}_{b:.3f}_{ch}.mp4")
     if os.path.isfile(out):
@@ -492,6 +558,24 @@ def estabilizar(path, a, b, cfg=None, on_pct=None, stop=None):
             zoom = None
         return {"success": True, "path": out, "zoom": zoom}
     pct = on_pct or (lambda p: None)
+    if cfg["modo"] == "tripe":
+        t0 = time.time()
+        W, H = max(2, info["width"] or 1920), max(2, info["height"] or 1080)
+        taxa = float(info.get("fps_timeline") or 30.0)
+        Wts, tremor = tripe(path, a, b, taxa, W, H, lambda p: pct(int(p * 0.45)), stop)
+        zoom = _zoom_de(Wts, W, H, cfg["zoom_max"])
+        Z = np.array([[zoom, 0, W / 2 * (1 - zoom)], [0, zoom, H / 2 * (1 - zoom)], [0, 0, 1]])
+        an = {"W": W, "H": H, "taxa": taxa, "a": a, "b": b}
+        t1 = time.time()
+        q = renderizar(path, an, [Z @ w for w in Wts], out, on_pct=lambda p: pct(45 + int(p * 0.55)), stop=stop)
+        pct(100)
+        try:
+            with open(out + ".json", "w", encoding="utf-8") as f:
+                json.dump({"zoom": round(float(zoom), 4), "quadros": q, "tremor_px": round(tremor, 3)}, f)
+        except OSError:
+            pass
+        return {"success": True, "path": out, "zoom": round(float(zoom), 4), "quadros": q, "tremor_px": round(tremor, 3),
+                "t_analise": round(t1 - t0, 1), "t_render": round(time.time() - t1, 1)}
     arq_an = os.path.join(work, f"estab_{a:.3f}_{b:.3f}_{chave(path, a, b, {})}.json")
     t0 = time.time()
     an = None

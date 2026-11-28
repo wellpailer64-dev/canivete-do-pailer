@@ -18,7 +18,8 @@ VE_FX.estab = {
     nota: 'Estabilizador: preparando…',
     notaDe: f => VEST.status.get(f.id) || veT('Estabilizador: preparando…'),   // status vivo (veStStatus)
     params: [
-        { k: 'res', nome: 'Resultado', tipo: 'lista', opcoes: ['Movimento suave', 'Sem movimento (tripé)'], def: 0 },
+        { k: 'res', nome: 'Resultado', tipo: 'lista', opcoes: ['Movimento suave', 'Sem movimento', 'Tripé (micro-trepidação)'], def: 0,
+          dica: 'Tripé: câmera parada que treme (piso, gente passando). Trava pelo fundo, com zoom mínimo' },
         { k: 'suav', nome: 'Suavidade', min: 0, max: 100, step: 1, def: 50, un: '%',
           dica: 'Quanto do movimento lento fica: pouco = segue a câmera de perto; muito = câmera flutuando' },
         { k: 'metodo', nome: 'Método', tipo: 'lista', opcoes: ['Posição', 'Posição, escala e giro'], def: 1 },
@@ -36,7 +37,7 @@ const veStOff = m => (m && m.stDe != null ? m.stA : 0);   // instante da origina
 
 function veStCfg(f) {
     const v = (f && f.v) || {}, n = (k, d) => (v[k] == null || isNaN(+v[k]) ? d : +v[k]);
-    return { suavidade: n('suav', 50), zoom_max: +(1 + n('corte', 10) / 100).toFixed(3), modo: n('res', 0) === 1 ? 'parado' : 'suave',
+    return { suavidade: n('suav', 50), zoom_max: +(1 + n('corte', 10) / 100).toFixed(3), modo: ['suave', 'parado', 'tripe'][n('res', 0)] || 'suave',
              rotacao: n('metodo', 1) === 1, escala: n('metodo', 1) === 1 };
 }
 
